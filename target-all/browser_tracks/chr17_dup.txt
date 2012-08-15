@@ -7,14 +7,14 @@ https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PASLZM-03A-01D.csv
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PARIAD-03A-01D.csv
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PAPSPN-03A-01D.csv
-https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PARGHW-03A-01D.csv
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PAPSPG-03A-01D.csv
-https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PARJZZ-03A-01D.csv
+https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PARGHW-03A-01D.csv
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PAPZNK-03A-01D.csv
+https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PARJZZ-03A-01D.csv
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PASFXA-03A-01D.csv
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PARPNM-03A-01D.csv
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PARPRW-03A-01D.csv
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PANTSM-03A-01D.csv
-https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PAPLDL-03A-01D.csv
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PAPAGK-03A-01D.csv
+https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PAPLDL-03A-01D.csv
 https://raw.github.com/sidreddy96/lohcate/master/target-all/browser_tracks/chr17_dup/TARGET-10-PASKAY-03A-01D.csv
