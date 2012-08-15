@@ -1,0 +1,5 @@
+browser position chr18:34850846-44555312
+browser hide all
+track name="het_density" description=" " visibility=dense useScore=1
+chr18 34850846 34850846 row1 900.0 + 34850846 34850846
+chr18 44555312 44555312 row1 900.0 + 44555312 44555312

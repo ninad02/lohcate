@@ -1,0 +1,5 @@
+browser position chr15:50784955-79067099
+browser hide all
+track name="het_density" description=" " visibility=dense useScore=1
+chr15 50784955 50784955 row1 900.0 + 50784955 50784955
+chr15 79067099 79067099 row1 900.0 + 79067099 79067099

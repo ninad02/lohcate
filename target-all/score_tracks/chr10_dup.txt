@@ -1,0 +1,3 @@
+https://raw.github.com/sidreddy96/lohcate/master/target-all/score_tracks/chr10_dup/recurrence.csv
+https://raw.github.com/sidreddy96/lohcate/master/target-all/score_tracks/chr10_dup/het_density.csv
+https://raw.github.com/sidreddy96/lohcate/master/target-all/score_tracks/chr10_dup/event_density.csv

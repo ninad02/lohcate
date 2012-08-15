@@ -1,0 +1,6 @@
+browser position chr20:1592312-44680412
+browser hide all
+track name="recurrence" description=" " visibility=dense useScore=1
+chr20 44680412 44680412 row1 200.0 + 44680412 44680412
+chr20 25755558 25755574 row1 200.0 + 25755558 25755574
+chr20 1592312 1592312 row2 200.0 + 1592312 1592312

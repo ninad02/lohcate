@@ -1,3 +1,0 @@
-https://raw.github.com/sidreddy96/lohcate/master/ptest/score_tracks/chr16_dup/recurrence.csv
-https://raw.github.com/sidreddy96/lohcate/master/ptest/score_tracks/chr16_dup/het_density.csv
-https://raw.github.com/sidreddy96/lohcate/master/ptest/score_tracks/chr16_dup/event_density.csv
