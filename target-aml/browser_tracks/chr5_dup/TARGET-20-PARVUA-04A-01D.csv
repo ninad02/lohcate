@@ -1,0 +1,7 @@
+browser position chr5:182291-180687212
+browser hide all
+track name="TARGET-20-PARVUA-04A-01D.csv" description=" " visibility=dense itemRgb="on"
+chr5 5461553 5461553 row1 0 + 5461553 5461553 205,201,201
+chr5 254599 254600 row1 0 + 254599 254600 255,0,0
+chr5 5461553 5461554 row2 0 + 5461553 5461554 0,100,0
+chr5 5461553 5461553 row1 0 + 5461553 5461553 205,201,201
