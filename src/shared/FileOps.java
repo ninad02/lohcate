@@ -71,6 +71,7 @@ public class FileOps {
 		File file = new File(fileName);
         StringBuffer contents = new StringBuffer();
         BufferedReader reader = null;
+        
 
         try {
             reader = new BufferedReader(new FileReader(file));

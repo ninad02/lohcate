@@ -1,4 +1,7 @@
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.ListIterator;
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
  * D Wheeler & SG Reddy
@@ -10,7 +13,7 @@ import java.util.ArrayList;
  * @author Siddharth G. Reddy
  *
  */
-public class DBSCAN {
+public class DBSCAN2 {
 	
 	protected ArrayList<Floint> mPoints; //data points
 	protected float mEps; //neighborhood parameter
@@ -18,7 +21,7 @@ public class DBSCAN {
 	
 	protected int mClusterIndex = 0;
 	
-	public DBSCAN(ArrayList<Floint> points, float eps, int minPts) {
+	public DBSCAN2(ArrayList<Floint> points, float eps, int minPts) {
 		this.mPoints = points;
 		this.mEps = eps;
 		this.mMinPts = minPts;
@@ -29,13 +32,13 @@ public class DBSCAN {
 	 */
 	public void cluster() {
 		mClusterIndex = 0; // start at default
-		ArrayList<Floint> neighbors;
+		ArrayList<Floint> neighbors = new ArrayList<Floint>(30000);
 		
 		for (Floint thePoint : mPoints) {				
 			if (!thePoint.getVisited()) { 
 				//System.out.println(i + " of " + points.length);
 				thePoint.setVisited();
-				neighbors = getNeighbors(thePoint); //grab neighbors for points[i]
+				neighbors = getNeighbors(thePoint, neighbors, true); //grab neighbors for points[i]
 				//System.out.println(neighbors.size());
 				if (neighbors.size() >= mMinPts) { //if neighborhood is dense enough
 					//System.out.println("expanding cluster...");
@@ -46,46 +49,68 @@ public class DBSCAN {
 		}
 	}
 	
-	private void expandCluster(Floint point, ArrayList<Floint> neighbors, int c) {
+	protected void expandCluster(Floint point, ArrayList<Floint> neighbors, int c) {
 		point.mClusterAssigned = c;   // assign our 'core' point to cluster c
 		
-		ArrayList<Floint> neighborsOfNeighbors;		
-		//int count = 0;
+		ArrayList<Floint> neighborsOfNeighbor = new ArrayList<Floint>(30000);		
 		
 		// We perform a loop on the neighbors list, which can grow 
-		// in size during the body of the loop. 
-		for (int i = 0; i < neighbors.size(); i++) { //iterate through neighbors (later becomes neighbors' neighbors', neighbors' neighbors' neighbors', &c.) of core point
+		// in size during the body of the loop.  Thus, neighbors list becomes
+		// neighbors' neighbors, neighbors' neighbors' neighbors
+		//for (ListIterator<Floint> iter = neighbors.listIterator(); iter.hasNext(); ) {
+			//Floint theNeighbor = iter.next();
+		for (int i = 0; i < neighbors.size(); i++) {
 			Floint theNeighbor = neighbors.get(i);
-			
+
 			if (!theNeighbor.getVisited()) {
 				//count++;
 				//System.out.println(count);
-				theNeighbor.setVisited();								
+				theNeighbor.setVisited();
 				
-				neighborsOfNeighbors = getNeighbors(theNeighbor); //grab neighbor's neighbors			
-				if (neighborsOfNeighbors.size() >= mMinPts) { //if neighbor's neighborhood is dense enough
+				neighborsOfNeighbor = getNeighbors(theNeighbor, neighborsOfNeighbor, true); //grab neighbor's neighbors
+				if (neighborsOfNeighbor.size() >= mMinPts) { //if neighbor's neighborhood is dense enough
 					//then let's iterate through them as well (they might be 'eligible' for inclusion in cluster c)
-					neighbors.addAll(neighborsOfNeighbors);
+					//addAllToNextPosition(iter, neighborsOfNeighbor);
+					addAll(neighbors, neighborsOfNeighbor);
 				}
 			}
 
-			// Assign neighbor to current cluster if it hasn't already been assigned to a cluster
 			if (theNeighbor.mClusterAssigned == 0) {
 				theNeighbor.mClusterAssigned = c;
 			}
 		}
 	}
 	
-	
-	private ArrayList<Floint> getNeighbors(Floint point) {
-		ArrayList<Floint> pre_rtn = new ArrayList<Floint>();
-		
-		for (Floint elem : mPoints)
-			if (Math.sqrt(Math.pow(elem.mX - point.mX, 2) + Math.pow(elem.mY - point.mY, 2)) < mEps) //if point is within parameter-defined neighborhood
-				pre_rtn.add(elem);
-		return pre_rtn;
+	// We create this function because it is ironically more efficient than the ArrayList.addAll() method,
+	// which stupidly allocates memory to create an extra and needless temporary array in its implementaion.
+	public static void addAll(Collection<Floint> listToWhichToAdd, Collection<Floint> elementsToAdd) {
+		for (Floint element : elementsToAdd) {
+			listToWhichToAdd.add(element);
+		}
 	}
 	
+	// We must add elements to a list this way if the iterator for that list has already been invoked.
+	// If we do not add elements to the list via the iterator, the iterator will throw an exception.
+	public static void addAllToNextPosition(ListIterator<Floint> iter, Collection<Floint> elementsToAdd) {
+		for (Floint element : elementsToAdd) {
+			iter.add(element);
+		}
+	}
+	
+	protected ArrayList<Floint> getNeighbors(Floint point, ArrayList<Floint> neighbors, boolean clearList) {
+		neighbors = (neighbors == null) ? new ArrayList<Floint>(10000) : neighbors; 
+		if (clearList) { 
+			neighbors.clear(); 
+		}
+		
+		for (Floint elem : mPoints) {
+			if (point.getCartesianDistance(elem) < mEps) { //if point is within parameter-defined neighborhood
+				neighbors.add(elem);
+			}				
+		}
+		return neighbors;
+	}
+		
 	public int[] getClustAssignments() {
 		int[] thePoints = new int[mPoints.size()];
 		for (int i = 0; i < thePoints.length; i++) {

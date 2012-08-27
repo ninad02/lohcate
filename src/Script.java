@@ -1,5 +1,8 @@
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Date;
+
+import lohcateEnums.ClusterType;
 
 import shared.FileOps;
 import shared.Utils;
@@ -44,19 +47,25 @@ public class Script {
 	 */
 	public static void curateSNPCalls(String inDir, String outDir, int opt) {
 		File[] files = (new File(inDir)).listFiles();
-		String[] load, split;
+		String[] load;
+		
 		String som_load, germ_load, germ_som, toWrite, mut_type, gene, temp;
-		int cluster, len_gload, som_start;
-		int[] cluster_get;
+		int len_gload, som_start;
+		ClusterType[] cluster_get;
 		for (File file : files) {
-			if (file.getName().indexOf("germline")!=-1) {// && wList(file.getName())) {
+			if (file.getName().indexOf("germline") != -1) {// &&
+															// wList(file.getName()))
+															// {
 				System.out.println(file.getName().replace(".germline.txt", ""));
-				som_load = FileOps.loadFromFile(file.getAbsolutePath().replace("germline", "somatic"));
-				germ_load = FileOps.loadFromFile(file.getAbsolutePath()); len_gload = germ_load.split("\n").length;
+				som_load = FileOps.loadFromFile(file.getAbsolutePath().replace(
+						"germline", "somatic"));
+				germ_load = FileOps.loadFromFile(file.getAbsolutePath());
+				len_gload = germ_load.split("\n").length;
 				try {
-					load = (germ_load + som_load.replace(som_load.split("\n")[0] + "\n", "")).split("\n");
+					load = (germ_load + som_load.replace(
+							som_load.split("\n")[0] + "\n", "")).split("\n");
 					som_start = germ_load.split("\n").length;
-				} catch (Exception e) { 
+				} catch (Exception e) {
 					try {
 						load = germ_load.split("\n");
 						som_start = load.length + 1;
@@ -68,10 +77,11 @@ public class Script {
 				som_load = ""; germ_load = "";
 				FileOps.writeToFile(outDir + "/" + file.getName().replace(".germline.txt", ".csv"), "chr,pos,n_vaf,t_vaf,allele_freq,gene,mutation_type,germ_som,cluster\n");
 				cluster_get = getClusters(load, som_start, opt); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
+
 				for (int i = 1; i<load.length; i++) {
 					if (load[i].indexOf("refName")==-1 && load[i].indexOf("coord")==-1) { //upstream pipelines will randomly spit header lines into the middle of a naf-taf-input file. we're just avoiding those
 						try {
-							cluster = cluster_get[i-1];//assignCluster(Float.parseFloat(load[i].split("\t")[7]), Float.parseFloat(load[i].split("\t")[8]));
+							ClusterType cluster = cluster_get[i-1];//assignCluster(Float.parseFloat(load[i].split("\t")[7]), Float.parseFloat(load[i].split("\t")[8]));
 							
 							if (opt==1) //SOLiD
 								toWrite = "chr" + load[i].split("\t")[0].replace("chr", "") + "," + load[i].split("\t")[1] + "," + (Float.parseFloat(load[i].split("\t")[6]) / Float.parseFloat(load[i].split("\t")[5])) + "," + (Float.parseFloat(load[i].split("\t")[4]) / Float.parseFloat(load[i].split("\t")[3])) + ","; //chr,pos,n_vaf,t_vaf
@@ -111,13 +121,13 @@ public class Script {
 								try {
 									gene = load[i].split("\t")[8];
 								} catch (Exception e) { gene = "N/A"; }
-								FileOps.appendToFile(outDir + "/" + file.getName().replace(".germline.txt", ".csv"), toWrite + gene + "," + mut_type + "," + germ_som + "," + Integer.toString(cluster) + "\n"); //gene, mutation_type, cluster
-								if (cluster==2) //include roc-loh points in general loh pool
+								FileOps.appendToFile(outDir + "/" + file.getName().replace(".germline.txt", ".csv"), toWrite + gene + "," + mut_type + "," + germ_som + "," + cluster + "\n"); //gene, mutation_type, cluster
+								if (cluster == ClusterType.rocLOH) //include roc-loh points in general loh pool
 									FileOps.appendToFile(outDir + "/" + file.getName().replace(".germline.txt", ".csv"), toWrite + gene + "," + mut_type + "," + germ_som + ",1\n"); //gene, mutation_type, cluster
 							}
 							else { //Illumina
-								FileOps.appendToFile(outDir + "/" + file.getName().replace(".germline.txt", ".csv"), toWrite + load[i].split("\t")[11] + "," + load[i].split("\t")[10].split("_SNV")[0] + "," + germ_som + "," + Integer.toString(cluster) + "\n"); //gene, mutation_type, cluster
-								if (cluster==2) //include roc-loh points in general loh pool
+								FileOps.appendToFile(outDir + "/" + file.getName().replace(".germline.txt", ".csv"), toWrite + load[i].split("\t")[11] + "," + load[i].split("\t")[10].split("_SNV")[0] + "," + germ_som + "," + cluster + "\n"); //gene, mutation_type, cluster
+								if (cluster == ClusterType.rocLOH) //include roc-loh points in general loh pool
 									FileOps.appendToFile(outDir + "/" + file.getName().replace(".germline.txt", ".csv"), toWrite + load[i].split("\t")[11] + "," + load[i].split("\t")[10].split("_SNV")[0] + "," + germ_som + ",1\n"); //gene, mutation_type, cluster
 							}
 						} catch (Exception e) { }//e.printStackTrace(); }
@@ -148,8 +158,9 @@ public class Script {
 	 * @param load line-split FileOps.loadFromFile of naf-taf-input
 	 * @param som_start start index of .somatic.txt naf-taf-input data in 'load' parameter
 	 */
-	public static int[] getClusters(String[] load, int som_start, int opt) {
-		int[] rtn = new int[load.length - 1];
+	public static ClusterType[] getClusters(String[] load, int som_start, int opt) {
+		//int[] rtn = new int[load.length - 1];
+		ClusterType[] returnClusters = new ClusterType[load.length - 1];
 		
 		//NAF {het, loh, dup} FRAME definition via peak detection and parameter-tuned standard deviation expansion
 		float NAF_frame_lbound = 0.2f, NAF_frame_ubound = 0.8f; //we have to avoid the often hugely dense peak of homozygous mutations (AF > 0.8) and the occasionally hugely dense peak of neg. tail noise / somatics / &c. (AF < 0.2)
@@ -158,29 +169,27 @@ public class Script {
 		float count_mean = 0f;
 		int[] bin_count = new int[(int) ((NAF_frame_ubound - NAF_frame_lbound) / bin_size)];
 		int count = 0;
+		
 		for (float i = NAF_frame_lbound + bin_size; i<= NAF_frame_ubound; i+= bin_size) { //iterate through bins (<=> horizontal strips of thickness 'bin_size' on VAF plot)
 			bin_count[count] = 0;
-			for (int row = 1; row<load.length; row++) { //iterate through points
-				try {
-					if (opt==1) {//SOLiD
-						if (i - bin_size < (Float.parseFloat(load[row].split("\t")[6]) / Float.parseFloat(load[row].split("\t")[5])) && (Float.parseFloat(load[row].split("\t")[6]) / Float.parseFloat(load[row].split("\t")[5])) <= i)
-							bin_count[count]++;
-					}
-					else { //Illumina
-						if (i - bin_size < Float.parseFloat(load[row].split("\t")[7]) && Float.parseFloat(load[row].split("\t")[7]) <= i) //counting points that fall in current bin
-							bin_count[count]++;
-					}
-				} catch (Exception e) { }
+			
+			for (int row = 1; row < load.length; row++) { //iterate through points
+				String[] components = load[row].split("\t");
+				float vafNormal = extractVAFNormal(components, opt);
+				if ((i - bin_size < vafNormal) && (vafNormal <= i)) { //counting points that fall in current bin
+					bin_count[count]++;
+				}				
 			}
 			count_mean += i * bin_count[count];
 			count++;
 		}
+		
 		int tot_count = 0;
-		for (int elem : bin_count)
-			tot_count += elem;
-		count_mean /= (float)tot_count;
-		for (int i = 0; i<bin_count.length; i++) //calculate std. deviation of # points in each bin
+		for (int elem : bin_count) { tot_count += elem; }
+		count_mean /= (float) tot_count;
+		for (int i = 0; i<bin_count.length; i++) { //calculate std. deviation of # points in each bin
 			std_dev += Math.pow(count_mean - ((i+1) * bin_size + NAF_frame_lbound) * bin_count[i], 2);
+		}
 		std_dev = (float)Math.sqrt(std_dev) / (float)tot_count;
 		NAF_frame_lbound = count_mean - (NAF_STRIP_EXPANDER * std_dev);
 		NAF_frame_ubound = count_mean + (NAF_STRIP_EXPANDER * std_dev);
@@ -189,22 +198,14 @@ public class Script {
 		
 		//apply DBScan to points within NAF frame
 		ArrayList<Floint> points = new ArrayList<Floint>();
-		for (int i = 1; i<load.length; i++) {
-			try {
-				if (opt==1) { //SOLiD
-					if ((Float.parseFloat(load[i].split("\t")[6]) / Float.parseFloat(load[i].split("\t")[5])) > NAF_frame_lbound && (Float.parseFloat(load[i].split("\t")[6]) / Float.parseFloat(load[i].split("\t")[5])) <= NAF_frame_ubound)
-						points.add(new Floint((Float.parseFloat(load[i].split("\t")[4]) / Float.parseFloat(load[i].split("\t")[3])), (Float.parseFloat(load[i].split("\t")[6]) / Float.parseFloat(load[i].split("\t")[5])), i-1));
-				}
-				else { //Illumina
-					if (Float.parseFloat(load[i].split("\t")[7]) > NAF_frame_lbound && Float.parseFloat(load[i].split("\t")[7]) <= NAF_frame_ubound)
-						points.add(new Floint(Float.parseFloat(load[i].split("\t")[8]), Float.parseFloat(load[i].split("\t")[7]), i-1));
-				}
-			} catch (Exception e) { }
+		for (int i = 1; i < load.length; i++) {  // We start at 1 to ignore the first row header
+			String[] components = load[i].split("\t");
+			float vafNormal = extractVAFNormal(components, opt);
+			if ((vafNormal > NAF_frame_lbound) && (vafNormal <= NAF_frame_ubound)) {			
+				points.add(  new Floint(extractVAFTumor(components, opt), vafNormal)  );			
+			}
 		}
-		Floint[] param = new Floint[points.size()];
-		for (int i = 0; i<param.length; i++)
-			param[i] = points.get(i);
-		
+	
 		//Vv.vV well/poorly tuned parameters for different data sets
 		//data set --> (NAF_STRIP_EXPANDER, (HET_BALL_EPS, HET_BALL_MINPTS), (DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS))
 		//target-aml --> (1, (0.035, 100), (0.015, 100))
@@ -213,45 +214,62 @@ public class Script {
 		//hepato --> (1.25, (0.035, 100), (0.015, 100))
 		//renal-we --> (1, (0.05, 500), (0.02, 350))
 		
-		DBSCAN obj = new DBSCAN(param, HET_BALL_EPS, HET_BALL_MINPTS); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+		System.out.println("Getting clusters: " + (new Date()).toString());
+		DBScanFast obj = new DBScanFast(points, HET_BALL_EPS, HET_BALL_MINPTS); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
 		obj.cluster();
 		int het_ball = obj.getLargestCluster();
 		int[] dbscan = obj.getClustAssignments();
-		obj = new DBSCAN(param, HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS); //loosened parameter for capturing DUP lasso (around HET ball)//KDBSCAN(param, 10, 0.027f);
+		
+		obj = new DBScanFast(points, HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS); //loosened parameter for capturing DUP lasso (around HET ball)//KDBSCAN(param, 10, 0.027f);
 		obj.cluster();
 		int[] dup_inc = obj.getClustAssignments();
+		System.out.println("Finished clusters: " + (new Date()).toString());
+		
 		for (int i = 0; i<dbscan.length; i++)
 			if (dbscan[i]!=dup_inc[i])
 				dbscan[i] = -1;
 
 		count = 0;
-		for (int i = 1; i<load.length; i++) {
-			try {
-				if (i > som_start) //if we are now iterating through points coming from the *.somatic.txt input file
-					rtn[i-1] = -1; //somatic
-				else if ((opt==1 && (NAF_frame_lbound < (Float.parseFloat(load[i].split("\t")[6]) / Float.parseFloat(load[i].split("\t")[5])) && (Float.parseFloat(load[i].split("\t")[6]) / Float.parseFloat(load[i].split("\t")[5])) <= NAF_frame_ubound)) //SOLiD
-						|| (opt!=1 && (NAF_frame_lbound < Float.parseFloat(load[i].split("\t")[7]) && Float.parseFloat(load[i].split("\t")[7]) <= NAF_frame_ubound))) { //Illumina
-					if (dbscan[count]==het_ball)
-						rtn[i-1] = cluster_names.length - 1; //HET
-					else if (dbscan[count]==-1)
-						rtn[i-1] = 0; //DUP
-					else //anything not in the HET ball / DUP wedge is considered part of a LOH sidelobe
-						rtn[i-1] = 1; //LOH
-					if (opt==1) { //SOLiD
-						if (rtn[i-1]==1 && (Float.parseFloat(load[i].split("\t")[4]) / Float.parseFloat(load[i].split("\t")[3])) > 0.5)
-							rtn[i-1] = 2; //right-of-center LOH
+		for (int i = 1; i < load.length; i++) {
+				if (i > som_start) { //if we are now iterating through points coming from the *.somatic.txt input file
+					returnClusters[i - 1] = ClusterType.Null; //somatic
+					
+				} else {
+					String[] components = load[i].split("\t");
+					float vafNormal = extractVAFNormal(components, opt);
+
+					if ((NAF_frame_lbound < vafNormal) && (vafNormal <= NAF_frame_ubound)) {
+
+						if (dbscan[count] == het_ball) {
+							returnClusters[i - 1] = ClusterType.HET; //HET
+						} else if (dbscan[count] == -1) {
+							returnClusters[i - 1] = ClusterType.Dup; //DUP
+						} else { //anything not in the HET ball / DUP wedge is considered part of a LOH sidelobe
+							returnClusters[i - 1] = ClusterType.LOH; //LOH
+						}
+
+						float vafTumor = extractVAFTumor(components, opt);
+				
+						if ((returnClusters[i - 1] == ClusterType.LOH) && (vafTumor > 0.5)) {
+							 returnClusters[i - 1] = ClusterType.rocLOH;
+						}
+						count++;
+						
+					} else {
+						returnClusters[i - 1] = ClusterType.Null;   //outside NAF frame (<=> 'other')
 					}
-					else { //Illumina
-						if (rtn[i-1]==1 && Float.parseFloat(load[i].split("\t")[8]) > 0.5)
-							rtn[i-1] = 2; //right-of-center LOH
-					}
-					count++;
 				}
-				else
-					rtn[i-1] = cluster_names.length; //outside NAF frame (<=> 'other')
-			} catch (Exception e) { }
 		}
-		return rtn;
+		return returnClusters;
+	}
+	
+	// Extracts and calculates the variant allele frequency depending on the platform 
+	private static float extractVAFNormal(String[] components, int platformOption) {
+		return (platformOption == 1) ? (Float.parseFloat(components[6]) / Float.parseFloat(components[5])) : Float.parseFloat(components[7]);
+	}
+	
+	private static float extractVAFTumor(String[] components, int platformOption) {
+		return (platformOption == 1) ? (Float.parseFloat(components[4]) / Float.parseFloat(components[3])) : Float.parseFloat(components[8]);		
 	}
 	
 	/**
