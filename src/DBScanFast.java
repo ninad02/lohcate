@@ -12,8 +12,8 @@ public class DBScanFast extends DBSCAN2 {
 	
 	public DBScanFast(ArrayList<Floint> points, float eps, int minPts) {
 		super(points, eps, minPts);
-		mPointsSortedX = new ArrayList<DBScanPoint>();
-		mPointsSortedY = new ArrayList<DBScanPoint>();
+		mPointsSortedX = new ArrayList<DBScanPoint>(points.size());
+		mPointsSortedY = new ArrayList<DBScanPoint>(points.size());
 		duplicateAndSortPoints();
 	}
 	
@@ -102,9 +102,9 @@ public class DBScanFast extends DBSCAN2 {
 		getNeighborsHelperHelper(point, neighbors, sortedPoints, theComparator, distanceMethodOneAxis, false, doX);				
 	}
 
-	private void getNeighborsHelperHelper(DBScanPoint point, ArrayList<DBScanPoint> neighbors, ArrayList<DBScanPoint> sortedPoints, Comparator<DBScanPoint> theComparator, DBScanPoint.DBScanPointDistance distanceMethodOneAxis, boolean goForward, boolean doX) {
-		double theoreticalMaxDistance = point.mFloint.getTheoreticalFurthestDifferenceXOrYWithinDistance(mEps);
-		int increment = goForward ? 1 : -1;
+	private void getNeighborsHelperHelper(DBScanPoint point, ArrayList<DBScanPoint> neighbors, ArrayList<DBScanPoint> sortedPoints, Comparator<DBScanPoint> theComparator, DBScanPoint.DBScanPointDistance distanceMethodOneAxis, boolean moveRight, boolean doX) {
+		double theoreticalMaxDistance = point.mFloint.getTheoreticalFurthestDifferenceXOrYWithinDistance(mEpsilon);
+		int increment = moveRight ? 1 : -1;
 		DBScanPoint candidateNeighbor = null;
 		int centralIndex = doX ? point.mIndexSortedX : point.mIndexSortedY;
 				
@@ -114,7 +114,7 @@ public class DBScanFast extends DBSCAN2 {
 				&& (Math.abs(distanceMethodOneAxis.distance(point, candidateNeighbor)) <= theoreticalMaxDistance); 
 				i += increment) {
 			
-			if (point.getCartesianDistance(candidateNeighbor) < mEps) {
+			if (point.getCartesianDistanceSquared(candidateNeighbor) < mEpsilonSquared) {
 				if (doX) {
 					neighbors.add(candidateNeighbor);
 					candidateNeighbor.mAdded = true;

@@ -19,12 +19,15 @@ public class Floint implements Comparable<Floint> {
 		mY = y; 				
 	}
 	
+	public double getCartesianDistanceSquared(Floint rhs) {
+		return (this.mX - rhs.mX) * 
+			   (this.mX - rhs.mX) + 
+			   (this.mY - rhs.mY) * 
+			   (this.mY - rhs.mY);
+	}
+	
 	public double getCartesianDistance(Floint rhs) {
-		return Math.sqrt( 
-				(this.mX - rhs.mX) * 
-				(this.mX - rhs.mX) + 
-				(this.mY - rhs.mY) * 
-				(this.mY - rhs.mY));
+		return Math.sqrt(getCartesianDistanceSquared(rhs));
 	}
 	
 	// Cartesian distance is given by:

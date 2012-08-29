@@ -4,6 +4,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
 
+import com.sun.xml.internal.ws.wsdl.parser.MexEntityResolver;
+
+import sun.security.jgss.spi.MechanismFactory;
+
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
  * D Wheeler & SG Reddy
@@ -15,10 +19,17 @@ import java.util.Random;
 public class Utils {
 	
 	public static final String CommaStr = ",";
+	public static final String TabStr        = "\t";
+	public static final String TabPatternStr = "\\t";
 	public static final String rsPrefix = "rs";
 	public static final String rsNegative = "rs-1";
 	public static final String SemicolonStr = ";";
 	public static final String NAStr  = "N/A";
+	
+	public static final int NumAutosomes = 22;
+	
+	public static final FileExtensionAndDelimiter FileExtensionCSV = new FileExtensionAndDelimiter(".csv", CommaStr);
+	public static final FileExtensionAndDelimiter FileExtensionTSV = new FileExtensionAndDelimiter(".tsv", TabStr);
 
 	
 	public static double log(float param) {
@@ -254,7 +265,17 @@ public class Utils {
 		Test_extractRsNumberFromLine();
 	}
 
-	
+	// ========================================================================
+	// INNER CLASS
+	// ========================================================================
+	public static class FileExtensionAndDelimiter {
+		public String mExtension;
+		public String mDelimiter;
 		
+		public FileExtensionAndDelimiter(String extension, String delimiter) {
+			mExtension = extension;
+			mDelimiter = delimiter;
+		}
+	}
 }
 

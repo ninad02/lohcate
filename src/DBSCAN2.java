@@ -17,17 +17,19 @@ import java.util.ListIterator;
  */
 public class DBSCAN2 {
 	
+	public static final int ClusterIDOfNoise = 0;
+	
 	protected ArrayList<DBScanPoint> mPoints; //data points
-	protected float mEps; //neighborhood parameter
-	protected int mMinPts; //neighborhood density parameter
+	protected float mEpsilon; //neighborhood parameter
+	protected float mEpsilonSquared; // used for optimization
+	protected int mMinPts; //neighborhood density parameter	
+	protected int mClusterIndex;
 	
-	protected int mClusterIndex = 0;
+	public int getClusterIDOfNoise() { return ClusterIDOfNoise; }
 	
-	public DBSCAN2(ArrayList<Floint> points, float eps, int minPts) {
+	public DBSCAN2(ArrayList<Floint> points, float epsilon, int minPoints) {
 		this.mPoints = addPoints( points, new ArrayList<DBScanPoint>(points.size()) );
-		
-		this.mEps = eps;
-		this.mMinPts = minPts;
+		changeParams(epsilon, minPoints);
 	}
 	
 	/** Creates DBScanPoint object wrappers for the points. */
@@ -39,11 +41,34 @@ public class DBSCAN2 {
 		return targetList;
 	}
 	
+	/** Changes the parameter values
+	 *  @param newEpsilon   The new distance desired.  Enter a negative number for no change
+	 *  @param newMinPoints The new number of points required for density.  Enter a negative number for no change.
+	 */
+	public void changeParams(float newEpsilon, int newMinPoints) {
+		if (newEpsilon >= 0) {
+			mEpsilon = newEpsilon;
+			mEpsilonSquared = mEpsilon * mEpsilon; // don't use Math.pow(), as it's slow
+		}
+		
+		if (newMinPoints >= 0) {
+			mMinPts = newMinPoints;
+		}
+		
+		// Now we need to reset the clustering meta-information per point
+		// since the paramters changed.  cluster() will need to be run again
+		for (DBScanPoint point : mPoints) {
+			point.resetForClustering();
+		}
+		
+		mClusterIndex = ClusterIDOfNoise;  // reset our cluster index
+	}
+	
 	/**
 	 * Clusters points[] using DBSCAN
 	 */
 	public void cluster() {
-		mClusterIndex = 0; // start at default
+		mClusterIndex = ClusterIDOfNoise; // start at default
 		ArrayList<DBScanPoint> neighbors = new ArrayList<DBScanPoint>(30000);
 		
 		for (DBScanPoint thePoint : mPoints) {				
@@ -61,8 +86,8 @@ public class DBSCAN2 {
 		}
 	}
 	
-	protected void expandCluster(DBScanPoint point, ArrayList<DBScanPoint> neighbors, int c) {
-		point.mClusterAssigned = c;   // assign our 'core' point to cluster c
+	protected void expandCluster(DBScanPoint point, ArrayList<DBScanPoint> neighbors, int clusterIndex) {
+		point.mClusterAssigned = clusterIndex;   // assign our 'core' point to cluster c
 		
 		ArrayList<DBScanPoint> neighborsOfNeighbor = new ArrayList<DBScanPoint>(30000);		
 		
@@ -85,8 +110,8 @@ public class DBSCAN2 {
 				}
 			}
 
-			if (theNeighbor.mClusterAssigned == 0) {
-				theNeighbor.mClusterAssigned = c;
+			if (theNeighbor.mClusterAssigned == ClusterIDOfNoise) {
+				theNeighbor.mClusterAssigned = clusterIndex;
 			}
 		}
 	}
@@ -114,7 +139,7 @@ public class DBSCAN2 {
 		}
 		
 		for (DBScanPoint elem : mPoints) {
-			if (point.mFloint.getCartesianDistance(elem.mFloint) < mEps) { //if point is within parameter-defined neighborhood
+			if (point.mFloint.getCartesianDistance(elem.mFloint) < mEpsilon) { //if point is within parameter-defined neighborhood
 				neighbors.add(elem);
 			}				
 		}
@@ -133,14 +158,14 @@ public class DBSCAN2 {
 	 * Returns the value in clust_assignments[] that occurs most often
 	 */
 	public int getLargestCluster() {
-		if (mClusterIndex == 0) return -1;
+		if (mClusterIndex == ClusterIDOfNoise) return ClusterIDOfNoise;  // means we have nothing but noise
 		
 		int[] counts = new int[mClusterIndex + 1];
 		for (DBScanPoint thePoint : mPoints) {
 			counts[thePoint.mClusterAssigned]++;
 		}
 		
-		int startIndex = 1;  // we start at 1 so we only consider points with valid cluster assignments
+		int startIndex = ClusterIDOfNoise + 1;  // we start at 1 so we only consider points with valid cluster assignments
 		int indexOfMaxCount = startIndex;
 		for (int i = startIndex + 1; i < counts.length; i++) {
 			if (counts[i] > counts[indexOfMaxCount]) {
@@ -163,6 +188,7 @@ public class DBSCAN2 {
 		private boolean mVisited;
 		public boolean mAdded;
 		public int mClusterAssigned;
+		
 		public int mIndexSortedX;
 		public int mIndexSortedY;		
 		
@@ -178,15 +204,22 @@ public class DBSCAN2 {
 		public void  resetVisited() { mVisited = false; }
 		
 		public void reset() {
+			resetForClustering();
+			mIndexSortedX = mIndexSortedY = -1;
+		}
+		
+		public void resetForClustering() {
 			resetVisited();
-			mClusterAssigned = 0;
-			mIndexSortedX = -1;
-			mIndexSortedY = -1;
+			mClusterAssigned = DBSCAN2.ClusterIDOfNoise;
 			mAdded = false;
 		}
 		
 		public double getCartesianDistance(DBScanPoint rhs) {
 			return mFloint.getCartesianDistance(rhs.mFloint);
+		}
+		
+		public double getCartesianDistanceSquared(DBScanPoint rhs) {
+			return mFloint.getCartesianDistanceSquared(rhs.mFloint);
 		}
 		
 		/** Default sorting by x-coordinate */

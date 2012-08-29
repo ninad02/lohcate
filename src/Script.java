@@ -18,7 +18,7 @@ import shared.Utils;
  * 
  * This runner class is the big enchilada. See main method for 'switchboard' / pipeline overview.
  * 
- * @author Siddharth G. Reddy
+ * @author Siddharth G. Reddy, Ninad Dewal
  *
  */
 public class Script {
@@ -27,13 +27,13 @@ public class Script {
 	
 	private static final float NAF_STRIP_EXPANDER = 2; //1.25f; //# of std. deviations to move away from the mean (when defining the thickness of the horizontal band containing HET ball, LOH sidelobes, &c.)
 	private static final float HET_BALL_EPS = 0.035f, DUP_WEDGE_LASSO = 0.015f; //DBSCAN parameters for HET ball / DUP wedge detection
-	private static final int HET_BALL_MINPTS = 100, DUP_WEDGE_MINPTS = 100; //DBSCAN parameters for HET ball / DUP wedge detection
+	private static final int HET_BALL_MINPTS = 30, DUP_WEDGE_MINPTS = 30; //DBSCAN parameters for HET ball / DUP wedge detection
 	
 	private static final int REGION_SEGMENTATION_DIST_THRESHOLD = 2000000; //greatest possible distance between 2 'adjacent' points of LOH in a region of 'contiguous' LOH
 	
 	private static final String GermlineStr = "germline";
 	private static final String SomaticStr  = "somatic";
-	private static final String NovelStr  = "novel";
+	private static final String NovelStr  = "novel";	
 	
 	private static ArrayList<String> curateSNPCalls_removeHeaderLinesFromRows(ArrayList<String> rows) {		
 		for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
@@ -53,6 +53,7 @@ public class Script {
 	public static void curateSNPCalls(String inDir, String outDir, SeqPlatform platform) {
 		File[] files = (new File(inDir)).listFiles();
 		StringBuilder sb = new StringBuilder(8192);
+		Utils.FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionCSV;
 		
 		for (File file : files) {
 			int indexOfSubstring = file.getName().indexOf("." + GermlineStr);
@@ -91,15 +92,19 @@ public class Script {
 				for (int i = startingRowGermline; i < germlineSpecificVariantRows.size(); i++) {
 					String strRow = germlineSpecificVariantRows.get(i);
 					ClusterType clusterType = clustersGermline[i];
-					
-					String delimiter = "\t";
-					String[] germCols = strRow.split(delimiter);
-					
-					sb.setLength(0); // Clear the string builder
+										
+					String[] germCols = strRow.split(Utils.TabStr);
+										
 					float vafNormal = extractVAFNormal(germCols, platform);
 					float vafTumor  = extractVAFTumor (germCols, platform);
 					String chromStr = (platform == SeqPlatform.Illumina) ? germCols[0] : "chr" + germCols[0].replace("chr", "");
-					sb.append(chromStr).append(Utils.CommaStr).append(germCols[1]).append(Utils.CommaStr).append(vafNormal).append(Utils.CommaStr).append(vafTumor).append(Utils.CommaStr); //chr,pos,n_vaf,t_vaf
+					
+					sb.setLength(0); // Clear the string builder
+					sb.append(chromStr)
+					  .append(fileExtDelim.mDelimiter).append(germCols[1])
+					  .append(fileExtDelim.mDelimiter).append(vafNormal)
+					  .append(fileExtDelim.mDelimiter).append(vafTumor)
+					  .append(fileExtDelim.mDelimiter); //chr,pos,n_vaf,t_vaf
 					
 					String variantAnnotation = "";
 					if (platform == SeqPlatform.SOLiD) {
@@ -147,10 +152,10 @@ public class Script {
 						mutationType = germCols[10].split("_SNV")[0];
 					}
 					
-					sb.append(Utils.CommaStr).append(gene)
-					  .append(Utils.CommaStr).append(mutationType)
-					  .append(Utils.CommaStr).append(targetTissue)
-					  .append(Utils.CommaStr).append(clusterType);
+					sb.append(fileExtDelim.mDelimiter).append(gene)
+					  .append(fileExtDelim.mDelimiter).append(mutationType)
+					  .append(fileExtDelim.mDelimiter).append(targetTissue)
+					  .append(fileExtDelim.mDelimiter).append(clusterType);
 					
 					IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 					IOUtils.flushBufferedWriter(out);
@@ -194,6 +199,7 @@ public class Script {
 		int numBins = (int) ((vafNormalFrameUpper - vafNormalFrameLower) / binSize) + 1;		
 		int[] binCount = new int[numBins];				
 		
+		// First, tally the variant allele frequencies into bins
 		for (int row = 0; row < rows.size(); row++) {
 			String[] components = rows.get(row).split("\t");
 			float vafNormal = extractVAFNormal(components, platform);
@@ -203,16 +209,17 @@ public class Script {
 			}
 		}
 		
+		// Next, calculate summary statistics (mean, variance, standard deviation) 
 		float total = 0;
-		int tot_count = 0;
+		int numElementsTotal = 0;
 		float[] binValue = new float[binCount.length];
 		for (int i = 0; i < binCount.length; i++) {
 			binValue[i] = vafNormalFrameLower + ((i + 1) * binSize);
 			total     += (binCount[i] * binValue[i]);
-			tot_count +=  binCount[i];
+			numElementsTotal +=  binCount[i];
 		}	
 				
-		float countMean = (float) total / (float) tot_count;
+		float countMean = (float) total / (float) numElementsTotal;
 		
 		float varianceTotal = 0f;
 		for (int i = 0; i < binCount.length; i++) { //calculate std. deviation of # points in each bin
@@ -221,7 +228,7 @@ public class Script {
 			float totalForBin = diffSquared * binCount[i];
 			varianceTotal += totalForBin;			
 		}
-		float variance = varianceTotal / (float) (tot_count - 1);  // -1 for degrees of freedom		
+		float variance = varianceTotal / (float) (numElementsTotal - 1);  // -1 for degrees of freedom		
 		float stdDev = (float) Math.sqrt(variance);  //standard deviation in NAF-coord across {0.2 < NAF <= 0.8} variants in VAF plot
 		
 		// Now we adjust the frames based on the standard deviation
@@ -249,43 +256,56 @@ public class Script {
 		//renal-we --> (1, (0.05, 500), (0.02, 350))
 		
 		System.out.println("Getting clusters: " + (new Date()).toString());
-		DBScanFast obj = new DBScanFast(points, HET_BALL_EPS, HET_BALL_MINPTS); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
-		obj.cluster();
-		int het_ball = obj.getLargestCluster();
-		int[] dbscan = obj.getClustAssignments();
 		
-		obj = new DBScanFast(points, HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS); //loosened parameter for capturing DUP lasso (around HET ball)//KDBSCAN(param, 10, 0.027f);
-		obj.cluster();
-		int[] dup_inc = obj.getClustAssignments();
+		DBScanFast dbscanner = new DBScanFast(points, HET_BALL_EPS, HET_BALL_MINPTS); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+		dbscanner.cluster();
+		int clusterIDofHetBall = dbscanner.getLargestCluster();
+		int[] clusterAssignments = dbscanner.getClustAssignments();  // save and cache
+		
+		// Now, re-run DBScan, but with changed parameters		
+		dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
+		dbscanner.cluster();
+		int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
+		
 		System.out.println("Finished clusters: " + (new Date()).toString());
 		
-		for (int i = 0; i < dbscan.length; i++) {
-			if (dbscan[i] != dup_inc[i]) {
-				dbscan[i] = -1;
+		int nonAgreeingClusterID = -1;
+		for (int i = 0; i < clusterAssignments.length; i++) {
+			if (clusterAssignments[i] != clusterAssignmentsWithWedge[i]) {
+				clusterAssignments[i]  = nonAgreeingClusterID;
 			}
 		}
 
-		int count = 0;
+		int indexInClusterAssignments = -1;  // we need to keep a special index, since not all rows are used.
 		ClusterType[] returnClusters = new ClusterType[rows.size()];
 		
 		for (int row = 0; row < rows.size(); row++) {
-			String[] components = rows.get(row).split("\t");
-			
+
 			if (varLoc == VariantLocation.Somatic) {
-				returnClusters[row] = ClusterType.Null;  // somatic
+				returnClusters[row] = ClusterType.Somatic;  // somatic
 			} else {
+				String[] components = rows.get(row).split("\t");
 				float vafNormal = extractVAFNormal(components, platform);
 				
 				if (Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameLower, vafNormalFrameUpper)) {
-					if (dbscan[count] == het_ball) {
+					++indexInClusterAssignments;
+					
+					if (clusterAssignments[indexInClusterAssignments] == clusterIDofHetBall) {
 						returnClusters[row] = ClusterType.HET; //HET
-					} else if (dbscan[count] == -1) {
+						
+					} else if (clusterAssignments[indexInClusterAssignments] == nonAgreeingClusterID) {
 						returnClusters[row] = ClusterType.Dup; //DUP
+						// TODO @Sidd, this logic isn't right.  Just because they disagree, you're overriding
+						// the original dbscanning with the value from the wedges?  Then why run the first one
+						// at all?  Might as well just run the second one.
+						
+					} else if (clusterAssignments[indexInClusterAssignments] == dbscanner.getClusterIDOfNoise()) { 
+						returnClusters[row] = ClusterType.Noise;
+						
 					} else { //anything not in the HET ball / DUP wedge is considered part of a LOH sidelobe
 						float vafTumor = extractVAFTumor(components, platform);						
-						returnClusters[row] = (vafTumor > 0.5) ? ClusterType.LOHref : ClusterType.LOHvar; //LOH
+						returnClusters[row] = (vafTumor >= 0.5) ? ClusterType.LOHref : ClusterType.LOHvar; //LOH
 					}
-					count++;
 					
 				} else {
 					returnClusters[row] = ClusterType.Null;   //outside NAF frame (<=> 'other')
@@ -339,10 +359,7 @@ public class Script {
 				load = FileOps.loadFromFile(file.getAbsolutePath());
 				for (int i = 1; i<=22; i++) { //iterate through chromosomes
 					try {
-						if (i<=21)
-							chr = Integer.toString(i);
-						else
-							chr = "X";
+						chr = Integer.toString(i);
 						System.out.print(chr + " ");
 						split = load.split("\nchr" + chr + ",");
 						for (int k = 0; k<cluster_names.length - 1; k++) { //iterate through {dup, loh, roc-loh}
@@ -612,10 +629,7 @@ public class Script {
 			load = FileOps.loadFromFile(inDir + "/" + pats.get(p));
 			for (int k = 0; k<cluster_names.length - 1; k++) { //iterate through {dup, loh, roc-loh}
 				for (int i = 1; i<=22; i++) { //iterate through chromosomes
-					if (i<=21)
-						chr = Integer.toString(i);
-					else
-						chr = "X";
+					chr = Integer.toString(i);
 					System.out.print(chr + " ");
 						
 					for (int w = 0; w<2; w++) { //iterate through germline, somatic
@@ -674,10 +688,7 @@ public class Script {
 		ArrayList<Integer> patsort, blacklist;
 		int temp_max, temp_max_ind;
 		for (int i = 1; i<=22; i++) { //chromosomes
-			if (i<=21)
-				chr = Integer.toString(i);
-			else
-				chr = "X";
+			chr = Integer.toString(i);
 			for (int k = 0; k<cluster_names.length - 1; k++) { //clusters
 				manifest = "";
 				patsort = new ArrayList<Integer>(); 
@@ -733,10 +744,8 @@ public class Script {
 		float temp_score;
 		ArrayList<Point> regions;
 		for (int i = 1; i<=22; i++) { //iterate through chromosomes
-			if (i<=21)
-				chr = Integer.toString(i);
-			else
-				chr = "X";
+			chr = Integer.toString(i);
+			
 			System.out.println("chr" + chr);
 			for (int k = 0; k<cluster_names.length - 1; k++) { //iterate through clusters
 				System.out.print(k + " ");
@@ -785,10 +794,8 @@ public class Script {
 		System.out.println("writing to file...");
 		String manifest;
 		for (int i = 1; i<=22; i++) { //chromosomes
-			if (i<=21)
-				chr = Integer.toString(i);
-			else
-				chr = "X";
+			chr = Integer.toString(i);
+			
 			for (int k = 0; k<cluster_names.length - 1; k++) { //clusters
 				manifest = "";
 				for (int c = 0; c<cols.length; c++) { //cols:{recurrence, het density, variant density}
