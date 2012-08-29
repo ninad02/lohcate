@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
  * D Wheeler & SG Reddy
@@ -12,14 +13,14 @@ import java.util.ArrayList;
  */
 public class DBSCAN {
 	
-	protected ArrayList<Floint> mPoints; //data points
+	protected ArrayList<DBSCAN2.DBScanPoint> mPoints; //data points
 	protected float mEps; //neighborhood parameter
 	protected int mMinPts; //neighborhood density parameter
 	
 	protected int mClusterIndex = 0;
 	
 	public DBSCAN(ArrayList<Floint> points, float eps, int minPts) {
-		this.mPoints = points;
+		//this.mPoints = points;
 		this.mEps = eps;
 		this.mMinPts = minPts;
 	}
@@ -29,9 +30,9 @@ public class DBSCAN {
 	 */
 	public void cluster() {
 		mClusterIndex = 0; // start at default
-		ArrayList<Floint> neighbors;
+		ArrayList<DBSCAN2.DBScanPoint> neighbors;
 		
-		for (Floint thePoint : mPoints) {				
+		for (DBSCAN2.DBScanPoint thePoint : mPoints) {				
 			if (!thePoint.getVisited()) { 
 				//System.out.println(i + " of " + points.length);
 				thePoint.setVisited();
@@ -46,16 +47,16 @@ public class DBSCAN {
 		}
 	}
 	
-	private void expandCluster(Floint point, ArrayList<Floint> neighbors, int c) {
+	private void expandCluster(DBSCAN2.DBScanPoint point, ArrayList<DBSCAN2.DBScanPoint> neighbors, int c) {
 		point.mClusterAssigned = c;   // assign our 'core' point to cluster c
 		
-		ArrayList<Floint> neighborsOfNeighbors;		
+		ArrayList<DBSCAN2.DBScanPoint> neighborsOfNeighbors;		
 		//int count = 0;
 		
 		// We perform a loop on the neighbors list, which can grow 
 		// in size during the body of the loop. 
 		for (int i = 0; i < neighbors.size(); i++) { //iterate through neighbors (later becomes neighbors' neighbors', neighbors' neighbors' neighbors', &c.) of core point
-			Floint theNeighbor = neighbors.get(i);
+			DBSCAN2.DBScanPoint theNeighbor = neighbors.get(i);
 			
 			if (!theNeighbor.getVisited()) {
 				//count++;
@@ -77,11 +78,11 @@ public class DBSCAN {
 	}
 	
 	
-	private ArrayList<Floint> getNeighbors(Floint point) {
-		ArrayList<Floint> pre_rtn = new ArrayList<Floint>();
+	private ArrayList<DBSCAN2.DBScanPoint> getNeighbors(DBSCAN2.DBScanPoint point) {
+		ArrayList<DBSCAN2.DBScanPoint> pre_rtn = new ArrayList<DBSCAN2.DBScanPoint>();
 		
-		for (Floint elem : mPoints)
-			if (Math.sqrt(Math.pow(elem.mX - point.mX, 2) + Math.pow(elem.mY - point.mY, 2)) < mEps) //if point is within parameter-defined neighborhood
+		for (DBSCAN2.DBScanPoint elem : mPoints)
+			if (Math.sqrt(Math.pow(elem.mFloint.mX - point.mFloint.mX, 2) + Math.pow(elem.mFloint.mY - point.mFloint.mY, 2)) < mEps) //if point is within parameter-defined neighborhood
 				pre_rtn.add(elem);
 		return pre_rtn;
 	}
@@ -101,7 +102,7 @@ public class DBSCAN {
 		if (mClusterIndex == 0) return -1;
 		
 		int[] counts = new int[mClusterIndex + 1];
-		for (Floint thePoint : mPoints) {
+		for (DBSCAN2.DBScanPoint thePoint : mPoints) {
 			counts[thePoint.mClusterAssigned]++;
 		}
 		

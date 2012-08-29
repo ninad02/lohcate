@@ -1,7 +1,9 @@
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.ListIterator;
+
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
  * D Wheeler & SG Reddy
@@ -10,21 +12,31 @@ import java.util.ListIterator;
  * An implementation of the DBSCAN (density-based spatial clustering of applications with noise) algorithm.
  * Link --> https://en.wikipedia.org/wiki/DBSCAN
  * 
- * @author Siddharth G. Reddy
+ * @author Ninad Dewal
  *
  */
 public class DBSCAN2 {
 	
-	protected ArrayList<Floint> mPoints; //data points
+	protected ArrayList<DBScanPoint> mPoints; //data points
 	protected float mEps; //neighborhood parameter
 	protected int mMinPts; //neighborhood density parameter
 	
 	protected int mClusterIndex = 0;
 	
 	public DBSCAN2(ArrayList<Floint> points, float eps, int minPts) {
-		this.mPoints = points;
+		this.mPoints = addPoints( points, new ArrayList<DBScanPoint>(points.size()) );
+		
 		this.mEps = eps;
 		this.mMinPts = minPts;
+	}
+	
+	/** Creates DBScanPoint object wrappers for the points. */
+	protected static ArrayList<DBScanPoint> addPoints(ArrayList<Floint> points, ArrayList<DBScanPoint> targetList) {
+		for (Floint floint : points) {
+			DBScanPoint dbsp = new DBScanPoint(floint);
+			targetList.add(dbsp);
+		}
+		return targetList;
 	}
 	
 	/**
@@ -32,9 +44,9 @@ public class DBSCAN2 {
 	 */
 	public void cluster() {
 		mClusterIndex = 0; // start at default
-		ArrayList<Floint> neighbors = new ArrayList<Floint>(30000);
+		ArrayList<DBScanPoint> neighbors = new ArrayList<DBScanPoint>(30000);
 		
-		for (Floint thePoint : mPoints) {				
+		for (DBScanPoint thePoint : mPoints) {				
 			if (!thePoint.getVisited()) { 
 				//System.out.println(i + " of " + points.length);
 				thePoint.setVisited();
@@ -49,18 +61,16 @@ public class DBSCAN2 {
 		}
 	}
 	
-	protected void expandCluster(Floint point, ArrayList<Floint> neighbors, int c) {
+	protected void expandCluster(DBScanPoint point, ArrayList<DBScanPoint> neighbors, int c) {
 		point.mClusterAssigned = c;   // assign our 'core' point to cluster c
 		
-		ArrayList<Floint> neighborsOfNeighbor = new ArrayList<Floint>(30000);		
+		ArrayList<DBScanPoint> neighborsOfNeighbor = new ArrayList<DBScanPoint>(30000);		
 		
 		// We perform a loop on the neighbors list, which can grow 
 		// in size during the body of the loop.  Thus, neighbors list becomes
 		// neighbors' neighbors, neighbors' neighbors' neighbors
-		//for (ListIterator<Floint> iter = neighbors.listIterator(); iter.hasNext(); ) {
-			//Floint theNeighbor = iter.next();
 		for (int i = 0; i < neighbors.size(); i++) {
-			Floint theNeighbor = neighbors.get(i);
+			DBScanPoint theNeighbor = neighbors.get(i);
 
 			if (!theNeighbor.getVisited()) {
 				//count++;
@@ -83,28 +93,28 @@ public class DBSCAN2 {
 	
 	// We create this function because it is ironically more efficient than the ArrayList.addAll() method,
 	// which stupidly allocates memory to create an extra and needless temporary array in its implementaion.
-	public static void addAll(Collection<Floint> listToWhichToAdd, Collection<Floint> elementsToAdd) {
-		for (Floint element : elementsToAdd) {
+	public static void addAll(Collection<DBScanPoint> listToWhichToAdd, Collection<DBScanPoint> elementsToAdd) {
+		for (DBScanPoint element : elementsToAdd) {
 			listToWhichToAdd.add(element);
 		}
 	}
 	
 	// We must add elements to a list this way if the iterator for that list has already been invoked.
 	// If we do not add elements to the list via the iterator, the iterator will throw an exception.
-	public static void addAllToNextPosition(ListIterator<Floint> iter, Collection<Floint> elementsToAdd) {
-		for (Floint element : elementsToAdd) {
+	public static void addAllToNextPosition(ListIterator<DBScanPoint> iter, Collection<DBScanPoint> elementsToAdd) {
+		for (DBScanPoint element : elementsToAdd) {
 			iter.add(element);
 		}
 	}
 	
-	protected ArrayList<Floint> getNeighbors(Floint point, ArrayList<Floint> neighbors, boolean clearList) {
-		neighbors = (neighbors == null) ? new ArrayList<Floint>(10000) : neighbors; 
+	protected ArrayList<DBScanPoint> getNeighbors(DBScanPoint point, ArrayList<DBScanPoint> neighbors, boolean clearList) {
+		neighbors = (neighbors == null) ? new ArrayList<DBScanPoint>(20000) : neighbors; 
 		if (clearList) { 
 			neighbors.clear(); 
 		}
 		
-		for (Floint elem : mPoints) {
-			if (point.getCartesianDistance(elem) < mEps) { //if point is within parameter-defined neighborhood
+		for (DBScanPoint elem : mPoints) {
+			if (point.mFloint.getCartesianDistance(elem.mFloint) < mEps) { //if point is within parameter-defined neighborhood
 				neighbors.add(elem);
 			}				
 		}
@@ -126,7 +136,7 @@ public class DBSCAN2 {
 		if (mClusterIndex == 0) return -1;
 		
 		int[] counts = new int[mClusterIndex + 1];
-		for (Floint thePoint : mPoints) {
+		for (DBScanPoint thePoint : mPoints) {
 			counts[thePoint.mClusterAssigned]++;
 		}
 		
@@ -136,9 +146,91 @@ public class DBSCAN2 {
 			if (counts[i] > counts[indexOfMaxCount]) {
 				indexOfMaxCount = i;
 			}
-		}
+		}		
 
 		//System.out.println("partition " + rtn + " :: " + counts.get(rtn) + " of " + points.length);
 		return indexOfMaxCount;
+	}
+	
+	// ========================================================================
+	// INNER CLASS: DBScanPoint
+	// ========================================================================
+	/** This class contains meta information for each point in DBScan in order
+	 *  to decrease run-time for the DBScan algorithm.
+	 */
+	protected static class DBScanPoint implements Comparable<DBScanPoint> {
+		
+		private boolean mVisited;
+		public boolean mAdded;
+		public int mClusterAssigned;
+		public int mIndexSortedX;
+		public int mIndexSortedY;		
+		
+		protected Floint mFloint; 
+		
+		protected DBScanPoint(Floint floint) {
+			mFloint = floint;
+			reset();
+		}
+		
+		public boolean getVisited() { return mVisited; }
+		public void    setVisited() { mVisited = true; }	
+		public void  resetVisited() { mVisited = false; }
+		
+		public void reset() {
+			resetVisited();
+			mClusterAssigned = 0;
+			mIndexSortedX = -1;
+			mIndexSortedY = -1;
+			mAdded = false;
+		}
+		
+		public double getCartesianDistance(DBScanPoint rhs) {
+			return mFloint.getCartesianDistance(rhs.mFloint);
+		}
+		
+		/** Default sorting by x-coordinate */
+		public int compareTo(DBScanPoint rhs) {
+			return mFloint.compareTo(rhs.mFloint);
+		}
+
+		// ========================================================================
+		// Global Comparator object for public use	
+		public static final DBScanPointCompareX  DBScanPointCompareXObj  = new DBScanPointCompareX();
+		public static final DBScanPointCompareY  DBScanPointCompareYObj  = new DBScanPointCompareY();
+		
+		public static final DBScanPointDistanceX DBScanPointDistanceXObj = new DBScanPointDistanceX();
+		public static final DBScanPointDistanceY DBScanPointDistanceYObj = new DBScanPointDistanceY();
+		
+		// ====================================================================
+		/** Comparator. */
+		public static class DBScanPointCompareX implements Comparator<DBScanPoint> {
+			public int compare(DBScanPoint p1, DBScanPoint p2) {
+				return Floint.FlointCompareXObj.compare(p1.mFloint, p2.mFloint);
+			}
+		}
+		
+		public static class DBScanPointCompareY implements Comparator<DBScanPoint> {
+			public int compare(DBScanPoint p1, DBScanPoint p2) {
+				return Floint.FlointCompareYObj.compare(p1.mFloint, p2.mFloint);
+			}
+		}
+		
+		// ====================================================================
+		public static abstract class DBScanPointDistance {
+			public abstract double distance(DBScanPoint n1, DBScanPoint n2); 
+		}
+		
+		public static class DBScanPointDistanceX extends DBScanPointDistance {
+			public double distance(DBScanPoint n1, DBScanPoint n2) { 
+				return Floint.FlointDistanceXObj.distance(n1.mFloint, n2.mFloint); 
+			} 
+		}
+		
+		public static class DBScanPointDistanceY extends DBScanPointDistance {
+			public double distance(DBScanPoint n1, DBScanPoint n2) { 
+				return Floint.FlointDistanceYObj.distance(n1.mFloint, n2.mFloint); 
+			}
+		}		
 	}
 }

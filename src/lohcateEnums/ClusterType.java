@@ -2,8 +2,8 @@ package lohcateEnums;
 
 public enum ClusterType {
 	Dup,
-	LOH,
-	rocLOH,  // right-of-center LOH
+	LOHvar,
+	LOHref,  // right-of-center LOH
 	
 	HET,
 	Null;

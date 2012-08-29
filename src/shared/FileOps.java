@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import javax.imageio.ImageIO;
@@ -65,6 +66,26 @@ public class FileOps {
 			contents += inputLine + "\n";
 		in.close();
 		return contents;
+	}
+	
+	public static ArrayList<String> readAllLinesFromFile(String filename) {
+		ArrayList<String> allLines = new ArrayList<String>(100000);
+		String line = null;
+		
+		try {
+			BufferedReader in = new BufferedReader(new FileReader(filename));
+			while ((line = in.readLine()) != null) {
+				allLines.add(line);				
+			}
+						
+			in.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(-1);
+		}
+		
+		allLines.trimToSize();
+		return allLines;
 	}
 	
 	public static String loadFromFile(String fileName) {
@@ -121,28 +142,32 @@ public class FileOps {
 		return contents.toString();
 	}
 	
+	
 	public static void writeToFile(String filename, String toWrite) {
-		File f = new File(filename);
-		File fi = new File(filename.replace(filename.split("/")[filename.split("/").length-1], ""));
-		if (!fi.isDirectory())
-			fi.mkdirs();
-	    FileOutputStream fop = null;
-	    try {
-	    	fop = new FileOutputStream(f);
+		writeToFile(filename, toWrite, false, false);
+	}
+	
+	
+	
+	public static void writeToFile(String filename, String toWrite, boolean writeNewLine, boolean appendTextToFile) {
+		File f = new File(filename);		
+		
+		File parentDir = new File(f.getParent());
+		if (!parentDir.isDirectory())
+			parentDir.mkdirs();
+			    
+	    try {	    	
+	    	BufferedWriter out = new BufferedWriter(new FileWriter(f, appendTextToFile));
+	    	out.write(toWrite);
+	    	if (writeNewLine) {
+	    		out.newLine();
+	    	}
+	    	out.close();
+	    	
 	    } catch (Exception e) {
 	    	e.printStackTrace();
-	    	System.out.println("flopped");
+	    	System.exit(-1);
 	    }
-	    try {
-	    	fop = new FileOutputStream(f);
-	    	fop.write(toWrite.getBytes());
-		} catch (Exception e) {
-	    	e.printStackTrace();
-	    	System.out.println("file write exception occurred");
-	    }
-		try {
-			fop.close();
-		} catch (IOException e) { e.printStackTrace(); }
 	}
 	
 	public static void t_writeToFile(String filename, String toWrite) throws Exception {
@@ -151,8 +176,7 @@ public class FileOps {
 		if (!fi.isDirectory())
 			fi.mkdirs();
 	    FileOutputStream fop = null;
-	    fop = new FileOutputStream(f);
-	    fop = new FileOutputStream(f);
+	    fop = new FileOutputStream(f);	    
 	    fop.write(toWrite.getBytes());
 		fop.close();
 	}

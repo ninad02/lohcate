@@ -14,29 +14,9 @@ import java.util.GregorianCalendar;
 public class Floint implements Comparable<Floint> {
 	public float mX, mY;
 	
-	// Variables relevant to the DB scan algorithm	
-	public int mClusterAssigned;
-	private boolean mVisited; 
-	public int mIndexSortedX;
-	public int mIndexSortedY;
-	public boolean mAdded;
-	
 	public Floint(float x, float y) { 
 		mX = x; 
-		mY = y; 		
-		reset();
-	}
-	
-	public boolean getVisited() { return mVisited; }
-	public void    setVisited() { mVisited = true; }	
-	public void  resetVisited() { mVisited = false; }
-	
-	public void reset() {
-		resetVisited();
-		mClusterAssigned = 0;
-		mIndexSortedX = -1;
-		mIndexSortedY = -1;
-		mAdded = false;
+		mY = y; 				
 	}
 	
 	public double getCartesianDistance(Floint rhs) {
