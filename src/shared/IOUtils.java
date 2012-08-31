@@ -380,20 +380,30 @@ public class IOUtils {
 	}
 
 	// ========================================================================
-	/** Given an infilename, this reads all the lines in the infilename and returns a list of strings. */
+	/** Returns all the lines from the file in the array, including the header string. */
 	public static ArrayList<String> readAllLinesFromFile(String inFilename, boolean trimLines, boolean ignoreWhitespaceLines) {
+		return readAllLinesFromFile(inFilename, trimLines, ignoreWhitespaceLines, null);
+	}
+	
+	// ========================================================================
+	/** Given an infilename, this reads all the lines in the infilename and returns a list of strings. */
+	public static ArrayList<String> readAllLinesFromFile(String inFilename, boolean trimLines, boolean ignoreWhitespaceLines, StringBuilder headerString) {
 		LinkedList<String> theList = new LinkedList<String>();
 		BufferedReader in = getBufferedReader(inFilename);
 		
-		String line;
-		while ((line = getNextLineInBufferedReader(in)) != null) {
-			String lineTrimmed = line.trim();
-			if (lineTrimmed.equals("")) {
-				if (!ignoreWhitespaceLines) {
-					theList.add(trimLines ? lineTrimmed : line);
+		int lineCounter = -1;
+		String line;		
+		while ((line = getNextLineInBufferedReader(in)) != null) {			
+			String lineTrimmed = trimLines ? line.trim() : line;			
+			boolean isBlankLine = lineTrimmed.equals("");
+			if (!isBlankLine || (isBlankLine && !ignoreWhitespaceLines)) {
+				++lineCounter;
+				if ((lineCounter == 0) && (headerString != null)) {
+					headerString.setLength(0);
+					headerString.append(lineTrimmed);				
+				} else {
+					theList.add(lineTrimmed);					
 				}
-			} else {
-				theList.add(trimLines ? lineTrimmed : line);
 			}
 		}
 		

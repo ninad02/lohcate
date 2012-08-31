@@ -1,8 +1,13 @@
+import genomeUtils.RegionRange;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 
+import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
 import lohcateEnums.SeqPlatform;
 import lohcateEnums.VariantLocation;
@@ -10,6 +15,7 @@ import lohcateEnums.VariantLocation;
 import shared.FileOps;
 import shared.IOUtils;
 import shared.Utils;
+import shared.Utils.FileExtensionAndDelimiter;
 
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
@@ -34,6 +40,9 @@ public class Script {
 	private static final String GermlineStr = "germline";
 	private static final String SomaticStr  = "somatic";
 	private static final String NovelStr  = "novel";	
+	private static final String ChromPrefix = "chr";
+	
+	public static final GenomicCoordinateComparatorInTextFileLine LineComparatorTab = new GenomicCoordinateComparatorInTextFileLine();
 	
 	private static ArrayList<String> curateSNPCalls_removeHeaderLinesFromRows(ArrayList<String> rows) {		
 		for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
@@ -45,6 +54,49 @@ public class Script {
 		return Utils.removeNullElements(rows);		
 	}
 	
+	// ========================================================================
+	// INNER COMPARATOR CLASS
+	// ========================================================================
+	/** We define a comparator for sorting rows.  This assumes that the columns are tab
+	 *  delimited and that the chromosome resides in the first column (in the form of an 
+	 *  integer or chrN, where N represents an integer), while an integer genomic coordinate 
+	 *  resides in the second column. 
+	 */
+	public static class GenomicCoordinateComparatorInTextFileLine implements Comparator<String> {
+		public int compare(String line1, String line2) {
+			long line1Coordinates = readChromNumAndBasePairPosition(line1);
+			long line2Coordinates = readChromNumAndBasePairPosition(line2);
+			return Utils.compareLong(line1Coordinates, line2Coordinates);			
+		}
+			
+		/** This function reads the chromosome number and base pair position and packs
+		 *  them into a long variable, with the chromosome number taking up the first 32
+		 *  most significant bits and the base pair position taking up the last 32 bits.
+		 *  This allows for returning multiple integer values and for easy sorting therafter
+		 */
+		private long readChromNumAndBasePairPosition(String line) {
+			int firstTabIndexLine = line.indexOf(Utils.TabStr);			
+			if (firstTabIndexLine < 0) Utils.throwErrorAndExit("ERROR: Columns are not tab delimited in input line 1!");
+
+			int secondTabIndexLine = line.indexOf(Utils.TabStr, firstTabIndexLine + 1);
+			if (secondTabIndexLine < 0) Utils.throwErrorAndExit("ERROR: Columns are not tab delimited in input line 1!");
+
+			String chromString = "";
+			int indexChromPrefix = line.indexOf(ChromPrefix);
+			if (indexChromPrefix < 0) { // it does not exist
+				chromString = line.substring(0, firstTabIndexLine);
+			} else if (indexChromPrefix < firstTabIndexLine) {
+				chromString = line.substring(indexChromPrefix + ChromPrefix.length(), firstTabIndexLine);				
+			} else if (indexChromPrefix < secondTabIndexLine) {
+				Utils.throwErrorAndExit("ERROR: " + ChromPrefix + " string in an incorrect place on line!");
+			}  // We don't care if the string exists elsewhere
+			
+			int chromNum = Chrom.getChrom(chromString).getCode();					
+			int basePairPosition = Integer.parseInt(line.substring(firstTabIndexLine + 1, secondTabIndexLine));
+			return (0L | (chromNum << 32) | basePairPosition);   // pack two values into one long	
+		}
+	}
+	
 	/**
 	 * Curate SNP calls by clustering data points into HET ball, DUP wedge, LOH sidelobes, &c., and by grabbing dbsnp population allele frequencies when possible
 	 * @param inDir naf-taf-inputs
@@ -53,8 +105,11 @@ public class Script {
 	public static void curateSNPCalls(String inDir, String outDir, SeqPlatform platform) {
 		File[] files = (new File(inDir)).listFiles();
 		StringBuilder sb = new StringBuilder(8192);
-		Utils.FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionCSV;
+		Utils.FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionTSV;		
 		
+		String[] columnHeaders = new String[] { "chr", "pos", "n_vaf", "t_vaf", "allele_freq", "gene", "mutation_type", "germ_som", "cluster" };
+		String headerStr = Utils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();		
+				
 		for (File file : files) {
 			int indexOfSubstring = file.getName().indexOf("." + GermlineStr);
 			if (indexOfSubstring >= 0) {
@@ -73,12 +128,13 @@ public class Script {
 				// middle of a naf-taf-input file. we're just avoiding those
 				germlineSpecificVariantRows = curateSNPCalls_removeHeaderLinesFromRows(germlineSpecificVariantRows);
 				somaticSpecificVariantRows  = curateSNPCalls_removeHeaderLinesFromRows(somaticSpecificVariantRows);
+				Collections.sort(germlineSpecificVariantRows, LineComparatorTab);
+				Collections.sort(somaticSpecificVariantRows,  LineComparatorTab);
 				
 				int startingRowGermline = 0;  // include the header line
 				//int startingRowSomatic  = 1;  // we need to ignore the header line 
-				
-				String headerStr = "chr,pos,n_vaf,t_vaf,allele_freq,gene,mutation_type,germ_som,cluster"; 
-				String outFilename = samplenameRoot + ".csv";
+								
+				String outFilename = samplenameRoot + fileExtDelim.mExtension;
 				String outFilenameFullPath = outDir + File.separator + outFilename; 
 				
 				BufferedWriter out = IOUtils.getBufferedWriter(outFilenameFullPath);
@@ -97,7 +153,7 @@ public class Script {
 										
 					float vafNormal = extractVAFNormal(germCols, platform);
 					float vafTumor  = extractVAFTumor (germCols, platform);
-					String chromStr = (platform == SeqPlatform.Illumina) ? germCols[0] : "chr" + germCols[0].replace("chr", "");
+					String chromStr = (platform == SeqPlatform.Illumina) ? germCols[0] : ChromPrefix + germCols[0].replace(ChromPrefix, "");
 					
 					sb.setLength(0); // Clear the string builder
 					sb.append(chromStr)
@@ -276,6 +332,7 @@ public class Script {
 			}
 		}
 
+		// Now assign the cluster types
 		int indexInClusterAssignments = -1;  // we need to keep a special index, since not all rows are used.
 		ClusterType[] returnClusters = new ClusterType[rows.size()];
 		
@@ -334,11 +391,57 @@ public class Script {
 	}
 	
 	
+	/** 
+	 * Define contiguous regions of copy number abberration (including LOH),
+	 * given the results of our curated SNPs and DBScan clusters.
+	 * @author Ninad Dewal (re-implementation or original by Siddharth Reddy)
+	 * @param inDir curated SNP calls
+	 * @param outDir segmentation results
+	 */
+	public static void segmentRegionsAllFiles(String inDir, String outDir) {		
+		File[] files = (new File(inDir)).listFiles();
+		for (File file : files) {
+			segmentRegionsOneFile(file, outDir);
+		}
+	}
+	
+	public static void segmentRegionsOneFile(File inFile, String outDir) {
+		FileExtensionAndDelimiter fileExtAndDelim = Utils.FileExtensionTSV;
+		
+		// First check that the file is a file of the desired extension		
+		if (inFile.getName().indexOf(fileExtAndDelim.mExtension) < 0) return;
+		
+		StringBuilder sb = new StringBuilder(4096);
+		
+		// Load all lines into memory, extract the header row, and then sort by chrom/position
+		ArrayList<String> allLines = IOUtils.readAllLinesFromFile(inFile.getName(), false, true, sb);
+		String headerString = sb.toString();
+		Collections.sort(allLines, LineComparatorTab);	
+		
+		// Have an array of regions for amplifications and LOH
+		ArrayList<RegionRange> regionsAmp = new ArrayList<RegionRange>();
+		ArrayList<RegionRange> regionsLOH = new ArrayList<RegionRange>();
+		RegionRange currentRegionAmp = null;
+		RegionRange currentRegionLOH = null;
+		
+		// We start at index 0 assuming no header and that the rows are sorted by chrom/position
+		for (int row = 0; row < allLines.size(); row++) {
+			String line = allLines.get(row);
+			String[] columns = line.split(Utils.TabPatternStr);
+			
+			Chrom chrom  = Chrom.getChrom  (columns[0]);
+			int position = Integer.parseInt(columns[1]);
+			ClusterType clusterType = ClusterType.getClusterType(columns[8]);
+			
+			
+		}
+	}
+	
 	/**
 	 * Define 'contiguous' regions of LOH, given our curated SNP calls.
 	 * @param inDir curated SNP calls
 	 */
-	public static void segmentRegions(String inDir, String outDir) {
+	public static void segmentRegionsOld(String inDir, String outDir) {
 		File[] files = (new File(inDir)).listFiles();
 		String[] split;
 		String[][] toWrite = new String[22][cluster_names.length - 1]; //[chromosome][cluster]
@@ -881,38 +984,41 @@ public class Script {
 			if (file.getName().indexOf("csv")!=-1) {
 				System.out.println(file.getName());
 				load = FileOps.loadFromFile(file.getAbsolutePath()).split("\n");
-				for (int i = 1; i<load.length; i++) { //iterate through variants
-					if (i%10000==0)
-						System.out.println(i + " of " + load.length);
-					name = load[i].split(",")[5];
+				
+				for (int i = 1; i < load.length; i++) { // iterate through variants
+					if (i%10000==0) System.out.println(i + " of " + load.length);
+					
+					String components[] = load[i].split(Utils.CommaStr); 
+					name = components[5];
 					if (name.length() > 0) { //avoid ".", which crops up a lot
 						if (name.indexOf("dist")!=-1) //gene names can sometimes come with an uninteresting/irrelevant prefix
 							name = name.split("\\(")[0];
-						ind = indexOf(new Gene(name, load[i].split(",")[0]), genes);
+						Gene newGene = new Gene(name, components[0]); 
+						ind = indexOf(newGene, genes);
 						if (ind==-1) { //if we haven't seen this gene before
-							genes.add(new Gene(name, load[i].split(",")[0]));
+							genes.add(newGene);
 							ind = genes.size() - 1;
 							for (int k = 0; k<cluster_names.length; k++)
 								genes.get(ind).patients.add(new ArrayList<String>());
 						}
-						if (Integer.parseInt(load[i].split(",")[1]) > genes.get(ind).max) //get right-bound of gene's range of variants
-							genes.get(ind).max = Integer.parseInt(load[i].split(",")[1]); //...left-bound...
-						if (Integer.parseInt(load[i].split(",")[1]) < genes.get(ind).min)
-							genes.get(ind).min = Integer.parseInt(load[i].split(",")[1]);
-						if (load[i].split(",")[6].indexOf("nonsynonymous")!=-1) //increment nonsynonymous variant count
+						if (Integer.parseInt(components[1]) > genes.get(ind).max) //get right-bound of gene's range of variants
+							genes.get(ind).max = Integer.parseInt(components[1]); //...left-bound...
+						if (Integer.parseInt(components[1]) < genes.get(ind).min)
+							genes.get(ind).min = Integer.parseInt(components[1]);
+						if (components[6].indexOf("nonsynonymous")!=-1) //increment nonsynonymous variant count
 							genes.get(ind).arr[0]++;
-						else if (load[i].split(",")[6].indexOf("synonymous")!=-1) //...synonymous...
+						else if (components[6].indexOf("synonymous")!=-1) //...synonymous...
 							genes.get(ind).arr[1]++;
-						if (load[i].split(",")[7].equals("germline")) //...germline...
+						if (components[7].equals("germline")) //...germline...
 							genes.get(ind).arr[2]++;
-						else if (load[i].split(",")[7].equals("somatic")) //...somatic...
+						else if (components[7].equals("somatic")) //...somatic...
 							genes.get(ind).arr[3]++;
-						if (Integer.parseInt(load[i].split(",")[8]) < cluster_names.length && Integer.parseInt(load[i].split(",")[8]) >= 0)
-							genes.get(ind).counts[Integer.parseInt(load[i].split(",")[8])]++; //increment LOH/DUP/&c. count
-						if (Integer.parseInt(load[i].split(",")[8])==2) //include right-of-center LOH count in general LOH count
+						if (Integer.parseInt(components[8]) < cluster_names.length && Integer.parseInt(components[8]) >= 0)
+							genes.get(ind).counts[Integer.parseInt(components[8])]++; //increment LOH/DUP/&c. count
+						if (Integer.parseInt(components[8])==2) //include right-of-center LOH count in general LOH count
 							genes.get(ind).counts[1]++;
 						for (int k = 0; k<cluster_names.length; k++)
-							if (Utils.indexOf(genes.get(ind).patients.get(k), file.getName())==-1 && Integer.parseInt(load[i].split(",")[8])==k)
+							if (Utils.indexOf(genes.get(ind).patients.get(k), file.getName())==-1 && Integer.parseInt(components[8])==k)
 								genes.get(ind).patients.get(k).add(file.getName());
 					}
 				}
@@ -938,7 +1044,7 @@ public class Script {
 				curateSNPCalls(root + "/naf-taf-inputs", root + "/snps", platform); //args[2] --> 0::Illumina, 1::SOLiD
 				break;
 			case 1:
-				segmentRegions(root + "/snps", root + "/regions");
+				//segmentRegions(root + "/snps", root + "/regions");
 				pickupSomatics(root + "/snps", root + "/regions", root + "/curated_snps");
 				break;
 			case 2:

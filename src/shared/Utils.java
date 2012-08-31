@@ -4,10 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
 
-import com.sun.xml.internal.ws.wsdl.parser.MexEntityResolver;
-
-import sun.security.jgss.spi.MechanismFactory;
-
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
  * D Wheeler & SG Reddy
@@ -101,6 +97,10 @@ public class Utils {
 		return ((boundLower < value) && (value <= boundUpper));
 	}
 	
+	/** Compares two long values.  -1 if first argument is smaller, 0 if equal, 1 if first argument is greater. */
+	public static int compareLong(final long num1, final long num2) {
+		return (num1 == num2) ? 0 : ((num1 < num2) ? -1 : 1);
+	}
 	
 	
 	// removes any elements set to null in the list
@@ -264,6 +264,21 @@ public class Utils {
 		Test_removeNullElements();
 		Test_extractRsNumberFromLine();
 	}
+	
+	// ========================================================================
+	public static StringBuilder constructColumnDelimitedString(String[] values, String delimiter, StringBuilder sb, boolean clearStringBuilder) {
+		if (clearStringBuilder) {
+			sb.setLength(0);
+		}
+		
+		for (int i = 0; i < values.length; i++) {
+			if (i > 0) {
+				sb.append(delimiter);
+			}
+			sb.append(values[i]);
+		}
+		return sb;
+	}
 
 	// ========================================================================
 	// INNER CLASS
@@ -276,6 +291,12 @@ public class Utils {
 			mExtension = extension;
 			mDelimiter = delimiter;
 		}
+	}
+
+	public static void throwErrorAndExit(String errorString) {
+		Exception e = new Exception(errorString);
+		e.printStackTrace();
+		System.exit(-1);			
 	}
 }
 
