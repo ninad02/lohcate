@@ -15,28 +15,22 @@ public class RegionRange {
 	boolean mRangeFinalized;
 	int mRangeStart;
 	int mRangeEnd;		
+	int mNumSitesInterrogated;
 	
 	public RegionRange(Chrom chrom, int rangeStart) {
-		mChrom = chrom;
-		mRangeStart = rangeStart;
-		mRangeEnd = mRangeStart;
-		mRangeFinalized = false;
+		set(chrom, rangeStart, rangeStart, false, 1);		
 	}
 	
 	public RegionRange(Chrom chrom, int rangeStart, int rangeEnd) {
-		mChrom = chrom;
-		mRangeStart = rangeStart;
-		mRangeEnd = mRangeStart;
-		mRangeFinalized = false;
+		this(chrom, rangeStart);		
 		extendRange(chrom, rangeEnd);
 	}
 	
 	public RegionRange(RegionRange rhs) {
-		mChrom          = rhs.mChrom;
-		mRangeStart     = rhs.mRangeStart;
-		mRangeEnd       = rhs.mRangeEnd;
-		mRangeFinalized = rhs.mRangeFinalized;
+		set(rhs.mChrom, rhs.mRangeStart, rhs.mRangeEnd, rhs.mRangeFinalized, rhs.mNumSitesInterrogated);
 	}
+	
+	public RegionRange getCopy() { return new RegionRange(this); }
 	
 	/** Returns the range start. */
 	public int getRangeStart() { return mRangeStart; }
@@ -57,13 +51,26 @@ public class RegionRange {
 	public boolean isFinalized() { return mRangeFinalized; }
 	
 	/** Sets the range. */
-	public void set(Chrom chrom, int rangeStart, int rangeEnd, boolean makeFinalized) {
+	public void set(Chrom chrom, int rangeStart, int rangeEnd, boolean makeFinalized, int numSitesInterrogated) {
 		if (rangeEnd < rangeStart) Utils.throwErrorAndExit("ERROR: RegionRange.set(): Range end must follow range start!");		
 		
 		mChrom = chrom;		
 		mRangeStart = rangeStart;
 		mRangeEnd   = rangeEnd;  // need to do this before extending the rnage
 		mRangeFinalized = makeFinalized;
+		mNumSitesInterrogated = numSitesInterrogated;
+	}
+	
+	/** Sets the range start. */
+	public void setRangeStart(int rangeStart) {
+		if (rangeStart > mRangeEnd) Utils.throwErrorAndExit("ERROR: RegionRange.setRangeStart() Range start must precede range end!");
+		mRangeStart = rangeStart;
+	}
+	
+	/** Sets the range end.  */
+	public void setRangeEnd(int rangeEnd) {
+		if (rangeEnd < mRangeStart) Utils.throwErrorAndExit("ERROR: RegionRange.setRangeEnd(): Range end must follow range start!");
+		mRangeEnd = rangeEnd;		
 	}
 	
 	/** Given a chromNum and a position, this checks whether the chrom
@@ -73,12 +80,14 @@ public class RegionRange {
 	 *  then it adds it to the range, and true is returned.  Else, false. 
 	 */
 	public boolean extendRange(Chrom chrom, int position) {
+		//System.out.println(mRangeFinalized + "\t" + chrom + "\t" + mChrom + "\t" + position + "\t" + mRangeEnd);
 		if (mRangeFinalized || (chrom != mChrom) || (position <= mRangeEnd)) {
 			makeFinalized();
 			return false;
 		}
-		
+				
 		mRangeEnd = position;
+		mNumSitesInterrogated++;
 		return true;
 	}
 	
@@ -203,20 +212,20 @@ public class RegionRange {
 	 *
 	 */
 	public static enum RegionRangeOverlap {
-		Equals,                  //  
-		SubsumesTotal,           //
-		SubsumesAlignedLeft,     //
-		SubsumesAlignedRight,    //
+		Equals,                    
+		SubsumesTotal,           
+		SubsumesAlignedLeft,     
+		SubsumesAlignedRight,    
 		ConsumedByTotal,
-		ConsumedByAlignedLeft,   //
+		ConsumedByAlignedLeft,   
 		ConsumedByAlignedRight,
-		BeforeWithOverlap,       //
+		BeforeWithOverlap,       
 		AfterWithOverlap,
-		BeforeWithoutOverlap,    //
+		BeforeWithoutOverlap,    
 		AfterWithoutOverlap,
-		BeforeViaDiffChromosome, //
-		AfterViaDiffChromosome,  //
-		AdjacentBefore,          //
+		BeforeViaDiffChromosome, 
+		AfterViaDiffChromosome,  
+		AdjacentBefore,          
 		AdjacentAfter;
 		
 		protected static final RegionRangeOverlap[] RangeEndComparisonWithAlignedLeft = new RegionRangeOverlap[] {  
@@ -233,7 +242,7 @@ public class RegionRange {
 	/** Returns this as a string. */
 	public String toString() {
 		StringBuilder sb = new StringBuilder(512);
-		sb.append(mChrom);
+		sb.append(mChrom.getCode());
 		sb.append(":");
 		sb.append(mRangeStart);
 		sb.append("-");
@@ -255,12 +264,7 @@ public class RegionRange {
 	public static class RegionRangeComparator implements Comparator<RegionRange> {
 		
 		public static final RegionRangeComparator TheComparator = new RegionRangeComparator();
-		
-		public boolean equals(Object o) {
-			RegionRangeComparator rhs = (RegionRangeComparator) o;
-			return true;
-		}
-		
+			
 		public int compare(RegionRange ar1, RegionRange ar2) {
 			if (ar1.mRangeStart == ar1.mRangeEnd) {
 				return compareHelper(ar1, ar2);

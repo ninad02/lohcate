@@ -4,8 +4,7 @@ import java.util.ArrayList;
 
 public enum ClusterType {
 	Dup,
-	LOHvar,
-	LOHref,  // right-of-center LOH
+	LOH,
 	
 	HET,
 	Somatic,
@@ -14,7 +13,7 @@ public enum ClusterType {
 	
 	public static final ArrayList<String> namesLowercase = getClusterTypesLowercase();
 	
-	public int getNumAberrantClusterTypes() { return values().length - 4; }
+	public int getNumAberrantClusterTypes() { return 2; }
 	
 	
 	public static ClusterType getClusterType(int code) {
