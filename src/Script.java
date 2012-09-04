@@ -1,4 +1,6 @@
 import genomeUtils.RegionRange;
+import genomeUtils.RegionRange.RegionRangeOverlap;
+import static genomeUtils.RegionRange.RegionRangeOverlap.*;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -96,6 +98,10 @@ public class Script {
 			return ( 0L | (((long) chromNum) << 32) | ((long) basePairPosition) );   // pack two values into one long	
 		}
 	}
+	
+	// ========================================================================
+	// STAGE 1: Curate SNP Calls and Cluster with DBSCAN
+	// ========================================================================
 	
 	/**
 	 * Curate SNP calls by clustering data points into HET ball, DUP wedge, LOH sidelobes, &c., and by grabbing dbsnp population allele frequencies when possible
@@ -392,6 +398,11 @@ public class Script {
 	}
 	
 	
+	// ========================================================================
+	// Stage 2: Segmentation
+	// ========================================================================
+	
+	// ========================================================================
 	/** 
 	 * Define contiguous regions of copy number abberration (including LOH),
 	 * given the results of our curated SNPs and DBScan clusters.
@@ -411,6 +422,8 @@ public class Script {
 		}
 	}
 	
+	// ========================================================================
+	/** The continuation of the @method segmentRegionsAllFiles method, but by individual. */ 
 	public static CopyNumberRegionsByChromosome segmentRegionsOneFile(File inFile, String outDir) {
 		FileExtensionAndDelimiter fileExtAndDelim = Utils.FileExtensionTSV;		
 		
@@ -496,9 +509,16 @@ public class Script {
 		return regionsByChrom;
 	}
 	
+	// ========================================================================
 	private static boolean segmentRegionsOneFile_isValidCluster(ClusterType clusterType) {
 		return (clusterType != ClusterType.Noise && clusterType != ClusterType.Null);
 	}
+	
+	// ========================================================================
+	/** Given an individual's copy number regions by chromosome, this partitions the
+	 *  regions into three such objects based on the clustering type (Dup, LOH, HET)
+	 */
+	//public static ArrayList<CopyNumberRegionsByChromosome>
 	
 	// ========================================================================
 	// INNER CLASS
@@ -510,7 +530,7 @@ public class Script {
 		public CopyNumberRegionRange(ClusterType copyNumberClusterType, Chrom chrom, int regionStart) {
 			super(chrom, regionStart);
 			mCopyNumberClusterType = copyNumberClusterType;
-			mRecurrenceScore = 0;
+			mRecurrenceScore = 1.0f;
 		}		
 		
 		public CopyNumberRegionRange(CopyNumberRegionRange rhs) {
@@ -521,6 +541,8 @@ public class Script {
 		
 		public CopyNumberRegionRange(ClusterType copyNumberClusterType, Chrom chrom, int regionStart, int regionEnd) {
 			super(chrom, regionStart, regionEnd);
+			mCopyNumberClusterType = copyNumberClusterType;
+			mRecurrenceScore = 1.0f;
 		}
 		
 		public CopyNumberRegionRange getCopy() { return new CopyNumberRegionRange(this); }
@@ -551,6 +573,22 @@ public class Script {
 		public void addRegion(Chrom chrom, CopyNumberRegionRange region) {
 			mRegionsByChrom.get(chrom.getCode()).add(region);
 		}
+		
+		/** Returns an exact replica of this entire object, including copies of any contained regions. */ 
+		public CopyNumberRegionsByChromosome getDeepCopy() {
+			CopyNumberRegionsByChromosome newCopy = new CopyNumberRegionsByChromosome();
+			
+			for (int chromIndex = 0; chromIndex < mRegionsByChrom.size(); chromIndex++) {
+				ArrayList<CopyNumberRegionRange> cnrrList    =         mRegionsByChrom.get(chromIndex);
+				ArrayList<CopyNumberRegionRange> cnrrListNew = newCopy.mRegionsByChrom.get(chromIndex); 
+				
+				for (CopyNumberRegionRange cnrr : cnrrList) {
+					cnrrListNew.add(cnrr.getCopy());
+				}				
+			}
+			
+			return newCopy;
+		}
 	}
 		
 	/** Given an "original" list of regions and an "added" list of regions, this
@@ -574,7 +612,7 @@ public class Script {
 	 *  added:          xxxxxxxxxxxxxx                 xxx xx xxx
 	 *  resulting:      aabbbcddefffgg               aabbbcddefffgg
 	 *  
-	 *  @param regionsOriginal The list of original regions.  This parameter will
+	 *  @param regionsTarget The list of original regions.  This parameter will
 	 *  be modified by the function, so better to pass in a copy if the caller wants
 	 *  to keep the original regions.
 	 *  @param regionsAdded The list of regions to be added.
@@ -584,114 +622,180 @@ public class Script {
 	 *  an already existing list is more efficient, and if the user wants the original to not
 	 *  be modified, then he/she should pass in a copy.
 	 */
-	
 	public static CopyNumberRegionsByChromosome
-		takeUnionAndBreakDownIntersectingRegions(CopyNumberRegionsByChromosome regionsOriginal, CopyNumberRegionsByChromosome regionsToAdd) {		
-
-		CopyNumberRegionRange regionToAddBuffer = null;
-		
-		float recurrentScoreIncrement = 1.0f;
+		takeUnionAndBreakDownIntersectingRegions(CopyNumberRegionsByChromosome regionsTarget, CopyNumberRegionsByChromosome regionsSource, final ClusterType clusterType) {
 		
 		// First iterate over the chromosomes		
-		for (int chromIndex = 1; chromIndex < regionsOriginal.mRegionsByChrom.size(); chromIndex++) {  // start
-			int indexOriginal = 0;
-			int indexRegionsToAdd = 0;
-			ArrayList<CopyNumberRegionRange> regionsChrOriginal = regionsOriginal.mRegionsByChrom.get(chromIndex);
-			ArrayList<CopyNumberRegionRange> regionsChrToAdd    =    regionsToAdd.mRegionsByChrom.get(chromIndex);
-			regionsChrToAdd = new ArrayList<CopyNumberRegionRange>(regionsChrToAdd);  // now instead, make it a pseudo-shallow array copy			
-		
-			while ((indexOriginal < regionsChrOriginal.size()) && (indexRegionsToAdd < regionsChrToAdd.size())) {
-				CopyNumberRegionRange regionOriginal = regionsChrOriginal.get(indexOriginal);
-				CopyNumberRegionRange regionToAdd    = regionsChrToAdd.get(indexRegionsToAdd);
-				RegionRange.RegionRangeOverlap overlapType = regionOriginal.testAndCharacterizeOverlap(regionToAdd);
-					
-				switch(overlapType) {
-				case Equals: 
-					regionOriginal.mRecurrenceScore += recurrentScoreIncrement; 
-					indexOriginal++;
-					indexRegionsToAdd++;
-					break;
-				case BeforeWithoutOverlap: case AdjacentBefore:
-					// We leave the block in the original list as is, and we simply increment our original index
-					indexOriginal++;
-					break;
-				case AfterWithoutOverlap: case AdjacentAfter: {  // use braces to prevent declarations from spilling into other cases
-					CopyNumberRegionRange cnrr = regionToAdd.getCopy();
-					regionsChrOriginal.add(indexOriginal, cnrr);
-					indexOriginal++;  // To keep with the correct original region
-					indexRegionsToAdd++;  // move to the next region to add
-					break;
-				}
-				case BeforeViaDiffChromosome: case AfterViaDiffChromosome: 
-					Utils.throwErrorAndExit("ERROR: Should be on different chromosomes!");
-					break;
-				case SubsumesTotal: case SubsumesAlignedRight: case BeforeWithOverlap: {
-					//int diffRegionStart = regionToAdd.getRangeStart() - regionOriginal.getRangeStart();
-					// The following procedure reduces these cases to: 
-					//    SubsumesAlignedLeft, if SubsumesTotal was this case
-					//    Equals, if SubsumesAlignedRight was this case
-					CopyNumberRegionRange cnrrBefore = regionOriginal.getCopy();  // make a copy to keep the stats
-					cnrrBefore.setRangeEnd(regionToAdd.getRangeStart() - 1);  // make left-adjacent to the toAdd region
-					regionOriginal.setRangeStart(regionToAdd.getRangeStart());  // make left-aligned to the toAdd region
-					regionsChrOriginal.add(indexOriginal, cnrrBefore);  // add the preceding block to the array at this point
-					indexOriginal++;  // increment the original array index
-					break;
-				}
-				case SubsumesAlignedLeft: {
-					// The following procedure reduces the case to Eq 
-					CopyNumberRegionRange cnrrAfter = regionOriginal.getCopy();  // make a copy to keep the stats
-					cnrrAfter.setRangeStart(regionToAdd.getRangeEnd() + 1);  // make right-adjacent to the toAdd region
-					regionOriginal.setRangeEnd(regionToAdd.getRangeEnd());  // make right-aligned to the toAdd region
-					if (regionOriginal.testAndCharacterizeOverlap(regionToAdd) != RegionRange.RegionRangeOverlap.Equals) {
-						Utils.throwErrorAndExit("ERROR: Unequal Regions when should be!");					
-					} 
-					regionsChrOriginal.add(indexOriginal + 1, cnrrAfter);  // Add the next region					
-					break;
-				}
-				case ConsumedByTotal: case ConsumedByAlignedRight: case AfterWithOverlap: {
-					// The following procedure reduces these cases to:
-					//     ConsumedByAlignedLeft, if ConsumedByTotal was this case
-					//     Equals, if ConsumedByAlignedRight was this case
-					CopyNumberRegionRange cnrrBefore = regionToAdd.getCopy();    // make a copy to keep the stats
-					cnrrBefore.setRangeEnd(regionOriginal.getRangeStart() - 1);   // make left-adjacent to the original region
-					regionsChrOriginal.add(indexOriginal, cnrrBefore);  // add the preceding block to the array at this point
-					indexOriginal++;  // increment the original array index
-					
-					CopyNumberRegionRange cnrrCurrent = regionToAdd.getCopy();  // make a copy to keep the stats, and to modify the region without modifying the paramter version
-					cnrrCurrent.setRangeStart(regionOriginal.getRangeStart());  // make left-aligned to the original region
-					regionsChrToAdd.set(indexRegionsToAdd, cnrrCurrent);
-					break;
-				}
-				case ConsumedByAlignedLeft: {
-					// The following procedure reduces the case to Equals, and whatever follows
-					CopyNumberRegionRange cnrrAfter = regionToAdd.getCopy();    // make a copy to keep the stats
-					cnrrAfter.setRangeStart(regionOriginal.getRangeEnd() + 1);  // make right-adjacent to the original region
-					regionsChrToAdd.add(indexRegionsToAdd + 1, cnrrAfter);  
-					
-					CopyNumberRegionRange cnrrCurrent = regionToAdd.getCopy();  // make a copy to keep the stats, and to modify the region without modifying the paramter version
-					cnrrCurrent.setRangeEnd(regionOriginal.getRangeEnd());      // make right-aligned to the original region
-					if (cnrrCurrent.testAndCharacterizeOverlap(regionOriginal) != RegionRange.RegionRangeOverlap.Equals) {
-						Utils.throwErrorAndExit("ERROR: Unequal Regions when should be!");
-					}
-					regionsChrToAdd.set(indexRegionsToAdd, cnrrCurrent);
-					break;					
-				}		
-				default:
-					Utils.throwErrorAndExit("ERROR: Invalid option!");
-				}				
-			}			
+		for (int chromIndex = 1; chromIndex < regionsTarget.mRegionsByChrom.size(); chromIndex++) {
+			
+			ArrayList<CopyNumberRegionRange> regionsChrTarget = regionsTarget.mRegionsByChrom.get(chromIndex);
+			ArrayList<CopyNumberRegionRange> regionsChrSource = regionsSource.mRegionsByChrom.get(chromIndex);			
+			takeUnionAndBreakDownIntersectingRegions(regionsChrTarget, regionsChrSource, clusterType);			
 		}
-		return regionsOriginal;
+		return regionsTarget;
+	}
 	
-		/*
+	public static ArrayList<CopyNumberRegionRange>
+		takeUnionAndBreakDownIntersectingRegions(ArrayList<CopyNumberRegionRange> regionsTarget, ArrayList<CopyNumberRegionRange> regionsSource, final ClusterType clusterType) {		
 		
+		// Make a pseudo-shallow array copy so we don't alter the caller's master copy 
+		regionsSource = new ArrayList<CopyNumberRegionRange>(regionsSource);  
+		
+		int indexTarget = 0;
+		int indexSource = 0;
+		RegionRange.RegionRangeOverlap overlapTypePredicted = null;
+		
+		while ((indexTarget < regionsTarget.size()) && (indexSource < regionsSource.size())) {
+			//System.out.println(indexTarget + "\t" + regionsTarget.size() + "\t" + indexSource + "\t" + regionsSource.size());
+			CopyNumberRegionRange regionTarget = regionsTarget.get(indexTarget);
+			CopyNumberRegionRange regionSource = regionsSource.get(indexSource);
+
+			// Check and make sure that we are using the correct cluster type
+			if (regionTarget.mCopyNumberClusterType != clusterType) {
+				regionsTarget.remove(indexTarget);
+				//indexTarget++;
+				continue;
+			} else if (regionSource.mCopyNumberClusterType != clusterType) {
+				regionsSource.remove(indexSource);
+				//indexSource++;
+				continue;
+			}
+			
+			// Test for what type of overlap we have
+			RegionRange.RegionRangeOverlap overlapType = regionTarget.testAndCharacterizeOverlap(regionSource);			
+			
+			// Some of the following cases reduce down to other cases.  The following comparison
+			// checks to make sure that the reduction producres for cases were done properly.  Some
+			// cases are endpoints and do not result in reductions, however.
+			if ((overlapTypePredicted != null) && (overlapTypePredicted != overlapType)) {
+				Utils.throwErrorAndExit("ERROR: Predicted and determined region overlap types don't match!" 
+						+ overlapTypePredicted + "\t" + overlapType);
+			}
+			
+			//System.out.println(overlapType);
+			switch(overlapType) {
+			case Equals: 
+				regionTarget.mRecurrenceScore += regionSource.mRecurrenceScore; 
+				indexTarget++;
+				indexSource++;
+				overlapTypePredicted = null;
+				break;
+			case BeforeWithoutOverlap: case AdjacentBefore:
+				// We leave the block in the target list as is, and we simply increment our target index
+				indexTarget++;
+				overlapTypePredicted = null;
+				break;
+			case AfterWithoutOverlap: case AdjacentAfter: {  // use braces to prevent declarations from spilling into other cases					
+				regionsTarget.add(indexTarget, regionSource.getCopy());
+				indexTarget++;  // To keep with the correct target region
+				indexSource++;  // move to the next region to add
+				overlapTypePredicted = null;
+				break;
+			}
+			case BeforeViaDiffChromosome: case AfterViaDiffChromosome: 
+				overlapTypePredicted = null;
+				Utils.throwErrorAndExit("ERROR: Should be on different chromosomes!");					
+				break;
+			case SubsumesTotal: case SubsumesAlignedRight: case BeforeWithOverlap: {					
+				breakdownThreeCasesHelper(regionsTarget, regionsSource, indexTarget, indexSource, false, true);
+				indexTarget++;  // increment the target array index				
+
+				// The following procedure reduces these cases to: 
+				//    SubsumesAlignedLeft, if SubsumesTotal was this case
+				//    Equals, if SubsumesAlignedRight was this case
+				overlapTypePredicted = (overlapType == SubsumesTotal) ? SubsumesAlignedLeft : 
+					((overlapType == BeforeWithOverlap) ? ConsumedByAlignedLeft : Equals);
+				break;
+			}
+			case SubsumesAlignedLeft: {
+				// The following procedure reduces the case to Equals, and whatever follows
+				breakdownSubsumesConsumedAlignedLeftHelper(regionsTarget, regionsSource, indexTarget, indexSource, false);
+				overlapTypePredicted = RegionRangeOverlap.Equals;
+				break;
+			}
+			case ConsumedByTotal: case ConsumedByAlignedRight: case AfterWithOverlap: {
+				// The following procedure reduces these cases to:
+				//     ConsumedByAlignedLeft, if ConsumedByTotal was this case
+				//     Equals, if ConsumedByAlignedRight was this case
+				breakdownThreeCasesHelper(regionsSource, regionsTarget, indexSource, indexTarget, true, false);
+				indexTarget++;  // increment the target array index
+				
+				overlapTypePredicted = (overlapType == ConsumedByTotal) ? ConsumedByAlignedLeft :
+					((overlapType == AfterWithOverlap) ? SubsumesAlignedLeft : Equals);
+				break;
+			}
+			case ConsumedByAlignedLeft: {
+				// The following procedure reduces the case to Equals, and whatever follows
+				breakdownSubsumesConsumedAlignedLeftHelper(regionsSource, regionsTarget, indexSource, indexTarget, true);
+				overlapTypePredicted = RegionRangeOverlap.Equals;
+				break;					
+			}		
+			default:
+				Utils.throwErrorAndExit("ERROR: Invalid option!");
+			}				
+		}
+
 		// Add any remaining regions.  We know that either of the following two loops will execute, but not both
 		// since the previous loop was broken by failure of one of the loop conditions.
-		for (; indexOriginal < regionsOriginal.size(); indexOriginal++) {
-			CopyNumberRegionRange regionFromOriginal = new CopyNumberRegionRange(copyNumberClusterType, chrom, regionStart)
+		// 
+		// We do not need to add any regions to the target array, as either the array elements
+		// were already traversed, or they already exist in the original array.  We only need to 
+		// add elements (actually, their copies) if more still exist in the source array. 
+		for (; indexSource < regionsSource.size(); indexSource++) {
+			regionsTarget.add( regionsSource.get(indexSource).getCopy() );
 		}
-		return regionsOriginal;
-	*/
+		
+		return regionsTarget;
+	}
+	
+	/** A helper function used by the SubsumesAlignedLeft and ConsumedByAlignedLeft cases. */
+	private static void breakdownSubsumesConsumedAlignedLeftHelper(
+			ArrayList<CopyNumberRegionRange> regionsList1, 
+			ArrayList<CopyNumberRegionRange> regionsList2,
+			int indexList1, int indexList2, 
+			boolean makeCopyOfRegionFromList1) {
+		
+		CopyNumberRegionRange region1 = regionsList1.get(indexList1);
+		CopyNumberRegionRange region2 = regionsList2.get(indexList2);
+		
+		CopyNumberRegionRange cnrrAfter = region1.getCopy();  // make a copy to keep the stats
+		cnrrAfter.setRangeStart(region2.getRangeEnd() + 1);   // make right-adjacent to the toAdd region					
+		regionsList1.add(indexList1 + 1, cnrrAfter);          // Add the next region
+		
+		CopyNumberRegionRange cnrrCurrent = (makeCopyOfRegionFromList1) ? 
+				region1.getCopy() : 		// make a copy to keep the stats, and to modify the region without modifying the paramter version 
+				region1;                    // don't make a copy, but allow the region itself to be modified later
+						
+		cnrrCurrent.setRangeEnd(region2.getRangeEnd());  // make right-aligned to the toAdd region
+		regionsList1.set(indexList1, cnrrCurrent);
+	}
+	
+	private static void breakdownThreeCasesHelper(
+			ArrayList<CopyNumberRegionRange> regionsList1, 
+			ArrayList<CopyNumberRegionRange> regionsList2,
+			int indexList1, int indexList2, 
+			boolean makeCopyOfRegionFromList1,
+			boolean insertNewRegionIntoList1) {
+		
+		CopyNumberRegionRange region1 = regionsList1.get(indexList1);
+		CopyNumberRegionRange region2 = regionsList2.get(indexList2);
+		
+		CopyNumberRegionRange cnrrBefore = region1.getCopy();  // make a copy to keep the stats
+		cnrrBefore.setRangeEnd(region2.getRangeStart() - 1);  // make left-adjacent to the toAdd region
+		if (insertNewRegionIntoList1) {
+			regionsList1.add(indexList1, cnrrBefore);  // add the preceding block to the array at this point
+			indexList1++;
+		} else {
+			regionsList2.add(indexList2, cnrrBefore);  // add the preceding block to the array at this point
+			indexList2++;
+		}
+		
+		CopyNumberRegionRange cnrrCurrent = (makeCopyOfRegionFromList1) ? 
+				region1.getCopy() : 		// make a copy to keep the stats, and to modify the region without modifying the paramter version 
+				region1;                    // don't make a copy, but allow the region itself to be modified later
+
+		cnrrCurrent.setRangeStart(region2.getRangeStart());  // make left-aligned to the toAdd region
+		regionsList1.set(indexList1, cnrrCurrent);
 	}
 	
 	/**
@@ -883,8 +987,7 @@ public class Script {
 												recur.set(big_ind, recur.get(big_ind) + 1.0); //increase region X's recurrence score
 												region_pats.get(big_ind).add(columnsOther[0]);
 												break;
-											}
-											else if (yth.x < xth.x && (xth.x < yth.y && yth.y < xth.y)) { //if region X slides to the right of region Y (they are still intersecting)
+											} else if (yth.x < xth.x && (xth.x < yth.y && yth.y < xth.y)) { //if region X slides to the right of region Y (they are still intersecting)
 												ind = indexOf((new Point(xth.x, yth.y)), regions);
 												if (ind!=-1) { //if we have seen region overlap(X, Y) before
 													recur.set(ind, recur.get(ind) + 1.0);
@@ -892,17 +995,16 @@ public class Script {
 														region_pats.get(ind).add(columns[0]);
 													if (Utils.indexOf(region_pats.get(ind), columnsOther[0])==-1)
 														region_pats.get(ind).add(columnsOther[0]);
-												}
-												else {
+												} else {
 													regions.add(new Point(xth.x, yth.y));
 													recur.add(1.0);
-													region_pats.add(new ArrayList<String>());
-													region_pats.get(region_pats.size() - 1).add(load[x].split(",")[0]);
-													region_pats.get(region_pats.size() - 1).add(columnsOther[0]);
+													ArrayList<String> newPats = new ArrayList<String>();
+													region_pats.add(newPats);
+													newPats.add(columns[0]);
+													newPats.add(columnsOther[0]);
 												}
 												break;
-											}
-											else if (xth.x == yth.x && xth.y == yth.y) { //if regions X and Y have the same bounds
+											} else if (xth.x == yth.x && xth.y == yth.y) { //if regions X and Y have the same bounds
 												recur.set(big_ind, recur.get(big_ind) + 1.0);
 												region_pats.get(big_ind).add(columnsOther[0]);
 												break;
