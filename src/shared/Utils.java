@@ -21,7 +21,7 @@ public class Utils {
 	public static final String rsNegative = "rs-1";
 	public static final String SemicolonStr = ";";
 	public static final String NAStr  = "N/A";
-	
+	public static final String RangeDash = "-";
 	public static final int NumAutosomes = 22;
 	
 	public static final FileExtensionAndDelimiter FileExtensionCSV = new FileExtensionAndDelimiter(".csv", CommaStr);
@@ -29,10 +29,7 @@ public class Utils {
 
 	
 	public static double log(float param) {
-		if (param==0)
-			return param;
-		else
-			return Math.log(param);
+		return (param == 0) ? param : Math.log(param);
 	}
 	
 	public static float normalize(float val, float min, float max, float new_min, float new_max) {
@@ -81,6 +78,17 @@ public class Utils {
 		return -1;
 	}
 	
+	/** Given an arraylist of arraylists of a certain type, this adds numNewArraysToAdd new ArrayLists of
+	 *  that type to the target list.
+	 * @param targetList
+	 * @param numNewArraysToAdd
+	 */
+	public static<T> void addNewEmptyArrayLists(ArrayList<ArrayList<T>> targetList, int numNewArraysToAdd) {
+		for (int i = 0; i < numNewArraysToAdd; i++) {
+			targetList.add(new ArrayList<T>());
+		}
+	}
+	
 	// removes last n elements from the list
 	public static<T> ArrayList<T> removeLastNElements(ArrayList<T> theList, int numLastElementsToRemove) {
 		numLastElementsToRemove = Math.min(numLastElementsToRemove, theList.size());
@@ -90,6 +98,61 @@ public class Utils {
 			listSize--;
 		}
 		return theList;
+	}
+	
+	/** Given a tab-delimited string, this returns the value (as a String of the nth column, where 0
+	 *  represents the first column, 1 represents the second column, and so on.  
+	 *  @return the value in the column, or null if the column does not exist.  A blank
+	 *  string is returned if the column exists but contains no value (i.e. two consecutive
+	 *  tab characters).
+	 */
+	public static String extractNthColumnValue(String line, int nthColumn, String delim) {		
+				
+		// Test whether we have a blank line or not
+		if (line.isEmpty()) return "";
+		
+		// The location of the first delimiter
+		int indexFirstDelimiter = line.indexOf(delim);
+		
+		// Test this special case.  If the 0th column is desired, the line may only contain
+		// one column with no delimiter.  In addition, if the first column is blank (evidenced
+		// by a delimiter character at the beginning of the line), we just return a blank string.
+		if (nthColumn == 0) {
+			
+			// If we have no delimiter existing in the line, we set its index to the string length 
+			indexFirstDelimiter = (indexFirstDelimiter < 0) ? line.length() : indexFirstDelimiter;
+			
+			// Now we return the first token, whether it exists or is blank 
+			return ((indexFirstDelimiter == 0) ? "" : line.substring(0, indexFirstDelimiter));
+			
+		} else {
+			
+			// Test whether our delimiter exists
+			if (indexFirstDelimiter < 0) {
+				Utils.throwErrorAndExit("ERROR: The string does not contain at least two columns.  String:\n" + line);
+			}
+			
+			// Now move the first delimiter over to the appropriate column
+			for (int i = 1; i < nthColumn; i++) {
+				indexFirstDelimiter = line.indexOf(delim, indexFirstDelimiter + 1);
+				if (indexFirstDelimiter < 0) {
+					Utils.throwErrorAndExit("ERROR: The string does not have " + (nthColumn + 1) + " colum(s).  String:\n" + line);
+				}
+			}
+			
+			// Now we have our delimiter placed correctly.  We now check for the second delimiter
+			int indexSecondDelimiter = line.indexOf(delim, indexFirstDelimiter + 1);
+			
+			// If the second delimiter index doesn't exist, then it means we are at the end of the line
+			indexSecondDelimiter = (indexSecondDelimiter < 0) ? line.length() : indexSecondDelimiter;
+			
+			// Now return the substring
+			if (1 == indexSecondDelimiter - indexFirstDelimiter) {
+				return "";
+			} else {
+				return line.substring(indexFirstDelimiter + 1, indexSecondDelimiter);
+			}
+		}
 	}
 	
 	/** Returns whether the value is in the range, with an exclusive lower bound and inclusive upper bound. */
@@ -260,9 +323,54 @@ public class Utils {
 		}
 	}
 	
+	public static void TestExtractNthColumn() {
+		String testString = "a b cd efg h i jkl m";		
+		testString = testString.replaceAll(" ", "\t");
+		System.out.println(testString);
+		
+		for (int i = 0; i < 8; i++) {
+			System.out.println(extractNthColumnValue(testString, i, "\t"));
+		}
+		
+		System.out.println(Character.toChars('a' + 2));
+	}
+	
+	public static void TestExtractNthColumnRobust() {
+		int numTrials = 10000000;
+		StringBuilder sb = new StringBuilder(4096);
+		Random randomGen = new Random();
+		String delim = Utils.TabStr;
+		
+		for (int trial = 0; trial < numTrials; trial++) {
+			if (trial % 1000 == 0) System.out.println("Trial: " + trial);
+			sb.setLength(0);
+			int numColumns = randomGen.nextInt(10) + 1;
+			for (int col = 0; col < numColumns; col++) {
+				int colLength = randomGen.nextInt(4);
+				for (int i = 0; i < colLength; i++) {
+					int charCode = 'a' + randomGen.nextInt(22);
+					sb.append(Character.toChars(charCode));
+				}
+				if (col < numColumns - 1) { sb.append(delim); }
+			}
+			String line = sb.toString();
+			//System.out.println(trial + "\t[" + line + "]");
+			
+			String[] truthCols = line.split(TabPatternStr);
+			for (int i = 0; i < truthCols.length; i++) {
+				String colExtracted = extractNthColumnValue(line, i, Utils.TabStr);
+				if (!truthCols[i].equals(colExtracted)) {
+					Utils.throwErrorAndExit("ERROR: Values don't match!\n" + line + "\n" + i + "\t[" + truthCols[i] + "]\t[" + colExtracted + "]");
+				}
+			}
+		}
+	}
+	
 	public static void main(String[] args) {
-		Test_removeNullElements();
-		Test_extractRsNumberFromLine();
+		//Test_removeNullElements();
+		//Test_extractRsNumberFromLine();
+		//TestExtractNthColumn();
+		TestExtractNthColumnRobust();
 	}
 	
 	// ========================================================================

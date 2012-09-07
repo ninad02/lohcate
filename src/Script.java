@@ -4,13 +4,16 @@ import static genomeUtils.RegionRange.RegionRangeOverlap.*;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 
 import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
+import lohcateEnums.SNVType;
 import lohcateEnums.SeqPlatform;
 import lohcateEnums.VariantLocation;
 import shared.FileOps;
@@ -42,6 +45,17 @@ public class Script {
 	private static final String SomaticStr  = "somatic";
 	private static final String NovelStr  = "novel";	
 	private static final String ChromPrefix = "chr";
+	private static final String MissingGeneNameValue = ".";
+	private static final float MaxVariantAlleleFrequency = 1.0f;
+	
+	// Column constants for the curated TSV files (files that have a cluster column)
+	private static final int ColCuratedTSV_Chrom = 0;
+	private static final int ColCuratedTSV_Position = 1;
+	private static final int ColCuratedTSV_VafTumor = 3;
+	private static final int ColCuratedTSV_Gene = 5;
+	private static final int ColCuratedTSV_MutationType = 6;
+	private static final int ColCuratedTSV_VariantLocation = 7;
+	private static final int ColCuratedTSV_Cluster = 8;
 	
 	public static final GenomicCoordinateComparatorInTextFileLine LineComparatorTab = new GenomicCoordinateComparatorInTextFileLine();
 	
@@ -116,12 +130,13 @@ public class Script {
 		String[] columnHeaders = new String[] { "chr", "pos", "n_vaf", "t_vaf", "allele_freq", "gene", "mutation_type", "germ_som", "cluster" };
 		String headerStr = Utils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();		
 				
-		for (File file : files) {
+		int fileIndex = 0;
+		for (File file : files) {			
 			int indexOfSubstring = file.getName().indexOf("." + GermlineStr);
 			if (indexOfSubstring >= 0) {
 															// && wList(file.getName())) {
-				String samplenameRoot = file.getName().substring(0, indexOfSubstring);  
-				System.out.println(samplenameRoot);
+				String samplenameRoot = file.getName().substring(0, indexOfSubstring);  				
+				System.out.println("Processing (" + ++fileIndex + "): " + file.getName());
 				
 				String somaticFilename = file.getAbsolutePath().replace(GermlineStr, SomaticStr);
 				ArrayList<String> somaticSpecificVariantRows  = FileOps.readAllLinesFromFile(somaticFilename);
@@ -134,11 +149,16 @@ public class Script {
 				// middle of a naf-taf-input file. we're just avoiding those
 				germlineSpecificVariantRows = curateSNPCalls_removeHeaderLinesFromRows(germlineSpecificVariantRows);
 				somaticSpecificVariantRows  = curateSNPCalls_removeHeaderLinesFromRows(somaticSpecificVariantRows);
-				Collections.sort(germlineSpecificVariantRows, LineComparatorTab);
-				Collections.sort(somaticSpecificVariantRows,  LineComparatorTab);
 				
-				int startingRowGermline = 0;  // include the header line
-				//int startingRowSomatic  = 1;  // we need to ignore the header line 
+				// Create a combined set of rows
+				ArrayList<String> allVariantRows = new ArrayList<String>(germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
+				allVariantRows.addAll(germlineSpecificVariantRows);
+				int indexFirstSomaticRowInAllVariants = allVariantRows.size();  // save the size with just the germline variants added
+				allVariantRows.addAll(somaticSpecificVariantRows);
+				
+				//Collections.sort(germlineSpecificVariantRows, LineComparatorTab);
+				//Collections.sort(somaticSpecificVariantRows,  LineComparatorTab);
+				Collections.sort(allVariantRows,              LineComparatorTab);
 								
 				String outFilename = samplenameRoot + fileExtDelim.mExtension;
 				String outFilenameFullPath = outDir + File.separator + outFilename; 
@@ -147,12 +167,13 @@ public class Script {
 				IOUtils.writeToBufferedWriter(out, headerStr, true);
 
 				// Now get the clusters
-				ClusterType[] clustersGermline = getClusters(germlineSpecificVariantRows, VariantLocation.Germline, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
+				ClusterType[] clustersGermline = getClusters(allVariantRows, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
 				System.out.println("Got clusters");
 				
 				// Do the post-processing
-				for (int i = startingRowGermline; i < germlineSpecificVariantRows.size(); i++) {
-					String strRow = germlineSpecificVariantRows.get(i);
+				int startingRowGermlineOrSomaticOrAll = 0;  // 0 because header line has been stripped away
+				for (int i = startingRowGermlineOrSomaticOrAll; i < allVariantRows.size(); i++) {
+					String strRow = allVariantRows.get(i);
 					ClusterType clusterType = clustersGermline[i];
 										
 					String[] germCols = strRow.split(Utils.TabStr);
@@ -193,13 +214,8 @@ public class Script {
 					
 					//System.out.println("Got variant annotations");
 					
-					// TODO 
-					/*
-					 * germ_som = "germline";
-							if (i > len_gload)
-								germ_som = "somatic";
-					 */
-					String targetTissue = GermlineStr;
+					// Determine whether we are at a germline or somatic row
+					String targetTissue = (i >= indexFirstSomaticRowInAllVariants) ? SomaticStr : GermlineStr; 
 										
 					String gene = "";
 					String mutationType = "";
@@ -243,69 +259,112 @@ public class Script {
 			return cluster_names.length;
 	}*/
 	
+	// ========================================================================
+	// INNER CLASS
+	// ========================================================================
+	/** An inner class that calculates statistics for a set of sites (with variant 
+	 *  allele frequencies information for tumor and matched normal). */
+	public static class AlleleFrequencyStatsForSample {
+		
+		//NAF {het, loh, dup} FRAME definition via peak detection and parameter-tuned standard deviation expansion
+		//we have to avoid the often hugely dense peak of homozygous mutations (AF > 0.8) and the occasionally hugely dense peak of neg. tail noise / somatics / &c. (AF < 0.2)
+		float mVAFNormalFrameLower = 0.2f;
+		float mVAFNormalFrameUpper = 0.8f; 
+		float mBinSize             = 0.025f; //smoothing parameter
+		int   mNumBins;
+		int[]   mBinCount;    // The bins in which counts are binned and stored
+		float[] mBinValue;    // The value each bin represents
+		
+		// Statistics values
+		float mCountMean = -1;   
+		float mVariance = -1;
+		float mStdDev = -1;
+		
+		public AlleleFrequencyStatsForSample() {
+			mNumBins = (int) ((mVAFNormalFrameUpper - mVAFNormalFrameLower) / mBinSize) + 1;
+			mBinCount = new   int[mNumBins];
+			mBinValue = new float[mNumBins];
+			deduceBinValues();
+			Arrays.fill(mBinCount, 0);			
+		}
+		
+		public void tabulateAndPerformStatistics(ArrayList<String> rows, SeqPlatform platform) {			
+			tallyVariantAlleleFrequenciesIntoBins(rows, platform, true);
+			calculateSummaryStatistics();
+		}
+		
+		private void deduceBinValues() {
+			for (int i = 0; i < mBinValue.length; i++) {
+				mBinValue[i] = mVAFNormalFrameLower + ((i + 1) * mBinSize);
+			}
+		}
+		
+		private void tallyVariantAlleleFrequenciesIntoBins(ArrayList<String> rows, SeqPlatform platform, boolean clearBinCountBins) {
+			if (clearBinCountBins) {
+				Arrays.fill(mBinCount, 0);
+			}
+			
+			// First, tally the variant allele frequencies into bins
+			for (int row = 0; row < rows.size(); row++) {
+				String[] components = rows.get(row).split("\t");
+				float vafNormal = extractVAFNormal(components, platform);
+				if (Utils.inRangeLowerExclusive(vafNormal, mVAFNormalFrameLower, mVAFNormalFrameUpper)) {
+					int binNumber = (int) ((vafNormal - mVAFNormalFrameLower) / mBinSize);
+					mBinCount[binNumber]++;
+				}
+			}
+		}
+				
+		private void calculateSummaryStatistics() {
+			// Next, calculate summary statistics (mean, variance, standard deviation) 
+			float total = 0;
+			int numElementsTotal = 0;
+						
+			for (int i = 0; i < mBinCount.length; i++) {
+				total            += (mBinCount[i] * mBinValue[i]);
+				numElementsTotal +=  mBinCount[i];
+			}	
+					
+			mCountMean = (float) total / (float) numElementsTotal;
+			
+			float varianceTotal = 0f;
+			for (int i = 0; i < mBinValue.length; i++) { //calculate std. deviation of # points in each bin
+				float diff = mCountMean - mBinValue[i];
+				float diffSquared = diff * diff;
+				float totalForBin = diffSquared * mBinCount[i];
+				varianceTotal += totalForBin;			
+			}
+			
+			mVariance = varianceTotal / (float) (numElementsTotal - 1);  // -1 for degrees of freedom		
+			mStdDev = (float) Math.sqrt(mVariance);  //standard deviation in NAF-coord across {0.2 < NAF <= 0.8} variants in VAF plot
+		}
+	}
+	
+	
 	/**
 	 * A helper method for curateSNPCalls()
 	 * @param load line-split FileOps.loadFromFile of naf-taf-input
 	 * @param som_start start index of .somatic.txt naf-taf-input data in 'load' parameter
 	 * This assumes header has been stripped out
 	 */
-	public static ClusterType[] getClusters(ArrayList<String> rows, VariantLocation varLoc, SeqPlatform platform) {
-		//int[] rtn = new int[load.length - 1];		
+	public static ClusterType[] getClusters(ArrayList<String> rows, int startingRowGermlineOrSomaticOrAll, SeqPlatform platform) {
 		
-		//NAF {het, loh, dup} FRAME definition via peak detection and parameter-tuned standard deviation expansion
-		//we have to avoid the often hugely dense peak of homozygous mutations (AF > 0.8) and the occasionally hugely dense peak of neg. tail noise / somatics / &c. (AF < 0.2)
-		float vafNormalFrameLower = 0.2f;
-		float vafNormalFrameUpper = 0.8f; 
-		float binSize             = 0.025f; //smoothing parameter
-		
-		int numBins = (int) ((vafNormalFrameUpper - vafNormalFrameLower) / binSize) + 1;		
-		int[] binCount = new int[numBins];				
-		
-		// First, tally the variant allele frequencies into bins
-		for (int row = 0; row < rows.size(); row++) {
-			String[] components = rows.get(row).split("\t");
-			float vafNormal = extractVAFNormal(components, platform);
-			if (Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameLower, vafNormalFrameUpper)) {
-				int binNumber = (int) ((vafNormal - vafNormalFrameLower) / binSize);
-				binCount[binNumber]++;
-			}
-		}
-		
-		// Next, calculate summary statistics (mean, variance, standard deviation) 
-		float total = 0;
-		int numElementsTotal = 0;
-		float[] binValue = new float[binCount.length];
-		for (int i = 0; i < binCount.length; i++) {
-			binValue[i] = vafNormalFrameLower + ((i + 1) * binSize);
-			total     += (binCount[i] * binValue[i]);
-			numElementsTotal +=  binCount[i];
-		}	
-				
-		float countMean = (float) total / (float) numElementsTotal;
-		
-		float varianceTotal = 0f;
-		for (int i = 0; i < binCount.length; i++) { //calculate std. deviation of # points in each bin
-			float diff = countMean - binValue[i];
-			float diffSquared = diff * diff;
-			float totalForBin = diffSquared * binCount[i];
-			varianceTotal += totalForBin;			
-		}
-		float variance = varianceTotal / (float) (numElementsTotal - 1);  // -1 for degrees of freedom		
-		float stdDev = (float) Math.sqrt(variance);  //standard deviation in NAF-coord across {0.2 < NAF <= 0.8} variants in VAF plot
+		AlleleFrequencyStatsForSample afStatsSample = new AlleleFrequencyStatsForSample();
+		afStatsSample.tabulateAndPerformStatistics(rows, platform);
 		
 		// Now we adjust the frames based on the standard deviation
-		vafNormalFrameLower = countMean - (NAF_STRIP_EXPANDER * stdDev);
-		vafNormalFrameUpper = countMean + (NAF_STRIP_EXPANDER * stdDev);
+		float vafNormalFrameAdjustedLower = afStatsSample.mCountMean - (NAF_STRIP_EXPANDER * afStatsSample.mStdDev);
+		float vafNormalFrameAdjustedUpper = afStatsSample.mCountMean + (NAF_STRIP_EXPANDER * afStatsSample.mStdDev);
 		//System.out.println("MEAN = " + count_mean + " | STD_DEV = " + std_dev);
 		//System.out.println("NAF FRAME = " + (count_mean - std_dev) + " - " + (count_mean + std_dev));
 		
 		//apply DBScan to points within NAF frame
-		ArrayList<Floint> points = new ArrayList<Floint>();
+		ArrayList<Floint> points = new ArrayList<Floint>(rows.size());
 		for (int row = 0; row < rows.size(); row++) {
-			String[] components = rows.get(row).split("\t");			
-			float vafNormal = extractVAFNormal(components, platform);
-			if (Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameLower, vafNormalFrameUpper)) {	
-				points.add(  new Floint(extractVAFTumor(components, platform), vafNormal)  );			
+			String line = rows.get(row);			
+			float vafNormal = extractVAFNormal(line, platform);
+			if (Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper)) {	
+				points.add(  new Floint(extractVAFTumor(line, platform), vafNormal)  );			
 			}
 		}
 	
@@ -317,7 +376,7 @@ public class Script {
 		//hepato --> (1.25, (0.035, 100), (0.015, 100))
 		//renal-we --> (1, (0.05, 500), (0.02, 350))
 		
-		System.out.println("Getting clusters: " + (new Date()).toString());
+		System.out.println("Begin clustering algorithm: " + (new Date()).toString());
 		
 		DBScanFast dbscanner = new DBScanFast(points, HET_BALL_EPS, HET_BALL_MINPTS); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
 		dbscanner.cluster();
@@ -329,7 +388,7 @@ public class Script {
 		dbscanner.cluster();
 		int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
 		
-		System.out.println("Finished clusters: " + (new Date()).toString());
+		System.out.println("End clustering algorithm: " + (new Date()).toString());
 		
 		int nonAgreeingClusterID = -1;
 		for (int i = 0; i < clusterAssignments.length; i++) {
@@ -343,14 +402,52 @@ public class Script {
 		ClusterType[] returnClusters = new ClusterType[rows.size()];
 		
 		for (int row = 0; row < rows.size(); row++) {
-
-			if (varLoc == VariantLocation.Somatic) {
-				returnClusters[row] = ClusterType.Somatic;  // somatic
-			} else {
-				String[] components = rows.get(row).split("\t");
-				float vafNormal = extractVAFNormal(components, platform);
+			
+			//String[] components = rows.get(row).split("\t");
+			String line = rows.get(row);
+			float vafNormal = extractVAFNormal(line, platform);
+			boolean vafInRangeNormal = Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper);
+			
+			if ((row >= startingRowGermlineOrSomaticOrAll) && (!vafInRangeNormal)) {
+				// The vafNormal is either very low (homozygous reference) or very high (homozygous common variant).
+				// We do some very simple decision making now (which should be replaced by formal clustering later)
+				// to partition the calls.
+				float justBelowZero = -0.0001f;				
+				float hetBoundaryLower = 0.3333f;
+				float hetBoundaryUpper = 0.6667f;
+				float vafTumor = extractVAFTumor(line, platform);
+				if (Utils.inRangeLowerExclusive(vafNormal, justBelowZero, vafNormalFrameAdjustedLower)) {
+					// We are equal to or below the lower frame boundary
+					if (vafTumor <= hetBoundaryLower) {
+						// Normal: AA, Tumor: AA [Thus homozygous reference in both, no events]
+						returnClusters[row] = ClusterType.Null;
+					} else if (vafTumor > hetBoundaryUpper) {
+						// Normal: AA, Tumor: BB or CC [made by: AA -> AB or AC (somatic het mutation) -> B or C (LOH, loss of A)]
+						returnClusters[row] = ClusterType.LOH;
+					} else {
+						// Normal: AA, Tumor: AB [made by: AA -> AB (somatic het mutation)
+						returnClusters[row] = ClusterType.HET;
+					}					
+				} else if (Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameAdjustedUpper, MaxVariantAlleleFrequency)) {
+					// We are above the upper frame boundary
+					if (vafTumor <= hetBoundaryLower) {
+						// Normal: BB, Tumor: AB [made by: BB -> AB (reverse somatic het mutation) -> A (LOH, loss of B)]
+						returnClusters[row] = ClusterType.LOH;
+					} else if (vafTumor > hetBoundaryUpper) {
+						// Normal: BB, Tumor: BB or CC (ambiguous until we know exact variant for tumor)
+						// TODO - Leave as Null for now, but will need to change later to resolve the
+						// ambiguity mentioned above
+						returnClusters[row] = ClusterType.Null;
+					} else {
+						// Normal: BB, Tumor: AB or CB [made by: BB -> AB (reverse somatic het mutation) or BB -> CB (somatic het mutation)
+						returnClusters[row] = ClusterType.HET;
+					}
+				} else {
+					Utils.throwErrorAndExit("ERROR: Contradiction - variant allele frequency cannot be in and out of bounds simultanteously!" + vafNormal);
+				}
 				
-				if (Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameLower, vafNormalFrameUpper)) {
+			} else {	// Our vaf-normal is in range in somatic sites, or we're at a germline site regardless of vaf-normal value	
+				if (vafInRangeNormal) {
 					++indexInClusterAssignments;
 					
 					if (clusterAssignments[indexInClusterAssignments] == clusterIDofHetBall) {
@@ -389,6 +486,16 @@ public class Script {
 		return Float.NaN;
 	}
 	
+	// Extracts and calculates the variant allele frequency in the normal depending on the platform tab-delimited file
+	private static float extractVAFNormal(String line, SeqPlatform platform) {
+		switch(platform) {
+		case Illumina: return  Float.parseFloat(Utils.extractNthColumnValue(line, 7, Utils.TabStr));
+		case SOLiD:    return (Float.parseFloat(Utils.extractNthColumnValue(line, 6, Utils.TabStr)) / 
+				               Float.parseFloat(Utils.extractNthColumnValue(line, 5, Utils.TabStr)));
+		}
+		return Float.NaN;		
+	}
+	
 	private static float extractVAFTumor(String[] components, SeqPlatform platform) {
 		switch(platform) {
 		case Illumina: return  Float.parseFloat(components[8]);
@@ -397,6 +504,15 @@ public class Script {
 		return Float.NaN;
 	}
 	
+	// Extracts and calculates the variant allele frequency in the tumor depending on the platform tab-delimited file
+	private static float extractVAFTumor(String line, SeqPlatform platform) {
+		switch(platform) {
+		case Illumina: return  Float.parseFloat(Utils.extractNthColumnValue(line, 8, Utils.TabStr));
+		case SOLiD:    return (Float.parseFloat(Utils.extractNthColumnValue(line, 4, Utils.TabStr)) / 
+				               Float.parseFloat(Utils.extractNthColumnValue(line, 3, Utils.TabStr)));
+		}
+		return Float.NaN;		
+	}
 	
 	// ========================================================================
 	// Stage 2: Segmentation
@@ -414,12 +530,38 @@ public class Script {
 		File[] files = (new File(inDir)).listFiles();
 		ArrayList<CopyNumberRegionsByChromosome> regionsInSamples = new ArrayList<CopyNumberRegionsByChromosome>();
 		
+		// First we determine the regions from each sample
 		for (File file : files) {
 			CopyNumberRegionsByChromosome regionsInSampleByChr = segmentRegionsOneFile(file, outDir);
 			if (regionsInSampleByChr != null) {
 				regionsInSamples.add(regionsInSampleByChr);
 			}
 		}
+		
+		// Now we want to overlap the regions
+		CopyNumberRegionsByChromosome recurrentRegionsLOH = determineRecurrentRegions(regionsInSamples, ClusterType.LOH);
+		recurrentRegionsLOH.print(System.out);
+	}
+
+	// ========================================================================
+	/** This takes in a list of regions per sample and intersects all the regions.  It reports
+	 *  for each intersecting region the recurrence score across samples.
+	 *   
+	 */
+	public static CopyNumberRegionsByChromosome determineRecurrentRegions(ArrayList<CopyNumberRegionsByChromosome> regionsInSamples, ClusterType clusterType) {
+		
+		// Test for a null parameter
+		if (regionsInSamples.isEmpty()) return null;
+		
+		// Create a copy that serves as the target (or "sink") for all the intersecting regions
+		CopyNumberRegionsByChromosome target = regionsInSamples.get(0).getDeepCopy();
+		
+		// Now traverse the rest of the samples
+		for (int i = 1; i < regionsInSamples.size(); i++) {
+			takeUnionAndBreakDownIntersectingRegions(target, regionsInSamples.get(i), clusterType);
+		}
+		
+		return target;
 	}
 	
 	// ========================================================================
@@ -447,9 +589,9 @@ public class Script {
 			String line = allLines.get(row);			
 			String[] columns = line.split(Utils.TabPatternStr);
 			
-			final Chrom chrom  = Chrom.getChrom  (columns[0]);
+			final Chrom chrom  = Chrom.getChrom  (columns[ColCuratedTSV_Chrom]);
 			final int position = Integer.parseInt(columns[1]);
-			final ClusterType clusterType = ClusterType.getClusterType(columns[8]);
+			final ClusterType clusterType = ClusterType.getClusterType(columns[ColCuratedTSV_Cluster]);
 			
 			// If the chromosome has changed, we set that we have no current region
 			if ((chrom != chromPreviousRow) && (currentRegion != null)) {
@@ -498,14 +640,7 @@ public class Script {
 		
 		if (currentRegion != null) currentRegion.makeFinalized();
 		
-		System.out.println(inFile.getName());
-		
-		for (ArrayList<CopyNumberRegionRange> regionsOnChr : regionsByChrom.mRegionsByChrom) {
-			for (CopyNumberRegionRange cnrr : regionsOnChr) {
-				System.out.println(cnrr.mCopyNumberClusterType + "\t" + cnrr.toString());
-			}
-		}
-		
+		System.out.println(inFile.getName());				
 		return regionsByChrom;
 	}
 	
@@ -524,8 +659,8 @@ public class Script {
 	// INNER CLASS
 	// ========================================================================
 	public static class CopyNumberRegionRange extends RegionRange {
-		ClusterType mCopyNumberClusterType;
-		float mRecurrenceScore;
+		public ClusterType mCopyNumberClusterType;
+		public float mRecurrenceScore;
 		
 		public CopyNumberRegionRange(ClusterType copyNumberClusterType, Chrom chrom, int regionStart) {
 			super(chrom, regionStart);
@@ -554,6 +689,8 @@ public class Script {
 	/** Stores the regions for a given sample, split by chromosome.  
 	 *  Chromosomes are indexed starting at 1 */
 	public static class CopyNumberRegionsByChromosome {
+		private static final ArrayList<CopyNumberRegionRange> dummyListForChrom0 = new ArrayList<CopyNumberRegionRange>();
+		
 		ArrayList< ArrayList<CopyNumberRegionRange> > mRegionsByChrom;
 		
 		public CopyNumberRegionsByChromosome() {
@@ -589,8 +726,20 @@ public class Script {
 			
 			return newCopy;
 		}
-	}
 		
+		/** Prints the contents to the PrintStream. */
+		public void print(PrintStream out) {
+			for (ArrayList<CopyNumberRegionRange> regionsOnChr : mRegionsByChrom) {
+				for (CopyNumberRegionRange cnrr : regionsOnChr) {
+					out.println(cnrr.mCopyNumberClusterType + "\t" + cnrr.mRecurrenceScore + "\t" + cnrr.toString());
+				}
+			}
+		}		
+	}
+	// ========================================================================
+	// ========================================================================
+	
+	
 	/** Given an "original" list of regions and an "added" list of regions, this
 	 *  takes the union of the regions.  If there are overlaps, the regions
 	 *  are broken into component pieces in which the overlapping sections 
@@ -627,7 +776,6 @@ public class Script {
 		
 		// First iterate over the chromosomes		
 		for (int chromIndex = 1; chromIndex < regionsTarget.mRegionsByChrom.size(); chromIndex++) {
-			
 			ArrayList<CopyNumberRegionRange> regionsChrTarget = regionsTarget.mRegionsByChrom.get(chromIndex);
 			ArrayList<CopyNumberRegionRange> regionsChrSource = regionsSource.mRegionsByChrom.get(chromIndex);			
 			takeUnionAndBreakDownIntersectingRegions(regionsChrTarget, regionsChrSource, clusterType);			
@@ -675,7 +823,7 @@ public class Script {
 			//System.out.println(overlapType);
 			switch(overlapType) {
 			case Equals: 
-				regionTarget.mRecurrenceScore += regionSource.mRecurrenceScore; 
+				regionTarget.mRecurrenceScore += 1.0; //regionSource.mRecurrenceScore; 
 				indexTarget++;
 				indexSource++;
 				overlapTypePredicted = null;
@@ -734,15 +882,28 @@ public class Script {
 				Utils.throwErrorAndExit("ERROR: Invalid option!");
 			}				
 		}
+				
 
 		// Add any remaining regions.  We know that either of the following two loops will execute, but not both
 		// since the previous loop was broken by failure of one of the loop conditions.
 		// 
 		// We do not need to add any regions to the target array, as either the array elements
-		// were already traversed, or they already exist in the original array.  We only need to 
-		// add elements (actually, their copies) if more still exist in the source array. 
+		// were already traversed, or they already exist in the original array.  However, we need to remove
+		// elements that may not match the cluster type desired
+		while (indexTarget < regionsTarget.size()) {
+			if (regionsTarget.get(indexTarget).mCopyNumberClusterType != clusterType) {
+				regionsTarget.remove(indexTarget);
+			} else {
+				indexTarget++;
+			}
+		}
+		
+		// We only need to add elements (actually, their copies) if more still exist in the source array. 
 		for (; indexSource < regionsSource.size(); indexSource++) {
-			regionsTarget.add( regionsSource.get(indexSource).getCopy() );
+			CopyNumberRegionRange regionSource = regionsSource.get(indexSource);
+			if (regionSource.mCopyNumberClusterType == clusterType) {
+				regionsTarget.add(regionSource.getCopy());
+			}
 		}
 		
 		return regionsTarget;
@@ -886,34 +1047,45 @@ public class Script {
 	}
 	*/
 	
+	
 	/**
 	 * Now that we have our regions of LOH, let's 'pick up' any somatic mutations that fall within these regions (we'll call them LOH too). somatics don't separate into nice sidelobes in allele-fraction plots.
 	 * @param snps_inDir curated SNP calls
 	 * @param reg_inDir region segmentation data
 	 */
+	/* DEPRECATED
 	public static void pickupSomatics(String snps_inDir, String reg_inDir, String outDir) {
-		File[] files = (new File(snps_inDir)).listFiles();
-		String[] load, reg_load;
-		boolean toBreak, toAppend;
+		File[] files = (new File(snps_inDir)).listFiles();				
+		
 		for (File file : files) { //iterate through patients
 			if (file.getName().indexOf("csv")!=-1) {
 				System.out.println(file.getName().replace(".csv", ""));
-				load = FileOps.loadFromFile(file.getAbsolutePath()).split("\n");
+				
+				String[] load = FileOps.loadFromFile(file.getAbsolutePath()).split("\n");
+				
 				FileOps.writeToFile(outDir + "/" + file.getName(), load[0] + "\n");
-				for (int i = 1; i<load.length; i++) { //iterate through variants
-					toAppend = true;
-					if (load[i].split(",")[8].equals("-1")) { //if somatic
+				
+				for (int i = 1; i < load.length; i++) { //iterate through variants
+					boolean useUnmodifiedRow = true;
+					String[] columns = load[i].split(",");
+					
+					if (columns[8].equals("-1")) { //if somatic
 						System.out.println(i + " of " + load.length);
+						
 						//find out if variant lies within region of continuous DUP/LOH...
 						for (int k = 0; k<cluster_names.length - 1; k++) { //iterate through {dup, loh, roc-loh}
-							reg_load = FileOps.loadFromFile(reg_inDir + "/chr" + load[i].split(",")[0].replace("chr", "") + "/" + cluster_names[k] + ".csv").split("\n");
-							toBreak = false;
-							for (int row = 0; row<reg_load.length; row++) { //iterate through patients
-								for (int col = 1; col<reg_load[row].split(",").length; col++) { //iterate through regions
-									if (Integer.parseInt(reg_load[row].split(",")[col].split("-")[0]) < Integer.parseInt(load[i].split(",")[1])
-											&& Integer.parseInt(load[i].split(",")[1]) <= Integer.parseInt(reg_load[row].split(",")[col].split("-")[1])) { //if point falls within region
+							String[] reg_load = FileOps.loadFromFile(reg_inDir + "/chr" + columns[0].replace("chr", "") + "/" + cluster_names[k] + ".csv").split("\n");
+							
+							boolean toBreak = false;
+							for (int row = 0; row < reg_load.length; row++) { //iterate through patients
+								String[] regions = reg_load[row].split(",");
+								
+								for (int col = 1; col < regions.length; col++) { //iterate through regions
+									if (Integer.parseInt(regions[col].split("-")[0]) < Integer.parseInt(columns[1])
+											&& Integer.parseInt(columns[1]) <= Integer.parseInt(regions[col].split("-")[1])) { //if point falls within region
+										
 										FileOps.appendToFile(outDir + "/" + file.getName(), load[i].replace(",-1\n", ",1\n"));
-										toAppend = false;
+										useUnmodifiedRow = false;
 										toBreak = true; //since the point has already been positively identified, we don't need to keep iterating through patients, regions
 										break; //ditto
 									}
@@ -923,12 +1095,12 @@ public class Script {
 							}
 						}
 					}
-					if (toAppend)
-						FileOps.appendToFile(outDir + "/" + file.getName(), load[i] + "\n");
+					if (useUnmodifiedRow) FileOps.appendToFile(outDir + "/" + file.getName(), load[i] + "\n");
 				}
 			}
 		}
 	}
+	*/
 	
 	/**
 	 * Score regions of 'contiguous' LOH based on recurrence across patients, variant density, &c. Key feature of this method is that it separates regions into their 'least common denominators', which allows for detection of regions that, while smaller than the ones defined by segmentRegions(), may be more recurrent across patients.
@@ -1033,16 +1205,21 @@ public class Script {
 									}
 								}
 							}
-							event_density = ((big_count / region_pats.get(r).size()) / (float)(regions.get(r).y - regions.get(r).x));
-							if (Float.toString(event_density).equals("Infinity")) //div by 0 (usually occurs when # events == 1, which implies event range == 0)
-								event_density = -1;
-							else if (Float.toString(event_density).equals("NaN")) //indeterminate form (usually occurs when numerator, # events == 0)
-								event_density = 0;
-							het_density = ((big_het_count / region_pats.get(r).size()) / (float)(regions.get(r).y - regions.get(r).x));
-							if (Float.toString(het_density).equals("Infinity")) //ditto
-								het_density = -1;
-							else if (Float.toString(het_density).equals("NaN")) //ditto
-								het_density = 0;
+							int regionLength = (regions.get(r).y - regions.get(r).x) + 1;
+							event_density = ((big_count / region_pats.get(r).size()) / (float) regionLength);
+							if (Float.isInfinite(event_density)) {
+								Utils.throwErrorAndExit("ERROR: Cannot have infinite density!");
+							} else if (Float.isNaN(event_density)) {
+								Utils.throwErrorAndExit("ERROR: Cannot have NaN density!");
+							}
+
+							het_density = ((big_het_count / region_pats.get(r).size()) / (float) regionLength);
+							if (Float.isInfinite(het_density)) {
+								Utils.throwErrorAndExit("ERROR: Cannot have infinite density!");
+							} else if (Float.isNaN(het_density)) {
+								Utils.throwErrorAndExit("ERROR: Cannot have NaN density!");
+							}
+							
 							FileOps.appendToFile(outDir + "/" + dir.getName() + "/" + cluster_names[i] + ".csv", regions.get(r).x + "-" + regions.get(r).y + "," + (regions.get(r).y - regions.get(r).x) + "," + (recur.get(r) / (float)(load.length - 1)) + "," + big_count + "," + big_het_count + "," + event_density + "," + het_density + "\n");
 						}
 					} catch (Exception e) { e.printStackTrace(); }
@@ -1060,7 +1237,7 @@ public class Script {
 	
 	public static int indexOf(Gene gene, ArrayList<Gene> arr) {
 		for (int i = 0; i<arr.size(); i++)
-			if (arr.get(i).lbl.equals(gene.lbl))
+			if (arr.get(i).mLabel.equals(gene.mLabel))
 				return i;
 		return -1;
 	}
@@ -1344,66 +1521,145 @@ public class Script {
 	 * Generate 'master' gene enrichment table (used to generate histograms).
 	 * @param inDir curated SNP calls
 	 */
-	public static void getGeneEnrichment(String inDir, String outDir) {
+	public static void getGeneEnrichment(String inDir, String outFilename) {
 		File[] files = (new File(inDir)).listFiles();
-		String[] load;
-		int ind;
-		String name;
-		ArrayList<Gene> genes = new ArrayList<Gene>(); 
-		for (File file : files) { //iterate through curated SNP calls
-			if (file.getName().indexOf("csv")!=-1) {
-				System.out.println(file.getName());
-				load = FileOps.loadFromFile(file.getAbsolutePath()).split("\n");
+		FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionTSV; 
 				
-				for (int i = 1; i < load.length; i++) { // iterate through variants
-					if (i%10000==0) System.out.println(i + " of " + load.length);
+		StringBuilder sb = new StringBuilder(4096);
+		
+		// A list of genes that we will keep binary sorted for efficieny purposes
+		ArrayList<Gene> genes = new ArrayList<Gene>(); 
+		Gene dummyGene = new Gene("", Chrom.c0);  // We'll use this gene for binary searching
+		
+		for (File file : files) { //iterate through curated SNP calls
+			if (file.getName().indexOf(fileExtDelim.mExtension) >= 0) {
+				System.out.println(file.getName());
+				
+				// Load all lines into memory, extract the header row, and then sort by chrom/position
+				ArrayList<String> allLines = IOUtils.readAllLinesFromFile(file.getAbsolutePath(), false, true, sb);
+				String headerString = sb.toString();
+				Collections.sort(allLines, LineComparatorTab);					
+				
+				int startingRow = 0;  // because the header was stripped away
+				for (int row = startingRow; row < allLines.size(); row++) {
+				
+					//if (row % 10000 == 0) System.out.println(row + " of " + allLines.size());
 					
-					String components[] = load[i].split(Utils.CommaStr); 
-					name = components[5];
-					if (name.length() > 0) { //avoid ".", which crops up a lot
-						if (name.indexOf("dist")!=-1) //gene names can sometimes come with an uninteresting/irrelevant prefix
-							name = name.split("\\(")[0];
-						Gene newGene = new Gene(name, components[0]); 
-						ind = indexOf(newGene, genes);
-						if (ind==-1) { //if we haven't seen this gene before
-							genes.add(newGene);
-							ind = genes.size() - 1;
-							for (int k = 0; k<cluster_names.length; k++)
-								genes.get(ind).patients.add(new ArrayList<String>());
+					String components[] = allLines.get(row).split(Utils.TabStr); 
+					String geneName =               components[ColCuratedTSV_Gene];
+					Chrom chrom  = Chrom.getChrom(  components[ColCuratedTSV_Chrom]);
+					int position = Integer.parseInt(components[ColCuratedTSV_Position]);
+
+					
+					if (!geneName.equals(MissingGeneNameValue)) { //avoid ".", which crops up a lot
+						if (geneName.indexOf("dist") >= 0) { //gene names can sometimes come with an uninteresting/irrelevant prefix
+							geneName = geneName.split("\\(")[0];
 						}
-						if (Integer.parseInt(components[1]) > genes.get(ind).max) //get right-bound of gene's range of variants
-							genes.get(ind).max = Integer.parseInt(components[1]); //...left-bound...
-						if (Integer.parseInt(components[1]) < genes.get(ind).min)
-							genes.get(ind).min = Integer.parseInt(components[1]);
-						if (components[6].indexOf("nonsynonymous")!=-1) //increment nonsynonymous variant count
-							genes.get(ind).arr[0]++;
-						else if (components[6].indexOf("synonymous")!=-1) //...synonymous...
-							genes.get(ind).arr[1]++;
-						if (components[7].equals("germline")) //...germline...
-							genes.get(ind).arr[2]++;
-						else if (components[7].equals("somatic")) //...somatic...
-							genes.get(ind).arr[3]++;
-						if (Integer.parseInt(components[8]) < cluster_names.length && Integer.parseInt(components[8]) >= 0)
-							genes.get(ind).counts[Integer.parseInt(components[8])]++; //increment LOH/DUP/&c. count
-						if (Integer.parseInt(components[8])==2) //include right-of-center LOH count in general LOH count
-							genes.get(ind).counts[1]++;
-						for (int k = 0; k<cluster_names.length; k++)
-							if (Utils.indexOf(genes.get(ind).patients.get(k), file.getName())==-1 && Integer.parseInt(components[8])==k)
-								genes.get(ind).patients.get(k).add(file.getName());
+					
+						// Set the dummy gene for binary search
+						dummyGene.mLabel = geneName;
+						dummyGene.mChrom = chrom;
+						
+						int resultIndex = Collections.binarySearch(genes, dummyGene);
+						if (resultIndex < 0) {  
+							// we haven't seen this gene before
+							resultIndex = -(resultIndex + 1);  // calculate the proper insertion point 							 
+							genes.add(resultIndex, new Gene(geneName, chrom));							
+						}
+						Gene currentGene = genes.get(resultIndex);
+						
+						if (position > currentGene.mMaxBasePairPosition) { //get right-bound of gene's range of variants
+							currentGene.mMaxBasePairPosition = position; 
+						}
+						if (position < currentGene.mMinBasePairPosition) { //...left-bound...
+							currentGene.mMinBasePairPosition = position;
+						}
+						
+						String mutationType = components[ColCuratedTSV_MutationType];
+						String mutationTypeLowerCase = mutationType.toLowerCase();  // do this in case we need to retain non-modified string
+						for (SNVType snvType : SNVType.values()) {
+							if (mutationTypeLowerCase.indexOf(snvType.toLowerCase()) >= 0) {
+								currentGene.incrementCountForMutationType(snvType);  // increment synonymous or nonsynonymous variant count
+							}
+						}
+						
+						String variantLocation = components[ColCuratedTSV_VariantLocation];
+						String variantLocationLowerCase = variantLocation.toLowerCase();
+						for (VariantLocation varLoc : VariantLocation.values()) {
+							if (variantLocationLowerCase.indexOf(varLoc.toLowerCase()) >= 0) {
+								currentGene.incrementCountForVariantLocation(varLoc);  // increment counts for germline or somatic
+							}
+						}
+										
+						ClusterType clusterType = ClusterType.getClusterType(components[ColCuratedTSV_Cluster]);
+						if (clusterType == null) { Utils.throwErrorAndExit("ERROR: Invalid cluster type: " + components[ColCuratedTSV_Cluster]); }
+						currentGene.incrementCountForClusterType(clusterType);  // increment LOH/DUP/&c. count
+						double vafTumor = Double.parseDouble(components[ColCuratedTSV_VafTumor]);
+						if ((clusterType == ClusterType.LOH) && (vafTumor > 0.5)) {
+							currentGene.mCountLOHreferenceLost++;
+						}
+						
+						
+						String patientName = file.getName();
+						currentGene.addPatientIfNotAlreadyAdded(patientName, ClusterType.Dup);
+						currentGene.addPatientIfNotAlreadyAdded(patientName, ClusterType.LOH);
+						currentGene.addPatientIfNotAlreadyAdded(patientName, ClusterType.HET);
 					}
 				}
 			}
 		}
-		String header =  "chr,range,gene,nonsynonymous,synonymous,germline,somatic,";
-		for (int i = 0; i<cluster_names.length; i++)
-			header += cluster_names[i] + ",";
-		for (int i = 0; i<cluster_names.length; i++)
-			header += cluster_names[i] + "_recurrence,";
-		FileOps.writeToFile(outDir, header.substring(0, header.length() - 1) + "\n");
-		for (Gene gene : genes)
-			FileOps.appendToFile(outDir, gene.chr + "," + gene.min + "-" + gene.max + "," + gene.lbl + "," + gene.toString() + "\n");
+		
+		String logStr = "_log";
+		String recurrenceStr = "_recurrence";
+		String densityStr = "_density";
+		String[] columnHeaders = new String[] { 
+				"chr", "bp_start", "bp_end", "length", "gene", 
+				SNVType.NonSynonymous.toLowerCase(), 
+				SNVType.Synonymous.toLowerCase(), 
+				VariantLocation.Germline.toLowerCase(), 
+				VariantLocation.Somatic.toLowerCase(),
+				
+				ClusterType.Dup.name(),
+				ClusterType.LOH.name(), 
+				ClusterType.LOH.name() + "_refLost", 
+				ClusterType.HET.name(),
+				
+				ClusterType.Dup.name() + logStr,
+				ClusterType.LOH.name() + logStr, 
+				ClusterType.LOH.name() + "_refLost" + logStr, 
+				ClusterType.HET.name() + logStr,
+				
+				ClusterType.Dup.name() + densityStr,
+				ClusterType.LOH.name() + densityStr, 
+				ClusterType.LOH.name() + "_refLost" + densityStr, 
+				ClusterType.HET.name() + densityStr,
+				
+				ClusterType.Dup.name() + recurrenceStr, 
+				ClusterType.LOH.name() + recurrenceStr, 
+				ClusterType.HET.name() + recurrenceStr,
+		};
+		String headerStr = Utils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();
+
+		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);
+		IOUtils.writeToBufferedWriter(out, headerStr, true);
+		for (Gene gene : genes) {			
+			sb.setLength(0);
+			sb.append(gene.mChrom.getCode())
+				.append(fileExtDelim.mDelimiter).append(gene.mMinBasePairPosition)
+				.append(fileExtDelim.mDelimiter).append(gene.mMaxBasePairPosition)
+				.append(fileExtDelim.mDelimiter).append(gene.getRangeLength())
+				.append(fileExtDelim.mDelimiter).append(gene.mLabel)
+				.append(fileExtDelim.mDelimiter).append(gene.countsToString(fileExtDelim.mDelimiter));
+			IOUtils.writeToBufferedWriter(out, sb.toString(), true);
+			IOUtils.flushBufferedWriter(out);
+		}
+		IOUtils.closeBufferedWriter(out);
 	}
 	
+	
+	// ========================================================================
+	// ENTRY POINT
+	// ========================================================================
 	public static void main(String[] args) {
 		long sys_time_init = System.currentTimeMillis();
 		
@@ -1415,6 +1671,8 @@ public class Script {
 				break;
 			case 1:
 				segmentRegionsAllFiles(root + "/snps", root + "/regions");
+				
+				//No need for this function now: 
 				//pickupSomatics(root + "/snps", root + "/regions", root + "/curated_snps");
 				break;
 			case 2:
@@ -1425,8 +1683,9 @@ public class Script {
 				addScoreTracks(root + "/scored_regions", root + "/score_tracks"); //come back to this
 				break;
 			case 4:
-				getGeneEnrichment(root + "/curated_snps", root + "/gene_enrichment.csv");
-				Enrichment.genTopGeneLists(root + "/gene_enrichment.csv", root + "/gene_enrichment");
+				//getGeneEnrichment(root + "/curated_snps", root + "/gene_enrichment.csv");
+				getGeneEnrichment(root + "/snps", root + "/gene_enrichment.csv");
+				//Enrichment.genTopGeneLists(root + "/gene_enrichment.csv", root + "/gene_enrichment");
 				break;
 			case 5:
 				for (int i = 0; i<cluster_names.length - 1; i++)
