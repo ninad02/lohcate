@@ -15,7 +15,7 @@ public enum VariantLocation {
 	public String toUpperCase() { return mUpperCase; }
 	public String toLowerCase() { return mLowerCase; }
 	
-	public VariantLocation getVariantLocation(String variantLocation) {
+	public static VariantLocation getVariantLocation(String variantLocation) {
 		for (VariantLocation enumType : values()) {
 			if (variantLocation.equals(enumType.name()) ||
 				variantLocation.toLowerCase().equals(enumType.mLowerCase) ||

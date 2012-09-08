@@ -454,29 +454,36 @@ public class Enrichment {
 	 */
 	public static void genTopGeneLists(String inDir, String outDir) {
 		String[] load = FileOps.loadFromFile(inDir).split("\n");
-		ArrayList<Integer> blacklist, g1blacklist, top, g1top;
+		ArrayList<Integer> top, g1top;
 		float temp_max, temp_max_g1;
 		int temp_max_ind, temp_max_ind_g1;
 		for (int i = 0; i<Script.cluster_names.length - 1; i++) { //iterate through {dup, loh}
 			System.out.println(Script.cluster_names[i]);
-			FileOps.writeToFile(outDir + "/gene_enrichment_top_" + Script.cluster_names[i] + ".csv", trim(i, load[0]) + "\n");
-			FileOps.writeToFile(outDir + "/g1/gene_enrichment_top_" + Script.cluster_names[i] + ".csv", trim(i, load[0]) + "\n");
-			blacklist = new ArrayList<Integer>();
+			//FileOps.writeToFile(outDir + "/gene_enrichment_top_" + Script.cluster_names[i] + ".csv", trim(i, load[0]) + "\n");
+			//FileOps.writeToFile(outDir + "/g1/gene_enrichment_top_" + Script.cluster_names[i] + ".csv", trim(i, load[0]) + "\n");
+			ArrayList<Integer> blacklist = new ArrayList<Integer>();
 			top = new ArrayList<Integer>();
 			g1top = new ArrayList<Integer>();
-			g1blacklist = new ArrayList<Integer>();
+			ArrayList<Integer> g1blacklist = new ArrayList<Integer>();
+			
+			int baseColOfClusterTypes = 9;
 			while (top.size() < 20) { //grab top 20 genes by cluster[i] count
-				temp_max = Float.MIN_VALUE; temp_max_g1 = Float.MIN_VALUE;
-				temp_max_ind = -1; temp_max_ind_g1 = -1;
-				for (int row = 1; row<load.length; row++) { //iterate through genes
-					if (load[row].split(",")[2].length() > 1) { //avoid "." gene name
-						if (Utils.indexOf(blacklist, row)==-1 && Float.parseFloat(load[row].split(",")[7 + i]) > temp_max) {
-							temp_max = Float.parseFloat(load[row].split(",")[7 + i]);
+				temp_max = Float.MIN_VALUE; 
+				temp_max_g1 = Float.MIN_VALUE;
+				temp_max_ind = -1; 
+				temp_max_ind_g1 = -1;
+				
+				for (int row = 1; row < load.length; row++) { //iterate through genes
+					String[] columns = load[row].split(Utils.TabStr);
+					
+					if (columns[4].equals(Script.MissingGeneNameValue)) { //avoid "." gene name
+						if (Utils.indexOf(blacklist, row)==-1 && Float.parseFloat(columns[baseColOfClusterTypes]) > temp_max) {
+							temp_max = Float.parseFloat(columns[baseColOfClusterTypes]);
 							temp_max_ind = row;
 						}
-						if (Utils.indexOf(g1blacklist, row)==-1 && Float.parseFloat(load[row].split(",")[7 + i]) > temp_max_g1
-								&& Float.parseFloat(load[row].split(",")[7 + i]) <= 1) {//!load[row].split(",")[1].split("-")[0].equals(load[row].split(",")[1].split("-")[1])) { //handle genes with variant range > 0
-							temp_max_g1 = Float.parseFloat(load[row].split(",")[7 + i]);
+						if (Utils.indexOf(g1blacklist, row)==-1 && Float.parseFloat(columns[baseColOfClusterTypes]) > temp_max_g1
+								&& Float.parseFloat(columns[baseColOfClusterTypes]) <= 1) {//!columns[1].split("-")[0].equals(columns[1].split("-")[1])) { //handle genes with variant range > 0
+							temp_max_g1 = Float.parseFloat(columns[baseColOfClusterTypes]);
 							temp_max_ind_g1 = row;
 						}
 					}
@@ -486,6 +493,7 @@ public class Enrichment {
 				top.add(temp_max_ind);
 				g1top.add(temp_max_ind_g1);
 			}			
+			
 			for (int g = 0; g<top.size(); g++) { //iterate through top genes
 				try {
 					FileOps.appendToFile(outDir + "/gene_enrichment_top_" + Script.cluster_names[i] + ".csv", trim(i, load[top.get(g)]) + "\n");
@@ -503,7 +511,7 @@ public class Enrichment {
 			rtn += "event_count,het_count,recurrence\n";
 		else
 			rtn += param.split(",")[param.split(",").length - Script.cluster_names.length - (Script.cluster_names.length - cluster)] + "," //avoid the recurrence columns (there's 1 for each cluster) & move left [cluster_names.length - cluster] columns
-					+ param.split(",")[param.split(",").length - Script.cluster_names.length - 1] + "," //this method is a little more robust than just using [7 + i], but it doesn't matter that much which indexing method you choose
+					+ param.split(",")[param.split(",").length - Script.cluster_names.length - 1] + "," //this method is a little more robust than just using [baseColOfClusterTypes], but it doesn't matter that much which indexing method you choose
 					+ param.split(",")[param.split(",").length - (Script.cluster_names.length - cluster)] + "\n";
 		return rtn;
 	}

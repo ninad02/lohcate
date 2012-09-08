@@ -16,7 +16,7 @@ public enum SNVType {
 	public String toUpperCase() { return mUpperCase; }
 	public String toLowerCase() { return mLowerCase; }
 	
-	public SNVType getSNVType(String snvType) {
+	public static SNVType getSNVType(String snvType) {
 		for (SNVType enumType : values()) {
 			if ( snvType.equals(enumType.name()) ||
 				 snvType.toLowerCase().equals(enumType.mLowerCase) ||

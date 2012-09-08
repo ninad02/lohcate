@@ -1,6 +1,6 @@
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Comparator;
 
 import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
@@ -57,14 +57,7 @@ public class Gene implements Comparable<Gene> {
 	/** Returns true if the patient was already existing for the clustertype, false otherwise. */
 	public boolean addPatientIfNotAlreadyAdded(String patientName, ClusterType clusterType) {
 		ArrayList<String> patientList = mPatients.get(clusterType.ordinal());
-		int resultIndex = Collections.binarySearch(patientList, patientName);
-		if (resultIndex < 0) {
-			int insertionIndex = -(resultIndex + 1);
-			patientList.add(insertionIndex, patientName);
-			return false;
-		} else {
-			return true;
-		}		
+		return Utils.checkInListAndInsertIfMissing(patientList, patientName);
 	}
 	
 	public int getNumPatientsForClusterType(ClusterType clusterType) {

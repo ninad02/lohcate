@@ -4,9 +4,9 @@ import java.util.ArrayList;
 
 public enum ClusterType {
 	Dup,
-	LOH,
-	
+	LOH,	
 	HET,
+	
 	Somatic,
 	Noise,
 	Null;

@@ -2,6 +2,7 @@ package shared;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -405,6 +406,24 @@ public class Utils {
 		Exception e = new Exception(errorString);
 		e.printStackTrace();
 		System.exit(-1);			
+	}
+
+	/** This assumes that the list is sorted.  It tests whether the element already exists in
+	 *  the list and inserts the element only if it doesn't already exist in the list. 
+	 * @param targetList The list that is tested for the presence of the element in the list  
+	 * @param element The element to be added if it doesn't already exist in the list
+	 * @return true if the element already existed in the list, false otherwise
+	 */
+	public static<T> boolean checkInListAndInsertIfMissing(List <? extends Comparable<? super T>> list, T key) {
+		int resultIndex = Collections.binarySearch(list, key);
+		if (resultIndex < 0) {
+			int insertionIndex = -(resultIndex + 1);
+			List<T> listCasted = (List<T>) list;
+			listCasted.add(insertionIndex, key);			
+			return false;
+		} else {
+			return true;
+		}		
 	}
 }
 

@@ -45,7 +45,7 @@ public class Script {
 	private static final String SomaticStr  = "somatic";
 	private static final String NovelStr  = "novel";	
 	private static final String ChromPrefix = "chr";
-	private static final String MissingGeneNameValue = ".";
+	public static final String MissingGeneNameValue = ".";
 	private static final float MaxVariantAlleleFrequency = 1.0f;
 	
 	// Column constants for the curated TSV files (files that have a cluster column)
@@ -393,7 +393,9 @@ public class Script {
 		int nonAgreeingClusterID = -1;
 		for (int i = 0; i < clusterAssignments.length; i++) {
 			if (clusterAssignments[i] != clusterAssignmentsWithWedge[i]) {
-				clusterAssignments[i]  = nonAgreeingClusterID;
+				if (clusterAssignments[i] == clusterIDofHetBall) {
+					clusterAssignments[i] = nonAgreeingClusterID;   // only change if we're in a het ball region
+				}
 			}
 		}
 
@@ -1574,36 +1576,24 @@ public class Script {
 						if (position < currentGene.mMinBasePairPosition) { //...left-bound...
 							currentGene.mMinBasePairPosition = position;
 						}
-						
-						String mutationType = components[ColCuratedTSV_MutationType];
-						String mutationTypeLowerCase = mutationType.toLowerCase();  // do this in case we need to retain non-modified string
-						for (SNVType snvType : SNVType.values()) {
-							if (mutationTypeLowerCase.indexOf(snvType.toLowerCase()) >= 0) {
-								currentGene.incrementCountForMutationType(snvType);  // increment synonymous or nonsynonymous variant count
-							}
+												
+						SNVType mutationType = SNVType.getSNVType(components[ColCuratedTSV_MutationType]);
+						if (mutationType != null) {
+							currentGene.incrementCountForMutationType(mutationType);  // increment synonymous or nonsynonymous variant count
 						}
 						
-						String variantLocation = components[ColCuratedTSV_VariantLocation];
-						String variantLocationLowerCase = variantLocation.toLowerCase();
-						for (VariantLocation varLoc : VariantLocation.values()) {
-							if (variantLocationLowerCase.indexOf(varLoc.toLowerCase()) >= 0) {
-								currentGene.incrementCountForVariantLocation(varLoc);  // increment counts for germline or somatic
-							}
-						}
-										
+						VariantLocation variantLocation = VariantLocation.getVariantLocation(components[ColCuratedTSV_VariantLocation]);
+						if (variantLocation == null) { Utils.throwErrorAndExit("ERROR: Invalid variantLocation: " + components[ColCuratedTSV_VariantLocation]); }
+						currentGene.incrementCountForVariantLocation(variantLocation);
+																
 						ClusterType clusterType = ClusterType.getClusterType(components[ColCuratedTSV_Cluster]);
 						if (clusterType == null) { Utils.throwErrorAndExit("ERROR: Invalid cluster type: " + components[ColCuratedTSV_Cluster]); }
 						currentGene.incrementCountForClusterType(clusterType);  // increment LOH/DUP/&c. count
 						double vafTumor = Double.parseDouble(components[ColCuratedTSV_VafTumor]);
 						if ((clusterType == ClusterType.LOH) && (vafTumor > 0.5)) {
 							currentGene.mCountLOHreferenceLost++;
-						}
-						
-						
-						String patientName = file.getName();
-						currentGene.addPatientIfNotAlreadyAdded(patientName, ClusterType.Dup);
-						currentGene.addPatientIfNotAlreadyAdded(patientName, ClusterType.LOH);
-						currentGene.addPatientIfNotAlreadyAdded(patientName, ClusterType.HET);
+						}										
+						currentGene.addPatientIfNotAlreadyAdded(file.getName(), clusterType);
 					}
 				}
 			}
@@ -1685,7 +1675,7 @@ public class Script {
 			case 4:
 				//getGeneEnrichment(root + "/curated_snps", root + "/gene_enrichment.csv");
 				getGeneEnrichment(root + "/snps", root + "/gene_enrichment.csv");
-				//Enrichment.genTopGeneLists(root + "/gene_enrichment.csv", root + "/gene_enrichment");
+				Enrichment.genTopGeneLists(root + "/gene_enrichment.csv", root + "/gene_enrichment");
 				break;
 			case 5:
 				for (int i = 0; i<cluster_names.length - 1; i++)
