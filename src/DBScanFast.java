@@ -114,7 +114,7 @@ public class DBScanFast extends DBSCAN2 {
 				&& (Math.abs(distanceMethodOneAxis.distance(point, candidateNeighbor)) <= theoreticalMaxDistance); 
 				i += increment) {
 			
-			if (point.getCartesianDistanceSquared(candidateNeighbor) < mEpsilonSquared) {
+			if (point.getCartesianDistanceSquared(candidateNeighbor) <= mEpsilonSquared) {
 				if (doX) {
 					neighbors.add(candidateNeighbor);
 					candidateNeighbor.mAdded = true;

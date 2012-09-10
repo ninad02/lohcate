@@ -378,7 +378,8 @@ public class Script {
 		
 		System.out.println("Begin clustering algorithm: " + (new Date()).toString());
 		
-		DBScanFast dbscanner = new DBScanFast(points, HET_BALL_EPS, HET_BALL_MINPTS); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+		DBScanFaster dbscanner = new DBScanFaster(points, HET_BALL_EPS, HET_BALL_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+		//DBScanFast dbscanner = new DBScanFast(points, HET_BALL_EPS, HET_BALL_MINPTS); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
 		dbscanner.cluster();
 		int clusterIDofHetBall = dbscanner.getLargestCluster();
 		int[] clusterAssignments = dbscanner.getClustAssignments();  // save and cache
