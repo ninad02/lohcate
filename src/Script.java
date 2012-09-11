@@ -384,20 +384,33 @@ public class Script {
 		int clusterIDofHetBall = dbscanner.getLargestCluster();
 		int[] clusterAssignments = dbscanner.getClustAssignments();  // save and cache
 		
-		// Now, re-run DBScan, but with changed parameters		
-		dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
-		dbscanner.cluster();
-		int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
+		int clusterIDofDup = -1;
+		boolean tryCircularMethod = true;
 		
-		System.out.println("End clustering algorithm: " + (new Date()).toString());
-		
-		int nonAgreeingClusterID = -1;
-		for (int i = 0; i < clusterAssignments.length; i++) {
-			if (clusterAssignments[i] != clusterAssignmentsWithWedge[i]) {
-				if (clusterAssignments[i] == clusterIDofHetBall) {
-					clusterAssignments[i] = nonAgreeingClusterID;   // only change if we're in a het ball region
+
+
+			// Now, re-run DBScan, but with changed parameters		
+			dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
+			dbscanner.cluster();
+			int clusterIDofHetBallWithWedge = dbscanner.getLargestCluster();
+			int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
+
+			System.out.println("End clustering algorithm: " + (new Date()).toString());
+
+			for (int i = 0; i < clusterAssignments.length; i++) {
+				if (clusterAssignments[i] != clusterAssignmentsWithWedge[i]) {
+					//System.out.println("Diff Clusters: " + clusterAssignments[i] + "\t" + clusterAssignmentsWithWedge[i] + "\t" + clusterIDofHetBall);
+					if (clusterAssignmentsWithWedge[i] == clusterIDofHetBallWithWedge) {						
+						if (clusterAssignments[i] == DBSCAN2.ClusterIDOfNoise) {
+							clusterAssignments[i] = clusterIDofDup;   // only change if we're in a het ball region
+						}
+					} else {
+						// We're on the outskirts, probably (within LOH regions), so 
+						// we just assign to the run with the greater epsilon
+						//clusterAssignments[i] = clusterAssignmentsWithWedge[i];					
+					}
 				}
-			}
+			
 		}
 
 		// Now assign the cluster types
@@ -452,17 +465,18 @@ public class Script {
 			} else {	// Our vaf-normal is in range in somatic sites, or we're at a germline site regardless of vaf-normal value	
 				if (vafInRangeNormal) {
 					++indexInClusterAssignments;
+					int assignedClusterID = clusterAssignments[indexInClusterAssignments]; // we create a local variable for fast test modifications 
 					
-					if (clusterAssignments[indexInClusterAssignments] == clusterIDofHetBall) {
+					if (assignedClusterID == clusterIDofHetBall) {
 						returnClusters[row] = ClusterType.HET; //HET
 						
-					} else if (clusterAssignments[indexInClusterAssignments] == nonAgreeingClusterID) {
+					} else if (assignedClusterID == clusterIDofDup) {
 						returnClusters[row] = ClusterType.Dup; //DUP
 						// TODO @Sidd, this logic isn't right.  Just because they disagree, you're overriding
 						// the original dbscanning with the value from the wedges?  Then why run the first one
 						// at all?  Might as well just run the second one.
 						
-					} else if (clusterAssignments[indexInClusterAssignments] == dbscanner.getClusterIDOfNoise()) { 
+					} else if (assignedClusterID == dbscanner.getClusterIDOfNoise()) { 
 						returnClusters[row] = ClusterType.Noise;
 						
 					} else { //anything not in the HET ball / DUP wedge is considered part of a LOH sidelobe
