@@ -36,6 +36,12 @@ public class DBScanFaster extends DBSCAN2 {
 	protected float getBlockValueX(int indexX) { return ((indexX * mEpsilonDivided) + mOffsetX); }
 	protected float getBlockValueY(int indexY) { return ((indexY * mEpsilonDivided) + mOffsetY); }
 	
+	protected float getMinBlockValueX() { return getBlockValueX(0); }
+	protected float getMaxBlockMaxValueX() { return getBlockValueX(mBlocks.length - 1) + mEpsilonDivided; }
+	
+	protected float getMinBlockValueY() { return getBlockValueY(0); }
+	protected float getMaxBlockMaxValueY() { return getBlockValueY(mBlocks[0].length - 1) + mEpsilonDivided; }
+	
 	public int getBlockIndexAlongXAxis(float x) { return (int) ((x - mOffsetX) / mEpsilonDivided); }
 	public int getBlockIndexAlongYAxis(float y) { return (int) ((y - mOffsetY) / mEpsilonDivided); }
 	
@@ -102,6 +108,23 @@ public class DBScanFaster extends DBSCAN2 {
 		return neighbors;
 	}
 	
+	/** Returns the cluster ID of a central cluster, if any.  Returns the ID of the point closest to the central cluster. */
+	public int getCentralClusterID() {
+		int centralClusterID = -1;
+		float centralX = (float) ((getMinBlockValueX() + getMaxBlockMaxValueX()) / 2.0);  // calc the mid-point
+		float centralY = (float) ((getMinBlockValueY() + getMaxBlockMaxValueY()) / 2.0);  // calc the mid-point
+		
+		double minDistanceToCenterPoint = Double.MAX_VALUE;
+		for (DBScanPoint thePoint : mPoints) {
+			double distanceToCenterPoint = Block.getCartesianDistanceSquared(centralX, centralY, thePoint.mFloint.mX, thePoint.mFloint.mY);
+			if (distanceToCenterPoint < minDistanceToCenterPoint) {
+				minDistanceToCenterPoint = distanceToCenterPoint;
+				centralClusterID = thePoint.mClusterAssigned;
+			}
+		}
+		
+		return centralClusterID;
+	}
 
 	/**
 	 * @param args
@@ -170,7 +193,7 @@ public class DBScanFaster extends DBSCAN2 {
 			return numCornersWithinRange;
 		}
 		
-		public float getCartesianDistanceSquared(float thisX, float thisY, float otherX, float otherY) {
+		public static float getCartesianDistanceSquared(float thisX, float thisY, float otherX, float otherY) {
 			return (thisX - otherX) * 
 				   (thisX - otherX) +
 				   

@@ -2,6 +2,9 @@ import genomeUtils.RegionRange;
 import genomeUtils.RegionRange.RegionRangeOverlap;
 import static genomeUtils.RegionRange.RegionRangeOverlap.*;
 
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.geom.Ellipse2D;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.PrintStream;
@@ -11,12 +14,25 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.XYDotRenderer;
+import org.jfree.chart.renderer.xy.XYItemRenderer;
+import org.jfree.chart.renderer.xy.XYShapeRenderer;
+import org.jfree.chart.title.LegendTitle;
+import org.jfree.data.xy.DefaultXYDataset;
+import org.jfree.data.xy.XYDataset;
+
 import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
+import lohcateEnums.ColorPastel;
 import lohcateEnums.SNVType;
 import lohcateEnums.SeqPlatform;
 import lohcateEnums.VariantLocation;
 import shared.FileOps;
+import shared.GraphUtils;
 import shared.IOUtils;
 import shared.Utils;
 import shared.Utils.FileExtensionAndDelimiter;
@@ -37,7 +53,9 @@ public class Script {
 	
 	private static final float NAF_STRIP_EXPANDER = 2; //1.25f; //# of std. deviations to move away from the mean (when defining the thickness of the horizontal band containing HET ball, LOH sidelobes, &c.)
 	private static final float HET_BALL_EPS = 0.035f, DUP_WEDGE_LASSO = 0.015f; //DBSCAN parameters for HET ball / DUP wedge detection
-	private static final int HET_BALL_MINPTS = 30, DUP_WEDGE_MINPTS = 30; //DBSCAN parameters for HET ball / DUP wedge detection
+	private static final float NON_HET_BALL_EPS = 0.065f;
+	private static final int NON_HET_BALL_MINPTS = 30;
+	private static final int HET_BALL_MINPTS = 100, DUP_WEDGE_MINPTS = 100; //DBSCAN parameters for HET ball / DUP wedge detection
 	
 	private static final int REGION_SEGMENTATION_DIST_THRESHOLD = 2000000; //greatest possible distance between 2 'adjacent' points of LOH in a region of 'contiguous' LOH
 	
@@ -47,10 +65,25 @@ public class Script {
 	private static final String ChromPrefix = "chr";
 	public static final String MissingGeneNameValue = ".";
 	private static final float MaxVariantAlleleFrequency = 1.0f;
+
+	// Column constants for the curated TSV files (files that have a cluster column)
+	private static final int Col_NAFTAFInput_Chrom = 0;
+	private static final int Col_NAFTAFInput_Position = 1;
+	private static final int Col_NAFTAFInput_FlankingStringNormal = 5;
+	private static final int Col_NAFTAFInput_FlankingStringTumor  = 6;
+	private static final int Col_NAFTAFInput_VariantRatioNormal   = 11;
+	private static final int Col_NAFTAFInput_VariantRatioTumor    = 12;
+	private static final int Col_NAFTAFInput_DbSNPString    = 13;
+	private static final int Col_NAFTAFInput_MutationType   = 14;
+	private static final int Col_NAFTAFInput_HugoSymbol     = 15;
+	
+	private static final double GCContentThresholdLow  = 0.05;
+	private static final double GCContentThresholdHigh = 0.80;
 	
 	// Column constants for the curated TSV files (files that have a cluster column)
 	private static final int ColCuratedTSV_Chrom = 0;
 	private static final int ColCuratedTSV_Position = 1;
+	//private static final int ColCuratedTSV_VariantBaseTumor = 2;
 	private static final int ColCuratedTSV_VafTumor = 3;
 	private static final int ColCuratedTSV_Gene = 5;
 	private static final int ColCuratedTSV_MutationType = 6;
@@ -64,6 +97,12 @@ public class Script {
 			String row = rows.get(rowIndex);
 			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0) {
 				rows.set(rowIndex, null);
+			} else {
+				String gcString = Utils.extractNthColumnValue(row, Col_NAFTAFInput_FlankingStringTumor, Utils.FileExtensionTSV.mDelimiter); 
+				double fractionGCNormal = Utils.calcFractionGC(gcString);
+				if ((fractionGCNormal < GCContentThresholdLow) || (fractionGCNormal >= GCContentThresholdHigh)) {
+					rows.set(rowIndex, null);
+				}
 			}
 		}
 		return Utils.removeNullElements(rows);		
@@ -122,7 +161,7 @@ public class Script {
 	 * @param inDir naf-taf-inputs
 	 * @param opt 0::Illumina, 1::SOLiD
 	 */
-	public static void curateSNPCalls(String inDir, String outDir, SeqPlatform platform) {
+	public static void curateSNPCalls(String inDir, String outDir, String vafComparisonPlotDir, SeqPlatform platform) {
 		File[] files = (new File(inDir)).listFiles();
 		StringBuilder sb = new StringBuilder(8192);
 		Utils.FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionTSV;		
@@ -170,21 +209,35 @@ public class Script {
 				ClusterType[] clustersGermline = getClusters(allVariantRows, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
 				System.out.println("Got clusters");
 				
+				// Now initialize the data structure needed to plot
+				int[] clusterTypeCounts = Utils.getClusterTypeCounts(clustersGermline);
+				double[][][] clusterCoordinates = new double[clusterTypeCounts.length][2][];
+				for (int clusterTypeIndex = 0; clusterTypeIndex < clusterCoordinates.length; clusterTypeIndex++) {
+					clusterCoordinates[clusterTypeIndex][0] = new double[ clusterTypeCounts[clusterTypeIndex] ];
+					clusterCoordinates[clusterTypeIndex][1] = new double[ clusterTypeCounts[clusterTypeIndex] ];
+				}
+				int[] clusterTypeIndex = new int[clusterTypeCounts.length];
+				Arrays.fill(clusterTypeIndex, -1);  
+				
 				// Do the post-processing
 				int startingRowGermlineOrSomaticOrAll = 0;  // 0 because header line has been stripped away
 				for (int i = startingRowGermlineOrSomaticOrAll; i < allVariantRows.size(); i++) {
 					String strRow = allVariantRows.get(i);
 					ClusterType clusterType = clustersGermline[i];
+					int indexForClusterType = ++(clusterTypeIndex[clusterType.ordinal()]);  // increase the index of the data structure of the cluster type
 										
 					String[] germCols = strRow.split(Utils.TabStr);
 										
 					float vafNormal = extractVAFNormal(germCols, platform);
 					float vafTumor  = extractVAFTumor (germCols, platform);
-					String chromStr = (platform == SeqPlatform.Illumina) ? germCols[0] : ChromPrefix + germCols[0].replace(ChromPrefix, "");
+					clusterCoordinates[ clusterType.ordinal() ][0][indexForClusterType] = vafTumor;
+					clusterCoordinates[ clusterType.ordinal() ][1][indexForClusterType] = vafNormal;
+					
+					String chromStr = (platform == SeqPlatform.Illumina) ? germCols[Col_NAFTAFInput_Chrom] : ChromPrefix + germCols[Col_NAFTAFInput_Chrom].replace(ChromPrefix, "");
 					
 					sb.setLength(0); // Clear the string builder
 					sb.append(chromStr)
-					  .append(fileExtDelim.mDelimiter).append(germCols[1])
+					  .append(fileExtDelim.mDelimiter).append(germCols[Col_NAFTAFInput_Position])
 					  .append(fileExtDelim.mDelimiter).append(vafNormal)
 					  .append(fileExtDelim.mDelimiter).append(vafTumor)
 					  .append(fileExtDelim.mDelimiter); //chr,pos,n_vaf,t_vaf
@@ -195,7 +248,7 @@ public class Script {
 						// Sidd: For the NAStr case, strangely, the variant base is n/a in the SOLiD naf-taf-inputs 
 						// (and there's not much point in looking up the reference base's allele frequency)
 					} else if (platform == SeqPlatform.Illumina) {
-						String dbsnpStr = germCols[9]; 
+						String dbsnpStr = germCols[Col_NAFTAFInput_DbSNPString]; 
 						if (dbsnpStr.indexOf(NovelStr) >= 0) {
 							variantAnnotation = NovelStr;
 						} else {
@@ -226,8 +279,8 @@ public class Script {
 						gene = germCols[8];
 						gene = (gene == "") ? Utils.NAStr : gene;
 					} else if (platform == SeqPlatform.Illumina) {
-						gene = germCols[11];
-						mutationType = germCols[10].split("_SNV")[0];
+						gene = germCols[Col_NAFTAFInput_HugoSymbol];
+						mutationType = germCols[Col_NAFTAFInput_MutationType].split("_SNV")[0];
 					}
 					
 					sb.append(fileExtDelim.mDelimiter).append(gene)
@@ -239,8 +292,18 @@ public class Script {
 					IOUtils.flushBufferedWriter(out);
 				}				
 				IOUtils.closeBufferedWriter(out);
+				
+				// Now let's create the datasets needed to 
+				
+				DefaultXYDataset xyDataset = new DefaultXYDataset();
+				for (ClusterType ct : ClusterType.values()) {
+					double[][] xyDataSeries = clusterCoordinates[ct.ordinal()];
+					xyDataset.addSeries(ct.name(), xyDataSeries);					
+				}
+				plotVAFComparison(xyDataset, vafComparisonPlotDir + File.separator + samplenameRoot, samplenameRoot);
+				
 			}
-		}
+		}		
 	}
 	
 	//Vv.vV implements our old window-based clustering method. ugly, isn't it?
@@ -258,6 +321,106 @@ public class Script {
 		else
 			return cluster_names.length;
 	}*/
+	
+	/** Plots the VAF (variant allele frequency) of the normal tissue comapred to the tumor tissue. */
+	public static void plotVAFComparison(XYDataset xyDataset, String outFilenameRoot, String sampleName) {
+		String title = "VAF Comparison: " + sampleName;
+		String xAxisLabel = "VAF Tumor";
+		String yAxisLabel = "VAF Normal";
+		JFreeChart theChart = 
+				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, true, false, false);
+		XYPlot xyPlot = (XYPlot) theChart.getPlot();
+		
+		XYItemRenderer itemRenderer = getXYItemRendererHelper(5);		
+		itemRenderer.setSeriesPaint(ClusterType.Dup.ordinal(), ColorPastel.Dark_Red.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.LOH.ordinal(), ColorPastel.Yellow_Green.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.HETGermline.ordinal(), ColorPastel.Dark_Yellow.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.HETSomatic.ordinal(), ColorPastel.Gray_80.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.Noise.ordinal(), ColorPastel.CMYK_Cyan.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.Null.ordinal(), ColorPastel.Light_Magenta_Red.getColor());		
+		xyPlot.setRenderer(itemRenderer);		
+		
+		xyPlot.setBackgroundPaint(ColorPastel.Gray_15.getColor());
+		xyPlot.setDomainGridlinePaint(Color.white);
+		xyPlot.setRangeGridlinePaint(Color.white);		
+		
+		LegendTitle legendTitle = theChart.getLegend();
+		legendTitle.setID("Clusters");
+		legendTitle.setItemFont(new Font("Arial", Font.BOLD, 20));
+		
+		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 20);
+		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 20);
+		xyPlot.getRangeAxis().setRange(0, 1.02);
+		xyPlot.getDomainAxis().setRange(0, 1.02);
+		xyPlot.getRangeAxis().setLabelFont(rangeAxisLabelFont);		
+		xyPlot.getRangeAxis().setTickLabelFont(rangeAxisTickFont);
+		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
+		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);		
+	
+		// Now write the plot		
+		int width = 800;
+		int height = 800;		
+		GraphUtils.saveChartAsPNG(outFilenameRoot + ".VAFComparison", theChart, width, height);
+	}
+	
+	public static XYItemRenderer getXYItemRendererHelper(int size) {
+		XYShapeRenderer xyShapeRend = new XYShapeRenderer();				
+		
+		//XYDotRenderer xyDotRend = new XYDotRenderer();
+		Ellipse2D.Double theEllipse = new Ellipse2D.Double(0, 0, size, size);
+		//xyDotRend.setBaseShape(theEllipse, true);
+		xyShapeRend.setBaseShape(theEllipse);
+		//xyDotRend.setDotWidth(size);
+		//xyDotRend.setDotHeight(size);
+		//return xyDotRend;
+		return xyShapeRend;
+	}
+
+	// ========================================================================
+	/*
+	public static void graphDistProbabilities(double[][] distProb, String chartTitleStr, String outFilenamePrefix) {
+		DefaultXYDataset xyDataset = new DefaultXYDataset();
+		Dimension chartDimension = new Dimension(800, 800);
+		xyDataset.addSeries("Graph",  distProb);		
+			
+		boolean showLegend = true;
+		
+		JFreeChart theChart = 
+			ChartFactory.createScatterPlot(chartTitleStr, "X-coordinate", "Probability", 
+					xyDataset, PlotOrientation.VERTICAL, showLegend, false, false);
+		XYPlot xyPlot = (XYPlot) theChart.getPlot();
+		//xyPlot.getDomainAxis().setTickLabelsVisible(false);
+			
+		XYDotRenderer xyDotRend = getXYDotRendererHelper(4);
+		xyDotRend.setSeriesPaint(0, Color.blue);
+		xyDotRend.setSeriesPaint(1, Color.green);
+		xyPlot.setRenderer(xyDotRend);
+		xyPlot.setBackgroundPaint(Color.white);
+		xyPlot.setDomainGridlinePaint(Color.gray);
+		xyPlot.setRangeGridlinePaint(Color.gray);
+		
+		// Set the chart title font
+		TextTitle title = theChart.getTitle();
+		Font titleFont = new Font("Arial", Font.BOLD, 44);
+		title.setFont(titleFont);
+		
+		// Set the chart legend font
+		LegendTitle legendTitle = theChart.getLegend();
+		Font legendFont = new Font("Arial", Font.BOLD, 24);
+		if (showLegend) { legendTitle.setItemFont(legendFont); }
+		
+		// Set the chart range axis font
+		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 32);
+		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 22);
+		xyPlot.getRangeAxis().setLabelFont(rangeAxisLabelFont);		
+		xyPlot.getRangeAxis().setTickLabelFont(rangeAxisTickFont);
+		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
+		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);
+	
+		// TODO - MAKE ALL
+		String outFilename = outFilenamePrefix + ".ChartDist.jpg"; 
+		saveChartAsJPEG(outFilename, theChart, chartDimension.width, chartDimension.height);
+		*/
 	
 	// ========================================================================
 	// INNER CLASS
@@ -381,36 +544,53 @@ public class Script {
 		DBScanFaster dbscanner = new DBScanFaster(points, HET_BALL_EPS, HET_BALL_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
 		//DBScanFast dbscanner = new DBScanFast(points, HET_BALL_EPS, HET_BALL_MINPTS); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
 		dbscanner.cluster();
-		int clusterIDofHetBall = dbscanner.getLargestCluster();
-		int[] clusterAssignments = dbscanner.getClustAssignments();  // save and cache
+		int clusterIDofHetBall = dbscanner.getCentralClusterID();
+		int[] clusterAssignments = dbscanner.getClustAssignments();  // save and cache		
 		
+		// Now, re-run DBScan, but with changed parameters		
+		dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
+		dbscanner.cluster();
+		int clusterIDofHetBallWithWedge = dbscanner.getCentralClusterID();
+		int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
+
+		// We now do a third pass, this time allowing only those points that are not part of the het cluster
+		// We then perform a lower neighbor threshold on these points so that they can be declared as LOH
+		ArrayList<Floint> nonHetPoints = new ArrayList<Floint>(points.size());
+		boolean[] isNonHetPoint = new boolean[points.size()];		
+		for (int i = 0; i < clusterAssignmentsWithWedge.length; i++) {
+			isNonHetPoint[i] = (clusterAssignmentsWithWedge[i] != clusterIDofHetBallWithWedge); 
+			if (isNonHetPoint[i]) {
+				nonHetPoints.add(points.get(i));
+			}
+		}
+		DBScanFaster dbscannerNonHet = new DBScanFaster(nonHetPoints, NON_HET_BALL_EPS, NON_HET_BALL_MINPTS, 0, 0, 1, 1);
+		dbscannerNonHet.cluster();
+		int[] clusterAssignmentsNonHet = dbscannerNonHet.getClustAssignments();
+				
+		System.out.println("End clustering algorithm: " + (new Date()).toString());
+
 		int clusterIDofDup = -1;
-		boolean tryCircularMethod = true;
-		
-
-
-			// Now, re-run DBScan, but with changed parameters		
-			dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
-			dbscanner.cluster();
-			int clusterIDofHetBallWithWedge = dbscanner.getLargestCluster();
-			int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
-
-			System.out.println("End clustering algorithm: " + (new Date()).toString());
-
-			for (int i = 0; i < clusterAssignments.length; i++) {
-				if (clusterAssignments[i] != clusterAssignmentsWithWedge[i]) {
-					//System.out.println("Diff Clusters: " + clusterAssignments[i] + "\t" + clusterAssignmentsWithWedge[i] + "\t" + clusterIDofHetBall);
-					if (clusterAssignmentsWithWedge[i] == clusterIDofHetBallWithWedge) {						
-						if (clusterAssignments[i] == DBSCAN2.ClusterIDOfNoise) {
-							clusterAssignments[i] = clusterIDofDup;   // only change if we're in a het ball region
-						}
-					} else {
-						// We're on the outskirts, probably (within LOH regions), so 
-						// we just assign to the run with the greater epsilon
-						//clusterAssignments[i] = clusterAssignmentsWithWedge[i];					
-					}
-				}
+		int nonHetIndex = -1;
+		for (int i = 0; i < clusterAssignments.length; i++) {	
+			if (isNonHetPoint[i]) { ++nonHetIndex; }  // make sure we're always at the correct index
 			
+			if (clusterAssignments[i] == DBSCAN2.ClusterIDOfNoise) {
+				if (isNonHetPoint[i]) {					
+					if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+						// There is a collision of numeric cluster assignments.  This is due to the
+						// fact that we run DBScan on different input lists, thus leading to respective
+						// clusterIDs being assigned to each cluster for each run.  We need to ensure
+						// that we are performing no collisions.  If the hetball cluster is the first
+						// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+						// cluster ID.  Yes, this is kind of a hack.						
+						clusterAssignmentsNonHet[nonHetIndex] = 
+							(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+					}
+					clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];  // assign for lower thresholds
+				} else {
+					clusterAssignments[i] = clusterIDofDup;   // only change if we're in a het ball region
+				}
+			}		
 		}
 
 		// Now assign the cluster types
@@ -442,12 +622,12 @@ public class Script {
 						returnClusters[row] = ClusterType.LOH;
 					} else {
 						// Normal: AA, Tumor: AB [made by: AA -> AB (somatic het mutation)
-						returnClusters[row] = ClusterType.HET;
+						returnClusters[row] = ClusterType.HETSomatic;
 					}					
 				} else if (Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameAdjustedUpper, MaxVariantAlleleFrequency)) {
 					// We are above the upper frame boundary
 					if (vafTumor <= hetBoundaryLower) {
-						// Normal: BB, Tumor: AB [made by: BB -> AB (reverse somatic het mutation) -> A (LOH, loss of B)]
+						// Normal: BB, Tumor: AA [made by: BB -> AB (reverse somatic het mutation) -> A (LOH, loss of B)]
 						returnClusters[row] = ClusterType.LOH;
 					} else if (vafTumor > hetBoundaryUpper) {
 						// Normal: BB, Tumor: BB or CC (ambiguous until we know exact variant for tumor)
@@ -456,7 +636,7 @@ public class Script {
 						returnClusters[row] = ClusterType.Null;
 					} else {
 						// Normal: BB, Tumor: AB or CB [made by: BB -> AB (reverse somatic het mutation) or BB -> CB (somatic het mutation)
-						returnClusters[row] = ClusterType.HET;
+						returnClusters[row] = ClusterType.HETSomatic;
 					}
 				} else {
 					Utils.throwErrorAndExit("ERROR: Contradiction - variant allele frequency cannot be in and out of bounds simultanteously!" + vafNormal);
@@ -468,7 +648,7 @@ public class Script {
 					int assignedClusterID = clusterAssignments[indexInClusterAssignments]; // we create a local variable for fast test modifications 
 					
 					if (assignedClusterID == clusterIDofHetBall) {
-						returnClusters[row] = ClusterType.HET; //HET
+						returnClusters[row] = ClusterType.HETGermline; //HET
 						
 					} else if (assignedClusterID == clusterIDofDup) {
 						returnClusters[row] = ClusterType.Dup; //DUP
@@ -497,7 +677,7 @@ public class Script {
 	// Extracts and calculates the variant allele frequency depending on the platform 
 	private static float extractVAFNormal(String[] components, SeqPlatform platform) {
 		switch(platform) {
-		case Illumina: return  Float.parseFloat(components[7]);
+		case Illumina: return  Float.parseFloat(components[Col_NAFTAFInput_VariantRatioNormal]);
 		case SOLiD:    return (Float.parseFloat(components[6]) / Float.parseFloat(components[5]));
 		}
 		return Float.NaN;
@@ -506,7 +686,7 @@ public class Script {
 	// Extracts and calculates the variant allele frequency in the normal depending on the platform tab-delimited file
 	private static float extractVAFNormal(String line, SeqPlatform platform) {
 		switch(platform) {
-		case Illumina: return  Float.parseFloat(Utils.extractNthColumnValue(line, 7, Utils.TabStr));
+		case Illumina: return  Float.parseFloat(Utils.extractNthColumnValue(line, Col_NAFTAFInput_VariantRatioNormal, Utils.TabStr));
 		case SOLiD:    return (Float.parseFloat(Utils.extractNthColumnValue(line, 6, Utils.TabStr)) / 
 				               Float.parseFloat(Utils.extractNthColumnValue(line, 5, Utils.TabStr)));
 		}
@@ -515,7 +695,7 @@ public class Script {
 	
 	private static float extractVAFTumor(String[] components, SeqPlatform platform) {
 		switch(platform) {
-		case Illumina: return  Float.parseFloat(components[8]);
+		case Illumina: return  Float.parseFloat(components[Col_NAFTAFInput_VariantRatioTumor]);
 		case SOLiD:    return (Float.parseFloat(components[4]) / Float.parseFloat(components[3]));
 		}
 		return Float.NaN;
@@ -524,7 +704,7 @@ public class Script {
 	// Extracts and calculates the variant allele frequency in the tumor depending on the platform tab-delimited file
 	private static float extractVAFTumor(String line, SeqPlatform platform) {
 		switch(platform) {
-		case Illumina: return  Float.parseFloat(Utils.extractNthColumnValue(line, 8, Utils.TabStr));
+		case Illumina: return  Float.parseFloat(Utils.extractNthColumnValue(line, Col_NAFTAFInput_VariantRatioTumor, Utils.TabStr));
 		case SOLiD:    return (Float.parseFloat(Utils.extractNthColumnValue(line, 4, Utils.TabStr)) / 
 				               Float.parseFloat(Utils.extractNthColumnValue(line, 3, Utils.TabStr)));
 		}
@@ -607,7 +787,7 @@ public class Script {
 			String[] columns = line.split(Utils.TabPatternStr);
 			
 			final Chrom chrom  = Chrom.getChrom  (columns[ColCuratedTSV_Chrom]);
-			final int position = Integer.parseInt(columns[1]);
+			final int position = Integer.parseInt(columns[ColCuratedTSV_Position]);
 			final ClusterType clusterType = ClusterType.getClusterType(columns[ColCuratedTSV_Cluster]);
 			
 			// If the chromosome has changed, we set that we have no current region
@@ -1627,21 +1807,21 @@ public class Script {
 				ClusterType.Dup.name(),
 				ClusterType.LOH.name(), 
 				ClusterType.LOH.name() + "_refLost", 
-				ClusterType.HET.name(),
+				ClusterType.HETGermline.name(),
 				
 				ClusterType.Dup.name() + logStr,
 				ClusterType.LOH.name() + logStr, 
 				ClusterType.LOH.name() + "_refLost" + logStr, 
-				ClusterType.HET.name() + logStr,
+				ClusterType.HETGermline.name() + logStr,
 				
 				ClusterType.Dup.name() + densityStr,
 				ClusterType.LOH.name() + densityStr, 
 				ClusterType.LOH.name() + "_refLost" + densityStr, 
-				ClusterType.HET.name() + densityStr,
+				ClusterType.HETGermline.name() + densityStr,
 				
 				ClusterType.Dup.name() + recurrenceStr, 
 				ClusterType.LOH.name() + recurrenceStr, 
-				ClusterType.HET.name() + recurrenceStr,
+				ClusterType.HETGermline.name() + recurrenceStr,
 		};
 		String headerStr = Utils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();
 
@@ -1672,7 +1852,7 @@ public class Script {
 		switch (Integer.parseInt(args[1])) { //args[1] --> 'switchboard' parameter
 			case 0:
 				SeqPlatform platform = SeqPlatform.getPlatform(Integer.parseInt(args[2]));
-				curateSNPCalls(root + "/naf-taf-inputs", root + "/snps", platform); //args[2] --> 0::Illumina, 1::SOLiD
+				curateSNPCalls(root + "/naf-taf-inputs", root + "/snps", root + "/mouse_ears", platform); //args[2] --> 0::Illumina, 1::SOLiD
 				break;
 			case 1:
 				segmentRegionsAllFiles(root + "/snps", root + "/regions");

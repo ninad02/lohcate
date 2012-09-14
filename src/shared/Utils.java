@@ -1,9 +1,13 @@
 package shared;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+
+import lohcateEnums.ClusterType;
+import lohcateEnums.Nuc;
 
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
@@ -77,6 +81,46 @@ public class Utils {
 			if (arr.get(i).equals(elem))
 				return i;
 		return -1;
+	}
+	
+	/** Given an array of ClusterTypes, this returns the counts of the ClusterTypes, 
+	 *  according to ordering of the ClusterType enums. 
+	 */
+	public static int[] getClusterTypeCounts(ClusterType[] clusterTypeArray) {
+		int[] counts = new int[ClusterType.values().length];
+		Arrays.fill(counts, 0);
+		for (ClusterType ct : clusterTypeArray) {
+			counts[ct.ordinal()]++;
+		}
+		
+		return counts;
+	}
+	
+	/** Given a string of nucleotides, this returns the fraction of characters that are G or C. */	
+	private static final char[] charBuffer = new char[65536];
+	
+	/** @return -1, if no valid nucleotides are present in the string; or if valid nucleotides are present,
+	 *  the fraction of G/C nucleotides
+	 */
+	public static synchronized double calcFractionGC(String nucleotideString) {		
+		int strLen = nucleotideString.length();
+		int validLength = 0;
+		int numGC = 0;
+		nucleotideString.getChars(0, strLen, charBuffer, 0);  // more efficient than calling charAt() each character
+		
+		for (int i = 0; i < strLen; i++) {
+			Nuc theNuc = Nuc.getNucUnsafe(charBuffer[i]);
+			if (theNuc != null) {
+				validLength++;
+				if (theNuc.isGC()) {
+					numGC++;
+				}
+			}
+		}
+		
+		// Now divide
+		if (validLength == 0) return -1;
+		return (double) numGC / (double) validLength;
 	}
 	
 	/** Given an arraylist of arraylists of a certain type, this adds numNewArraysToAdd new ArrayLists of

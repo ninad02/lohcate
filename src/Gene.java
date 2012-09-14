@@ -103,21 +103,21 @@ public class Gene implements Comparable<Gene> {
 		  .append(delim).append(getCountClusterType(ClusterType.Dup))
 		  .append(delim).append(getCountClusterType(ClusterType.LOH))
 		  .append(delim).append(mCountLOHreferenceLost)
-		  .append(delim).append(getCountClusterType(ClusterType.HET))
+		  .append(delim).append(getCountClusterType(ClusterType.HETGermline))
 		  
 		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.Dup)))
 		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.LOH)))
 		  .append(delim).append(Utils.log(mCountLOHreferenceLost))
-		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.HET)))
+		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.HETGermline)))
 		  
 		  .append(delim).append(getDensityClusterType(ClusterType.Dup))
 		  .append(delim).append(getDensityClusterType(ClusterType.LOH))
 		  .append(delim).append(mCountLOHreferenceLost / (float) getRangeLength())
-		  .append(delim).append(getDensityClusterType(ClusterType.HET))
+		  .append(delim).append(getDensityClusterType(ClusterType.HETGermline))
 		  
 		  .append(delim).append(getNumPatientsForClusterType(ClusterType.Dup))
 		  .append(delim).append(getNumPatientsForClusterType(ClusterType.LOH))
-		  .append(delim).append(getNumPatientsForClusterType(ClusterType.HET));
+		  .append(delim).append(getNumPatientsForClusterType(ClusterType.HETGermline));
 		
 		return sb.toString();
 	}
