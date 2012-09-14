@@ -125,6 +125,55 @@ public class DBScanFaster extends DBSCAN2 {
 		
 		return centralClusterID;
 	}
+	
+	/** Returns the minimum radius of the cluster.  If the cluster has an elliptical shape, this returns the smaller
+	 *  of the vertical or horizontal radius. */ 
+	public Boolean[] getPointsWithinMinRadiusOfCluster(final int clusterID) {
+		float totalX = 0;
+		float totalY = 0;
+		int numClusterPoints = 0;
+		Boolean[] pointsWithinRadius = new Boolean[mPoints.size()];
+		
+		// Find the centroid of the points in the cluster
+		for (DBScanPoint point : mPoints) {
+			if (clusterID == point.mClusterAssigned) {
+				totalX += point.mFloint.mX;
+				totalY += point.mFloint.mY;
+				numClusterPoints++;
+			}
+		}
+		
+		float centerX = totalX / (float) numClusterPoints;
+		float centerY = totalY / (float) numClusterPoints;
+		
+		float maxDiffX = Float.MIN_VALUE;
+		float maxDiffY = Float.MIN_VALUE;
+		
+		for (DBScanPoint point : mPoints) {
+			if (clusterID == point.mClusterAssigned) {
+				float diffX = Math.abs(point.mFloint.mX - centerX);
+				float diffY = Math.abs(point.mFloint.mY - centerY);
+				maxDiffX = Math.max(diffX, maxDiffX);
+				maxDiffY = Math.max(diffY, maxDiffY);
+			}
+		}
+		
+		float minRadius = Math.min(maxDiffX, maxDiffY);
+		float minRadiusSquared = minRadius * minRadius;
+		
+		int index = -1;
+		for (DBScanPoint point : mPoints) {
+			++index;
+			if (clusterID == point.mClusterAssigned) {
+				float distanceSquared = Block.getCartesianDistanceSquared(centerX, centerY, point.mFloint.mX, point.mFloint.mY);
+				pointsWithinRadius[index] = (distanceSquared <= minRadiusSquared) ? Boolean.TRUE : Boolean.FALSE;
+			} else {
+				pointsWithinRadius[index] = null;
+			}
+		}
+		
+		return pointsWithinRadius;
+	}
 
 	/**
 	 * @param args

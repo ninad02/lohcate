@@ -56,6 +56,7 @@ public class Script {
 	private static final float NON_HET_BALL_EPS = 0.065f;
 	private static final int NON_HET_BALL_MINPTS = 30;
 	private static final int HET_BALL_MINPTS = 100, DUP_WEDGE_MINPTS = 100; //DBSCAN parameters for HET ball / DUP wedge detection
+	private static final float ClusterDiagonalLeeway = (float) 0.2;
 	
 	private static final int REGION_SEGMENTATION_DIST_THRESHOLD = 2000000; //greatest possible distance between 2 'adjacent' points of LOH in a region of 'contiguous' LOH
 	
@@ -541,24 +542,27 @@ public class Script {
 		
 		System.out.println("Begin clustering algorithm: " + (new Date()).toString());
 		
-		DBScanFaster dbscanner = new DBScanFaster(points, HET_BALL_EPS, HET_BALL_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+		DBScanFaster dbscanner = new DBScanFaster(points, /* HET_BALL_EPS, HET_BALL_MINPTS*/ HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
 		//DBScanFast dbscanner = new DBScanFast(points, HET_BALL_EPS, HET_BALL_MINPTS); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
 		dbscanner.cluster();
 		int clusterIDofHetBall = dbscanner.getCentralClusterID();
-		int[] clusterAssignments = dbscanner.getClustAssignments();  // save and cache		
+		Boolean[] pointsWithinRadius = dbscanner.getPointsWithinMinRadiusOfCluster(clusterIDofHetBall);
+		int[] clusterAssignments = dbscanner.getClustAssignments();  // save and cache	
+		
 		
 		// Now, re-run DBScan, but with changed parameters		
-		dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
-		dbscanner.cluster();
-		int clusterIDofHetBallWithWedge = dbscanner.getCentralClusterID();
-		int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
+		//dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
+		//dbscanner.cluster();
+		//int clusterIDofHetBallWithWedge = dbscanner.getCentralClusterID();
+		//int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
 
 		// We now do a third pass, this time allowing only those points that are not part of the het cluster
 		// We then perform a lower neighbor threshold on these points so that they can be declared as LOH
 		ArrayList<Floint> nonHetPoints = new ArrayList<Floint>(points.size());
 		boolean[] isNonHetPoint = new boolean[points.size()];		
-		for (int i = 0; i < clusterAssignmentsWithWedge.length; i++) {
-			isNonHetPoint[i] = (clusterAssignmentsWithWedge[i] != clusterIDofHetBallWithWedge); 
+		
+		for (int i = 0; i < clusterAssignments.length; i++) {
+			isNonHetPoint[i] = (clusterAssignments[i] != clusterIDofHetBall); 
 			if (isNonHetPoint[i]) {
 				nonHetPoints.add(points.get(i));
 			}
@@ -570,10 +574,37 @@ public class Script {
 		System.out.println("End clustering algorithm: " + (new Date()).toString());
 
 		int clusterIDofDup = -1;
+		int clusterIDofNull = -2;
 		int nonHetIndex = -1;
-		for (int i = 0; i < clusterAssignments.length; i++) {	
-			if (isNonHetPoint[i]) { ++nonHetIndex; }  // make sure we're always at the correct index
+		for (int i = 0; i < clusterAssignments.length; i++) {
+			if (isNonHetPoint[i]) {
+				++nonHetIndex;
+				if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+					// There is a collision of numeric cluster assignments.  This is due to the
+					// fact that we run DBScan on different input lists, thus leading to respective
+					// clusterIDs being assigned to each cluster for each run.  We need to ensure
+					// that we are performing no collisions.  If the hetball cluster is the first
+					// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+					// cluster ID.  Yes, this is kind of a hack.						
+					clusterAssignmentsNonHet[nonHetIndex] = 
+						(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+				}
+				clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];  // assign for lower thresholds
+			} else {								
+				if (pointsWithinRadius[i] == null) {
+					Utils.throwErrorAndExit("ERROR: Cannot possibly be a non-het point!");
+				} else if (pointsWithinRadius[i] == Boolean.FALSE) {					
+					if (pointOnDiagonal(points.get(i), ClusterDiagonalLeeway)) {
+						clusterAssignments[i] = clusterIDofNull;
+					} else {
+						clusterAssignments[i] = clusterIDofDup;   // only change if we're in a het ball region
+					}
+				}
+			}
 			
+			/*
+			if (isNonHetPoint[i]) { ++nonHetIndex; }  // make sure we're always at the correct index
+						
 			if (clusterAssignments[i] == DBSCAN2.ClusterIDOfNoise) {
 				if (isNonHetPoint[i]) {					
 					if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
@@ -590,7 +621,8 @@ public class Script {
 				} else {
 					clusterAssignments[i] = clusterIDofDup;   // only change if we're in a het ball region
 				}
-			}		
+			}
+			*/		
 		}
 
 		// Now assign the cluster types
@@ -652,9 +684,9 @@ public class Script {
 						
 					} else if (assignedClusterID == clusterIDofDup) {
 						returnClusters[row] = ClusterType.Dup; //DUP
-						// TODO @Sidd, this logic isn't right.  Just because they disagree, you're overriding
-						// the original dbscanning with the value from the wedges?  Then why run the first one
-						// at all?  Might as well just run the second one.
+						
+					} else if (assignedClusterID == clusterIDofNull) {
+						returnClusters[row] = ClusterType.Null;  // we're on a diagonal
 						
 					} else if (assignedClusterID == dbscanner.getClusterIDOfNoise()) { 
 						returnClusters[row] = ClusterType.Noise;
@@ -672,6 +704,14 @@ public class Script {
 		}
 	
 		return returnClusters;
+	}
+	
+	// Tests whether the point lies roughly on the x = y diagonal, given a leeway from a ratio of 1.0
+	private static boolean pointOnDiagonal(Floint point, double leeway) {
+		double ratio = point.mY / point.mX;
+		double equalRatio = 1.0;
+		leeway = Math.min(leeway, equalRatio);
+		return ( ((equalRatio - leeway) <= ratio) && (ratio <= (equalRatio + leeway)) );
 	}
 	
 	// Extracts and calculates the variant allele frequency depending on the platform 
