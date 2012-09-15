@@ -2,6 +2,7 @@ package shared;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -81,6 +82,23 @@ public class Utils {
 			if (arr.get(i).equals(elem))
 				return i;
 		return -1;
+	}
+	
+	// ========================================================================
+	/** Given a target collection, this adds elements from the source collection at the end
+	 *  of the target collection.  We create this function because it is ironically more 
+	 *  efficient than the addAll() method in some collections, which stupidly allocates
+	 *  memory to create an extra and needless temporary array in its implementation.
+	 * @param listToWhichToAdd
+	 * @param elementsToAdd
+	 */
+	// We create this function because it is ironically more efficient than the ArrayList.addAll() method,
+	// which stupidly allocates memory to create an extra and needless temporary array in its implementaion.
+	public static<T> void addAll(ArrayList<T> listToWhichToAdd, ArrayList<T> elementsToAdd) {
+		listToWhichToAdd.ensureCapacity( listToWhichToAdd.size() + elementsToAdd.size() );  // Ensure capacity so no memory reallocation later		
+		for (T element : elementsToAdd) {
+			listToWhichToAdd.add(element);
+		}
 	}
 	
 	/** Given an array of ClusterTypes, this returns the counts of the ClusterTypes, 

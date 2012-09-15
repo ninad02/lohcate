@@ -60,8 +60,7 @@ public class Script {
 	
 	private static final int REGION_SEGMENTATION_DIST_THRESHOLD = 2000000; //greatest possible distance between 2 'adjacent' points of LOH in a region of 'contiguous' LOH
 	
-	private static final String GermlineStr = "germline";
-	private static final String SomaticStr  = "somatic";
+	private static final String GermlineSuffix = "." + VariantLocation.Germline.toLowerCase();	
 	private static final String NovelStr  = "novel";	
 	private static final String ChromPrefix = "chr";
 	public static final String MissingGeneNameValue = ".";
@@ -172,13 +171,13 @@ public class Script {
 				
 		int fileIndex = 0;
 		for (File file : files) {			
-			int indexOfSubstring = file.getName().indexOf("." + GermlineStr);
+			int indexOfSubstring = file.getName().indexOf(GermlineSuffix);
 			if (indexOfSubstring >= 0) {
 															// && wList(file.getName())) {
 				String samplenameRoot = file.getName().substring(0, indexOfSubstring);  				
 				System.out.println("Processing (" + ++fileIndex + "): " + file.getName());
 				
-				String somaticFilename = file.getAbsolutePath().replace(GermlineStr, SomaticStr);
+				String somaticFilename = file.getAbsolutePath().replace(VariantLocation.Germline.toLowerCase(), VariantLocation.Somatic.toLowerCase());
 				ArrayList<String> somaticSpecificVariantRows  = FileOps.readAllLinesFromFile(somaticFilename);
 				ArrayList<String> germlineSpecificVariantRows = FileOps.readAllLinesFromFile(file.getAbsolutePath());
 				
@@ -269,7 +268,8 @@ public class Script {
 					//System.out.println("Got variant annotations");
 					
 					// Determine whether we are at a germline or somatic row
-					String targetTissue = (i >= indexFirstSomaticRowInAllVariants) ? SomaticStr : GermlineStr; 
+					String targetTissue = (i >= indexFirstSomaticRowInAllVariants) ? 
+							VariantLocation.Somatic.toLowerCase() : VariantLocation.Germline.toLowerCase(); 
 										
 					String gene = "";
 					String mutationType = "";
@@ -769,15 +769,44 @@ public class Script {
 		
 		// First we determine the regions from each sample
 		for (File file : files) {
-			CopyNumberRegionsByChromosome regionsInSampleByChr = segmentRegionsOneFile(file, outDir);
-			if (regionsInSampleByChr != null) {
-				regionsInSamples.add(regionsInSampleByChr);
+			CopyNumberRegionsByChromosome regionsInOneSample = segmentRegionsOneFile(file, outDir);
+			if (regionsInOneSample != null) {
+				regionsInSamples.add(regionsInOneSample);
 			}
 		}
 		
-		// Now we want to overlap the regions
-		CopyNumberRegionsByChromosome recurrentRegionsLOH = determineRecurrentRegions(regionsInSamples, ClusterType.LOH);
-		recurrentRegionsLOH.print(System.out);
+		// Now we have all the contiguous regions from all the samples.  Find the regions of the cluster type
+		
+		// Declare the maximum stretch of a region for a particular cluster type 
+		int[] maxBasePairsContiguousRegion = new int[] {
+				REGION_SEGMENTATION_DIST_THRESHOLD,
+				REGION_SEGMENTATION_DIST_THRESHOLD,
+				Integer.MAX_VALUE
+		};  
+		
+		ArrayList<ArrayList<CopyNumberRegionsByChromosome>> regionsInSamplesPerClusterType = new ArrayList<ArrayList<CopyNumberRegionsByChromosome>>();
+		for (ClusterType clusterType : ClusterType.DupLOHHetG) {
+			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = new ArrayList<CopyNumberRegionsByChromosome>();
+			regionsInSamplesPerClusterType.add(regionsInSamplesForOneClusterType);			
+			int maxBasePairsContiguousRegionForCluster = maxBasePairsContiguousRegion[clusterType.ordinal()];
+			
+			for (CopyNumberRegionsByChromosome regionsInOneSample : regionsInSamples) {
+				CopyNumberRegionsByChromosome regionsInOneSampleMerged = mergeRegionsWithConstraints(regionsInOneSample, clusterType, maxBasePairsContiguousRegionForCluster);
+				regionsInSamplesForOneClusterType.add(regionsInOneSampleMerged);
+			}
+		}
+
+		PrintStream out = IOUtils.getPrintStream(outDir + File.separator + "testOut.txt");
+		
+		// Now we want to determine the recurrent regions
+		ArrayList<CopyNumberRegionsByChromosome> regionsRecurrentPerClusterType = new ArrayList<CopyNumberRegionsByChromosome>();
+		for (ClusterType clusterType : ClusterType.DupLOHHetG) {
+			CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType = 
+					determineRecurrentRegions(regionsInSamplesPerClusterType.get(clusterType.ordinal()), clusterType);
+			regionsRecurrentPerClusterType.add(recurrentRegionsForOneClusterType);
+			recurrentRegionsForOneClusterType.print(out);
+		}
+		IOUtils.closePrintStream(out);
 	}
 
 	// ========================================================================
@@ -802,12 +831,63 @@ public class Script {
 	}
 	
 	// ========================================================================
+	/** Given the segmented regions in one sample, this method merges the regions of one type (LOH, Amp, etc) 
+	 *  in the following manner.  LOH/Amp regions cannot be longer than maxLengthContiguousRegion long. 
+	 */
+	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraints(CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType, int maxBasePairsContiguousRegion) {
+		
+		// Create an empty return object
+		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName); 				
+		
+		// Go chromosome by chromosome
+		for (Chrom chrom : Chrom.Autosomes) {				
+			ArrayList<CopyNumberRegionRange> regionsInChromOriginal =       regionsInSample.mRegionsByChrom.get(chrom.getCode());
+			ArrayList<CopyNumberRegionRange> regionsInChromMerged   = regionsInSampleMerged.mRegionsByChrom.get(chrom.getCode());
+						
+			// We declare a stored region that can be extended.  Initialize to null for now
+			CopyNumberRegionRange regionToExtend = null;
+			
+			// Iterate through the regions for this chromosome
+			for (CopyNumberRegionRange currentRegion : regionsInChromOriginal) {
+
+				if (currentRegion.mCopyNumberClusterType == clusterType) {
+					// Check if there's a region already waiting for extension.  
+					// If not, create a new one (and a copy at that), and add to array
+					if (regionToExtend == null) {
+						regionToExtend = currentRegion.getCopy();
+						regionsInChromMerged.add(regionToExtend);  // add this to the new array
+						
+					} else {
+						if (currentRegion.mCopyNumberClusterType != regionToExtend.mCopyNumberClusterType) {
+							Utils.throwErrorAndExit("ERROR: Must have same cluster type!\t" + currentRegion.mCopyNumberClusterType + "\t" + regionToExtend.mCopyNumberClusterType);
+						}
+						
+						int maxEndIndexInclusive = regionToExtend.getRangeStart() + maxBasePairsContiguousRegion - 1;						
+						if (currentRegion.getRangeStart() <= maxEndIndexInclusive) {
+							regionToExtend.setRangeEnd(currentRegion.getRangeEnd());
+						} else {
+							// The current region is out of bounds.  We simply set
+							// the current region as the new region to extend.
+							regionToExtend = currentRegion.getCopy();
+							regionsInChromMerged.add(regionToExtend);  // add this to the new array
+						}
+					}	
+				}
+			}		
+		}
+		
+		return regionsInSampleMerged;
+	}
+	
+	// ========================================================================
 	/** The continuation of the @method segmentRegionsAllFiles method, but by individual. */ 
 	public static CopyNumberRegionsByChromosome segmentRegionsOneFile(File inFile, String outDir) {
 		FileExtensionAndDelimiter fileExtAndDelim = Utils.FileExtensionTSV;		
 		
 		// First check that the file is a file of the desired extension		
-		if (inFile.getName().indexOf(fileExtAndDelim.mExtension) < 0) return null;
+		int indexOfDelimiter = inFile.getName().indexOf(fileExtAndDelim.mExtension); 
+		if (indexOfDelimiter < 0) return null;
+		String samplenameRoot = inFile.getName().substring(0, indexOfDelimiter);
 		
 		StringBuilder sb = new StringBuilder(4096);
 		
@@ -817,7 +897,7 @@ public class Script {
 		Collections.sort(allLines, LineComparatorTab);	
 		
 		// Have an array of regions for amplifications and LOH
-		CopyNumberRegionsByChromosome regionsByChrom = new CopyNumberRegionsByChromosome();		 	
+		CopyNumberRegionsByChromosome regionsByChrom = new CopyNumberRegionsByChromosome(samplenameRoot);		 	
 		CopyNumberRegionRange currentRegion = null;
 		Chrom chromPreviousRow = null; // used to determine whether chrom has changed
 		
@@ -883,7 +963,7 @@ public class Script {
 	
 	// ========================================================================
 	private static boolean segmentRegionsOneFile_isValidCluster(ClusterType clusterType) {
-		return (clusterType != ClusterType.Noise && clusterType != ClusterType.Null);
+		return (clusterType != ClusterType.Noise && clusterType != ClusterType.Null && clusterType != ClusterType.HETSomatic);
 	}
 	
 	// ========================================================================
@@ -928,10 +1008,12 @@ public class Script {
 	public static class CopyNumberRegionsByChromosome {
 		private static final ArrayList<CopyNumberRegionRange> dummyListForChrom0 = new ArrayList<CopyNumberRegionRange>();
 		
+		String mSampleName;
 		ArrayList< ArrayList<CopyNumberRegionRange> > mRegionsByChrom;
 		
-		public CopyNumberRegionsByChromosome() {
+		public CopyNumberRegionsByChromosome(String sampleName) {
 			mRegionsByChrom = createRegionsByChromList();
+			mSampleName = sampleName;
 		}
 		
 		public static ArrayList<ArrayList<CopyNumberRegionRange>> createRegionsByChromList() {		
@@ -950,7 +1032,7 @@ public class Script {
 		
 		/** Returns an exact replica of this entire object, including copies of any contained regions. */ 
 		public CopyNumberRegionsByChromosome getDeepCopy() {
-			CopyNumberRegionsByChromosome newCopy = new CopyNumberRegionsByChromosome();
+			CopyNumberRegionsByChromosome newCopy = new CopyNumberRegionsByChromosome(mSampleName);
 			
 			for (int chromIndex = 0; chromIndex < mRegionsByChrom.size(); chromIndex++) {
 				ArrayList<CopyNumberRegionRange> cnrrList    =         mRegionsByChrom.get(chromIndex);
@@ -1011,12 +1093,14 @@ public class Script {
 	public static CopyNumberRegionsByChromosome
 		takeUnionAndBreakDownIntersectingRegions(CopyNumberRegionsByChromosome regionsTarget, CopyNumberRegionsByChromosome regionsSource, final ClusterType clusterType) {
 		
-		// First iterate over the chromosomes		
-		for (int chromIndex = 1; chromIndex < regionsTarget.mRegionsByChrom.size(); chromIndex++) {
-			ArrayList<CopyNumberRegionRange> regionsChrTarget = regionsTarget.mRegionsByChrom.get(chromIndex);
-			ArrayList<CopyNumberRegionRange> regionsChrSource = regionsSource.mRegionsByChrom.get(chromIndex);			
-			takeUnionAndBreakDownIntersectingRegions(regionsChrTarget, regionsChrSource, clusterType);			
+		// First iterate over the chromosomes
+		// for (int chromIndex = 1; chromIndex < regionsTarget.mRegionsByChrom.size(); chromIndex++) {
+		for (Chrom chrom : Chrom.Autosomes) {
+			ArrayList<CopyNumberRegionRange> regionsChrTarget = regionsTarget.mRegionsByChrom.get(chrom.getCode());
+			ArrayList<CopyNumberRegionRange> regionsChrSource = regionsSource.mRegionsByChrom.get(chrom.getCode());
+			takeUnionAndBreakDownIntersectingRegions(regionsChrTarget, regionsChrSource, clusterType);	
 		}
+
 		return regionsTarget;
 	}
 	
