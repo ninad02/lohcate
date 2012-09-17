@@ -15,6 +15,13 @@ public class BucketCounter {
 		clear();
 	}
 	
+	public BucketCounter(BucketCounter rhs) {
+		this(rhs.mArray.length, rhs.mIndexStart);		
+		add(rhs);
+	}
+	
+	public BucketCounter getCopy() { return new BucketCounter(this); }
+	
 	public void clear() { 
 		Arrays.fill(mArray, 0); 
 		mSumOfCounts = 0; 	
@@ -54,10 +61,42 @@ public class BucketCounter {
 	}
 	
 	public void print(PrintStream out, boolean printZeroCountElements) {
-		for (int i = 0; i < getLength(); i++) {
-			if (printZeroCountElements || (getCount(i) > 0)) {
-				out.println(i + "\t" + getCount(i) + "\t" + getProportion(i));
+		for (int i = 0; i < mArray.length; i++) {
+			if (printZeroCountElements || (mArray[i] > 0)) {
+				int bucketValue = i + mIndexStart;
+				out.println(bucketValue + "\t" + getCount(bucketValue) + "\t" + getProportion(bucketValue));
 			}
+		}		
+	}
+	
+	/** Writes all the counts to the string builder passed in. */
+	public void constructString(StringBuilder sb, boolean clearStringBuilder, String delimiter) {
+		if (clearStringBuilder) {
+			sb.setLength(0);
+		} 
+		
+		for (int i = 0; i < mArray.length; i++) {
+			if ((i > 0) || ((i == 0) && !clearStringBuilder)) {
+				sb.append(delimiter);
+			}
+			sb.append(mArray[i]);
+		}	
+	}
+	
+	public static void TestBucketCounter() {
+		int numBuckets = 8;
+		int valueStart = 1;
+		BucketCounter bc = new BucketCounter(numBuckets, valueStart);
+		for (int i = 0; i < numBuckets; i++) {
+			int bucketValue = i + valueStart;
+			bc.increment(bucketValue, bucketValue * bucketValue);
 		}
+		BucketCounter bcCopy = bc.getCopy();
+		bc.print(System.out);
+		bcCopy.print(System.out);
+	}
+	
+	public static void main(String[] args) {
+		TestBucketCounter();
 	}
 }

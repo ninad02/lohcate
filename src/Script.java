@@ -5,6 +5,7 @@ import static genomeUtils.RegionRange.RegionRangeOverlap.*;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.geom.Ellipse2D;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.PrintStream;
@@ -31,9 +32,11 @@ import lohcateEnums.ColorPastel;
 import lohcateEnums.SNVType;
 import lohcateEnums.SeqPlatform;
 import lohcateEnums.VariantLocation;
+import shared.BucketCounter;
 import shared.FileOps;
 import shared.GraphUtils;
 import shared.IOUtils;
+import shared.PrimitiveWrapper;
 import shared.Utils;
 import shared.Utils.FileExtensionAndDelimiter;
 
@@ -65,6 +68,7 @@ public class Script {
 	private static final String ChromPrefix = "chr";
 	public static final String MissingGeneNameValue = ".";
 	private static final float MaxVariantAlleleFrequency = 1.0f;
+	public static final String GenBrowserTrack = ".genBrowserTrack";
 
 	// Column constants for the curated TSV files (files that have a cluster column)
 	private static final int Col_NAFTAFInput_Chrom = 0;
@@ -418,7 +422,7 @@ public class Script {
 		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
 		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);
 	
-		// TODO - MAKE ALL
+		// 
 		String outFilename = outFilenamePrefix + ".ChartDist.jpg"; 
 		saveChartAsJPEG(outFilename, theChart, chartDimension.width, chartDimension.height);
 		*/
@@ -763,15 +767,18 @@ public class Script {
 	 * @param inDir curated SNP calls
 	 * @param outDir segmentation results
 	 */
-	public static void segmentRegionsAllFiles(String inDir, String outDir) {		
+	public static void segmentRegionsAllFiles(String inDir, String outDir, String outDirBrowserTracks) {
+		Utils.FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionTSV;
 		File[] files = (new File(inDir)).listFiles();
 		ArrayList<CopyNumberRegionsByChromosome> regionsInSamples = new ArrayList<CopyNumberRegionsByChromosome>();
+		ArrayList<File> validFilesList = new ArrayList<File>(files.length);
 		
 		// First we determine the regions from each sample
 		for (File file : files) {
 			CopyNumberRegionsByChromosome regionsInOneSample = segmentRegionsOneFile(file, outDir);
 			if (regionsInOneSample != null) {
 				regionsInSamples.add(regionsInOneSample);
+				validFilesList.add(file);
 			}
 		}
 		
@@ -785,10 +792,11 @@ public class Script {
 		};  
 		
 		ArrayList<ArrayList<CopyNumberRegionsByChromosome>> regionsInSamplesPerClusterType = new ArrayList<ArrayList<CopyNumberRegionsByChromosome>>();
-		for (ClusterType clusterType : ClusterType.DupLOHHetG) {
+		for (int clusterIndex = 0; clusterIndex < ClusterType.DupLOHHetG.length; clusterIndex++) {
+			ClusterType clusterType = ClusterType.DupLOHHetG[clusterIndex];
 			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = new ArrayList<CopyNumberRegionsByChromosome>();
 			regionsInSamplesPerClusterType.add(regionsInSamplesForOneClusterType);			
-			int maxBasePairsContiguousRegionForCluster = maxBasePairsContiguousRegion[clusterType.ordinal()];
+			int maxBasePairsContiguousRegionForCluster = maxBasePairsContiguousRegion[clusterIndex];
 			
 			for (CopyNumberRegionsByChromosome regionsInOneSample : regionsInSamples) {
 				CopyNumberRegionsByChromosome regionsInOneSampleMerged = mergeRegionsWithConstraints(regionsInOneSample, clusterType, maxBasePairsContiguousRegionForCluster);
@@ -800,15 +808,172 @@ public class Script {
 		
 		// Now we want to determine the recurrent regions
 		ArrayList<CopyNumberRegionsByChromosome> regionsRecurrentPerClusterType = new ArrayList<CopyNumberRegionsByChromosome>();
-		for (ClusterType clusterType : ClusterType.DupLOHHetG) {
+		for (int clusterIndex = 0; clusterIndex < ClusterType.DupLOHHetG.length; clusterIndex++) {
+			ClusterType clusterType = ClusterType.DupLOHHetG[clusterIndex];
+			
 			CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType = 
-					determineRecurrentRegions(regionsInSamplesPerClusterType.get(clusterType.ordinal()), clusterType);
+					determineRecurrentRegions(regionsInSamplesPerClusterType.get(clusterIndex), clusterType);
 			regionsRecurrentPerClusterType.add(recurrentRegionsForOneClusterType);
-			recurrentRegionsForOneClusterType.print(out);
+			recurrentRegionsForOneClusterType.print(out, fileExtDelim.mDelimiter);
 		}
+		
+		
+		System.out.println("Scoring regions...");
+		// Now, we need to go through the recurrent regions and score them, based on the 
+		// contents of the individual samples that make up the recurrent regions.
+		for (int clusterIndex = 0; clusterIndex < ClusterType.DupLOHHetG.length; clusterIndex++) {
+			ClusterType clusterType = ClusterType.DupLOHHetG[clusterIndex];
+
+			CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType = regionsRecurrentPerClusterType.get(clusterIndex);
+			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = regionsInSamplesPerClusterType.get(clusterIndex);
+			
+			countClusterTypesInRegions(recurrentRegionsForOneClusterType, regionsInSamplesForOneClusterType, validFilesList);
+			recurrentRegionsForOneClusterType.print(out, fileExtDelim.mDelimiter);
+			
+			
+		}
+				
 		IOUtils.closePrintStream(out);
+
+		System.out.println("Generating Browser tracks...");
+		// Generatebrowser tracks
+		for (int clusterIndex = 0; clusterIndex < ClusterType.DupLOHHetG.length; clusterIndex++) {
+			ClusterType clusterType = ClusterType.DupLOHHetG[clusterIndex];
+			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = regionsInSamplesPerClusterType.get(clusterIndex);
+			
+			genBrowserTracks(regionsInSamplesForOneClusterType, validFilesList, clusterType, outDirBrowserTracks);
+		}
+		
+		
+	}
+	
+	// ========================================================================
+	/** Given a list of regions (call it list1) and a list of samplename files, this parses each sample.
+	 *  For each site in the sample, it examines the cluster type assigned to the site.  If the site falls
+	 *  within a region from list1, this increments list1's region's count of the site's cluster type. 
+	 */
+	public static void countClusterTypesInRegions(CopyNumberRegionsByChromosome regionsGenomeWide, 
+												  ArrayList<CopyNumberRegionsByChromosome> regionsGenomeWideSampleSpecific, 
+												  ArrayList<File> sampleFiles) {
+		regionsGenomeWide.clearClusterCounts();
+		
+		StringBuilder sb = new StringBuilder(4096);
+
+		int sampleIndex = -1;
+		for (File inFile : sampleFiles) {
+			
+			// Load all lines into memory, extract the header row, and then sort by chrom/position
+			ArrayList<String> allLines = IOUtils.readAllLinesFromFile(inFile.getAbsolutePath(), false, true, sb);
+			String headerString = sb.toString();
+			Collections.sort(allLines, LineComparatorTab);
+						
+			CopyNumberRegionsByChromosome regionsOneSample = regionsGenomeWideSampleSpecific.get(++sampleIndex);
+			if (inFile.getName().indexOf(regionsOneSample.mSampleName) < 0) {
+				Utils.throwErrorAndExit("ERROR: Samples don't match up: " + regionsOneSample.mSampleName + "\t" + inFile.getName());
+			}
+			
+			// We initialize some indices for efficiency purposes
+			Chrom prevChrom = null;
+			ArrayList<CopyNumberRegionRange> regionsInChr = null;
+			ArrayList<CopyNumberRegionRange> regionsInChrSampleSpecific = null;
+			PrimitiveWrapper.WInteger regionIndexInChr               = new PrimitiveWrapper.WInteger(-1);
+			PrimitiveWrapper.WInteger regionIndexInChrSampleSpecific = new PrimitiveWrapper.WInteger(-1);
+			
+			// Go through all the lines
+			for (int lineIndex = 0; lineIndex < allLines.size(); lineIndex++) {
+				String line = allLines.get(lineIndex);
+				
+				final Chrom chrom  = Chrom.getChrom                       (Utils.extractNthColumnValue(line, ColCuratedTSV_Chrom,    Utils.TabStr));					
+				final int position = Integer.parseInt                     (Utils.extractNthColumnValue(line, ColCuratedTSV_Position, Utils.TabStr));
+				final ClusterType clusterType = ClusterType.getClusterType(Utils.extractNthColumnValue(line, ColCuratedTSV_Cluster,  Utils.TabStr));
+				
+				if ((prevChrom == null) || (chrom != prevChrom)) {
+					regionsInChr =                regionsGenomeWide.mRegionsByChrom.get(chrom.ordinal());
+					regionsInChrSampleSpecific =   regionsOneSample.mRegionsByChrom.get(chrom.ordinal());					
+					regionIndexInChr.mInt = 0;
+					regionIndexInChrSampleSpecific.mInt = 0;
+
+					prevChrom = chrom;  //  Must set
+				}
+				
+				if (regionsInChr.isEmpty() || regionsInChrSampleSpecific.isEmpty()) {
+					// no regions stored for this chromosome, so just move to the next line.  If
+					// the next line for the sample is also the same chromosome, then we'll just
+					// continue again, and so on... until we reach a line whose chromosome contains
+					// a non-empty list in the passed in regions
+					continue;  
+				}
+				
+				// We have a list of regions in place, with an index set to >= 0.  We test 
+				// whether the site position resides with the range, else we move on
+				Boolean inRange = scanRegionsForPoint(regionsInChr, regionIndexInChr, chrom, position);		
+				
+				// Test our results
+				if (inRange == null) {
+					// This means that we could not find a region on this chromosome
+					// that either: contains the site, or exists after the site.  The
+					// site (and all other sites following the site), exist after the 
+					// last region stored on this chromosome.  We just go through the
+					// sites until we reach a site on the next chromosome
+					continue;
+				} else if (inRange == Boolean.FALSE) {
+					// This means that the site lies prior to the next block in the
+					// list.  We just need to go through the sites until we reach a
+					// site that exists within the region.
+					continue;
+				} else {
+					Boolean inRangeSampleSpecific = scanRegionsForPoint(regionsInChrSampleSpecific, regionIndexInChrSampleSpecific, chrom, position);
+					if (inRangeSampleSpecific == null) {
+						// We could find a region on the sample's chromosome that either:
+						// contains the site, or exists downstream of the site.  The site
+						// (and all other sites following the site), exist after the last 
+						// region stored on this chromosome for the particular sample.  We
+						// therefore take no action on this particular site.
+					} else if (inRangeSampleSpecific == Boolean.FALSE) {
+						// The site lies upstream of the next region in the sample's list
+						// of regions.  We therefore take no action on this particular site.
+					} else {
+						CopyNumberRegionRange region = regionsInChr.get(regionIndexInChr.mInt);
+						region.mClusterTypeCounts.increment(clusterType.ordinal());
+					}
+				}
+			}
+		}
 	}
 
+	// ========================================================================
+	/** Given a sorted list of regions and an index at which to start, this scans across the list of 
+	 *  regions to find the region that contains the given (chrom, position).  If we reach a region
+	 *  that contains the given (chrom, position), we stop the scanning and have two return values:
+	 *  the index of the region in the list, and Boolean.TRUE.  If we exhaust all regions and still 
+	 *  have not reached the (chrom, position), it means that all regions exist upstream of the 
+	 *  (chrom, position); we return two values: the index of the region in the list (which should 
+	 *  be equal to the list size, as we have exhausted all blocks), and null.  Lastly, if we cannot 
+	 *  find any region that contains the (chrom, position) but reach a region that lies downstream
+	 *  of (chrom, position), we stop and return two values: Boolean.FALSE and the index of the 
+	 *  downstream region.
+	 * @param regionsInChromosome list of regions
+	 * @param regionIndex index in which to start scanning.  This value is changed during list execution
+	 * @param chrom 
+	 * @param position
+	 * @return Described above
+	 */
+	public static Boolean scanRegionsForPoint(ArrayList<? extends CopyNumberRegionRange> regionsInChromosome, 
+											  PrimitiveWrapper.WInteger regionIndex, 
+											  Chrom chrom, int position) {
+		
+		for (; regionIndex.mInt < regionsInChromosome.size(); regionIndex.mInt++) {			
+			CopyNumberRegionRange region = regionsInChromosome.get(regionIndex.mInt);
+			
+			if (region.inRange(chrom, position)) {
+				return Boolean.TRUE;				
+			} else if (region.getRangeStart() > position) {
+				return Boolean.FALSE;				
+			}
+		}
+		return null;
+	}
+	
 	// ========================================================================
 	/** This takes in a list of regions per sample and intersects all the regions.  It reports
 	 *  for each intersecting region the recurrence score across samples.
@@ -904,11 +1069,15 @@ public class Script {
 		// We start at index 0 assuming no header and that the rows are sorted by chrom/position
 		for (int row = 0; row < allLines.size(); row++) {			
 			String line = allLines.get(row);			
-			String[] columns = line.split(Utils.TabPatternStr);
+			//String[] columns = line.split(Utils.TabPatternStr);
 			
-			final Chrom chrom  = Chrom.getChrom  (columns[ColCuratedTSV_Chrom]);
-			final int position = Integer.parseInt(columns[ColCuratedTSV_Position]);
-			final ClusterType clusterType = ClusterType.getClusterType(columns[ColCuratedTSV_Cluster]);
+//			final Chrom chrom  = Chrom.getChrom  (columns[ColCuratedTSV_Chrom]);
+//			final int position = Integer.parseInt(columns[ColCuratedTSV_Position]);
+//			final ClusterType clusterType = ClusterType.getClusterType(columns[ColCuratedTSV_Cluster]);
+			
+			final Chrom chrom  = Chrom.getChrom                       (Utils.extractNthColumnValue(line, ColCuratedTSV_Chrom,    Utils.TabStr));					
+			final int position = Integer.parseInt                     (Utils.extractNthColumnValue(line, ColCuratedTSV_Position, Utils.TabStr));
+			final ClusterType clusterType = ClusterType.getClusterType(Utils.extractNthColumnValue(line, ColCuratedTSV_Cluster,  Utils.TabStr));
 			
 			// If the chromosome has changed, we set that we have no current region
 			if ((chrom != chromPreviousRow) && (currentRegion != null)) {
@@ -978,23 +1147,27 @@ public class Script {
 	public static class CopyNumberRegionRange extends RegionRange {
 		public ClusterType mCopyNumberClusterType;
 		public float mRecurrenceScore;
+		protected BucketCounter mClusterTypeCounts;
 		
 		public CopyNumberRegionRange(ClusterType copyNumberClusterType, Chrom chrom, int regionStart) {
 			super(chrom, regionStart);
 			mCopyNumberClusterType = copyNumberClusterType;
 			mRecurrenceScore = 1.0f;
+			mClusterTypeCounts = new BucketCounter(ClusterType.getNumClusterTypes(), 0);
 		}		
-		
-		public CopyNumberRegionRange(CopyNumberRegionRange rhs) {
-			super(rhs);
-			mCopyNumberClusterType = rhs.mCopyNumberClusterType;
-			mRecurrenceScore       = rhs.mRecurrenceScore;
-		}
 		
 		public CopyNumberRegionRange(ClusterType copyNumberClusterType, Chrom chrom, int regionStart, int regionEnd) {
 			super(chrom, regionStart, regionEnd);
 			mCopyNumberClusterType = copyNumberClusterType;
 			mRecurrenceScore = 1.0f;
+			mClusterTypeCounts = new BucketCounter(ClusterType.getNumClusterTypes(), 0);
+		}
+		
+		public CopyNumberRegionRange(CopyNumberRegionRange rhs) {
+			super(rhs);
+			mCopyNumberClusterType = rhs.mCopyNumberClusterType;
+			mRecurrenceScore       = rhs.mRecurrenceScore;
+			mClusterTypeCounts     = rhs.mClusterTypeCounts.getCopy();
 		}
 		
 		public CopyNumberRegionRange getCopy() { return new CopyNumberRegionRange(this); }
@@ -1030,6 +1203,14 @@ public class Script {
 			mRegionsByChrom.get(chrom.getCode()).add(region);
 		}
 		
+		public void clearClusterCounts() {
+			for (ArrayList<CopyNumberRegionRange> regionsInChrom : mRegionsByChrom) {
+				for (CopyNumberRegionRange oneRegionInChrom : regionsInChrom) {
+					oneRegionInChrom.mClusterTypeCounts.clear();
+				}
+			}
+		}
+		
 		/** Returns an exact replica of this entire object, including copies of any contained regions. */ 
 		public CopyNumberRegionsByChromosome getDeepCopy() {
 			CopyNumberRegionsByChromosome newCopy = new CopyNumberRegionsByChromosome(mSampleName);
@@ -1047,10 +1228,23 @@ public class Script {
 		}
 		
 		/** Prints the contents to the PrintStream. */
-		public void print(PrintStream out) {
+		public void print(PrintStream out, String delimiter) {
+			StringBuilder sb = new StringBuilder(65536);
+
 			for (ArrayList<CopyNumberRegionRange> regionsOnChr : mRegionsByChrom) {
 				for (CopyNumberRegionRange cnrr : regionsOnChr) {
-					out.println(cnrr.mCopyNumberClusterType + "\t" + cnrr.mRecurrenceScore + "\t" + cnrr.toString());
+					sb.setLength(0);
+					sb.append(cnrr.mCopyNumberClusterType);
+					sb.append(delimiter).append(cnrr.mRecurrenceScore);
+					sb.append(delimiter).append(cnrr.toString());
+					
+					double densityClusterType =        ((double) cnrr.mClusterTypeCounts.getCount(cnrr.mCopyNumberClusterType.ordinal()) / (double) cnrr.getRangeLength());
+					double densityClusterHetGermline = ((double) cnrr.mClusterTypeCounts.getCount(ClusterType.HETGermline.ordinal())     / (double) cnrr.getRangeLength());
+					sb.append(delimiter).append(densityClusterType);
+					sb.append(delimiter).append(densityClusterHetGermline);
+					
+					cnrr.mClusterTypeCounts.constructString(sb, false, delimiter);		
+					out.println(sb.toString());
 				}
 			}
 		}		
@@ -1279,6 +1473,231 @@ public class Script {
 		cnrrCurrent.setRangeStart(region2.getRangeStart());  // make left-aligned to the toAdd region
 		regionsList1.set(indexList1, cnrrCurrent);
 	}
+
+	// ========================================================================
+	private static void getBrowserTracksHelper_Helper_findMinMaxPositionsAcrossSamplesPerChromosome(int[] minPerChrom, int[] maxPerChrom, ArrayList<File> sampleFiles, ClusterType clusterType) {
+		Arrays.fill(minPerChrom, Integer.MAX_VALUE);
+		Arrays.fill(maxPerChrom, Integer.MIN_VALUE);
+		
+		for (File inFile : sampleFiles) {
+			int lineCounter = -1;
+			String line;
+			BufferedReader in = IOUtils.getBufferedReader(inFile.getAbsolutePath());
+			
+			while ((line = IOUtils.getNextLineInBufferedReader(in)) != null) {
+				if (++lineCounter == 0) { continue; }
+				
+				final Chrom chrom  = Chrom.getChrom  (Utils.extractNthColumnValue(line, ColCuratedTSV_Chrom,    Utils.TabStr));					
+				final int position = Integer.parseInt(Utils.extractNthColumnValue(line, ColCuratedTSV_Position, Utils.TabStr));
+				final ClusterType clusterTypeForSite = ClusterType.getClusterType(Utils.extractNthColumnValue(line, ColCuratedTSV_Cluster,      Utils.TabStr));
+
+				if (clusterTypeForSite == clusterType) {
+					// Set min, max indices across samples for this chromosome
+					minPerChrom[chrom.ordinal()] = Math.min(minPerChrom[chrom.ordinal()], position);
+					maxPerChrom[chrom.ordinal()] = Math.max(maxPerChrom[chrom.ordinal()], position);
+				}				
+			}
+			IOUtils.closeBufferedReader(in);
+		}		
+	}
+	
+	// ========================================================================
+	public static void genBrowserTracks(ArrayList<CopyNumberRegionsByChromosome> regionsPerSample, 
+										ArrayList<File> sampleFiles, 
+										ClusterType clusterType, String outDir) {		
+
+		// First, we want to find the minimum and maximum positions of sites across samples for each chromosome
+		int numChromArrayElements = Chrom.values().length;
+		StringBuilder sb = new StringBuilder(4096);
+		int[] minStartPositionOnChromosomeAcrossSamples = new int[numChromArrayElements];
+		int[] maxStartPositionOnChromosomeAcrossSamples = new int[numChromArrayElements];
+		getBrowserTracksHelper_Helper_findMinMaxPositionsAcrossSamplesPerChromosome
+			(minStartPositionOnChromosomeAcrossSamples, maxStartPositionOnChromosomeAcrossSamples, sampleFiles, clusterType);
+
+		// Initialize color array
+		int[] rgb = new int[3];
+				
+		int[][] eventCount = new int[numChromArrayElements][sampleFiles.size()];
+		for (int[] eventsPerChrom : eventCount) {
+			Arrays.fill(eventsPerChrom, 0);
+		}
+		
+		int sampleIndex = -1;
+		int greyscaleBEDScore = 900;
+		
+		// Now go through the files
+		for (File inFile : sampleFiles) {
+
+			// Load all lines into memory, extract the header row, and then sort by chrom/position
+			ArrayList<String> allLines = IOUtils.readAllLinesFromFile(inFile.getAbsolutePath(), false, true, sb);
+			String headerString = sb.toString();
+			Collections.sort(allLines, LineComparatorTab);			
+
+			CopyNumberRegionsByChromosome regionsOneSample = regionsPerSample.get(++sampleIndex);
+			if (inFile.getName().indexOf(regionsOneSample.mSampleName) < 0) {
+				Utils.throwErrorAndExit("ERROR: Samples don't match up: " + regionsOneSample.mSampleName + "\t" + inFile.getName());
+			}
+			String sampleNameRoot = regionsOneSample.mSampleName;
+
+			// This is the list of regions
+			int rowNum = 0;			
+			ArrayList<ArrayList<String>> outList = new ArrayList<ArrayList<String>>();
+			outList.add(new ArrayList<String>());  // add dummy list for chr 0
+			String snowString = "205,201,201";  // assign color to each row of region in cluster type 
+			
+			// We generate strings for the list of regions that we will print.  Just before that, however,
+			// we will print some header information.
+			for (Chrom chrom : Chrom.Autosomes) {
+				ArrayList<String> outListForChrom = new ArrayList<String>();
+				outList.add(outListForChrom);
+					
+				// Store header information
+				sb.setLength(0);
+				sb.append("browser position chr").append(chrom.ordinal()).append(Utils.ColonString)
+				  .append(minStartPositionOnChromosomeAcrossSamples[chrom.ordinal()]).append("-")
+				  .append(maxStartPositionOnChromosomeAcrossSamples[chrom.ordinal()]);
+				outListForChrom.add(sb.toString());				
+				outListForChrom.add("browser hide all");
+								
+				sb.setLength(0);				
+				sb.append("track name=").append(Utils.DoubleQuoteStr).append(sampleNameRoot).append(Utils.DoubleQuoteStr).append(Utils.SpaceString)
+				  .append("description=").append(Utils.DoubleQuoteStr).append(Utils.SpaceString).append(Utils.DoubleQuoteStr).append(Utils.SpaceString)
+				  .append("visibility=dense").append(Utils.SpaceString).append("itemRgb=").append(Utils.DoubleQuoteStr).append("on").append(Utils.DoubleQuoteStr);
+				outListForChrom.add(sb.toString());
+	
+				for (CopyNumberRegionRange cnrr : regionsOneSample.mRegionsByChrom.get(chrom.ordinal())) {
+					sb.setLength(0);
+					sb.append(ChromPrefix).append(chrom.ordinal()).
+					   append(Utils.SpaceString).append(cnrr.getRangeStart()).
+					   append(Utils.SpaceString).append(cnrr.getRangeEnd()).
+					   append(Utils.SpaceString).append("row").append(++rowNum).
+					   append(Utils.SpaceString).append("0 +").
+					   append(Utils.SpaceString).append(cnrr.getRangeStart()).
+					   append(Utils.SpaceString).append(cnrr.getRangeEnd()).
+					   append(Utils.SpaceString).append(snowString);
+					outListForChrom.add(sb.toString());
+				}
+			}
+						
+			// Go through all the lines
+			for (int lineIndex = 0; lineIndex < allLines.size(); lineIndex++) {
+				String line = allLines.get(lineIndex);
+
+				final Chrom chrom  = Chrom.getChrom                       (Utils.extractNthColumnValue(line, ColCuratedTSV_Chrom,    Utils.TabStr));					
+				final int position = Integer.parseInt                     (Utils.extractNthColumnValue(line, ColCuratedTSV_Position, Utils.TabStr));
+				final ClusterType clusterTypeForSite = ClusterType.getClusterType(Utils.extractNthColumnValue(line, ColCuratedTSV_Cluster,      Utils.TabStr));
+				final SNVType mutationType = SNVType.getSNVType                  (Utils.extractNthColumnValue(line, ColCuratedTSV_MutationType, Utils.TabStr));
+				final VariantLocation varLoc = VariantLocation.getVariantLocation(Utils.extractNthColumnValue(line, ColCuratedTSV_VariantLocation, Utils.TabStr));
+
+				int score = 0;
+				ColorPastel theColor = null;
+				if (clusterTypeForSite == clusterType) {
+					// Increment the event count for this chromosome and sample
+					eventCount[chrom.ordinal()][sampleIndex]++;					
+					score = greyscaleBEDScore; //used with grayscale BEDs (historical artifact)
+					
+					switch(mutationType) {
+					case NonSynonymous: theColor = ColorPastel.RGB_Red;    break;
+					case Synonymous:    theColor = ColorPastel.Dark_Green; break;
+					default:            theColor = ColorPastel.White;      break; 
+					}
+					
+					if (varLoc == VariantLocation.Somatic) {
+						theColor = ColorPastel.Blue;
+					}
+					
+				} else if  (clusterTypeForSite == ClusterType.HETGermline) {					
+					score = 300; //used with grayscale BEDs (historical artifact)
+					
+					switch(mutationType) {
+					case NonSynonymous: theColor = ColorPastel.Yellow_Orange; break;
+					case Synonymous:    theColor = ColorPastel.Light_Green;   break;
+					default:            theColor = ColorPastel.White;         break; 
+					}
+				}
+
+				if (score > 0) {
+					theColor.getRGBValues(rgb);
+					sb.setLength(0);
+					sb.append(ChromPrefix).append(chrom.ordinal()).
+					   append(Utils.SpaceString).append(position).
+					   append(Utils.SpaceString).append(position).
+					   append(Utils.SpaceString).append("row").append(++rowNum).
+					   append(Utils.SpaceString).append("0 +").
+					   append(Utils.SpaceString).append(position).
+					   append(Utils.SpaceString).append(position).
+					   append(Utils.SpaceString).append(rgb[0]).append(Utils.CommaStr).append(rgb[1]).append(Utils.CommaStr).append(rgb[2]);
+					outList.get(chrom.ordinal()).add(sb.toString());
+				}								
+			}
+			
+			// Now write output to disk
+			for (Chrom chrom : Chrom.Autosomes) {
+				String outFilename = outDir + File.separator + clusterType.name() + Utils.DotStr + ChromPrefix + Utils.DotStr + chrom.ordinal() +  
+						Utils.DotStr + sampleNameRoot + GenBrowserTrack + Utils.FileExtensionTSV.mExtension;
+				IOUtils.writeOutputFile(outFilename, outList.get(chrom.ordinal()));
+			}
+		}
+	}
+
+	
+	/*
+	
+
+		}
+		
+		
+		System.out.println("writing to file...");
+		String manifest;
+		ArrayList<Integer> patsort, blacklist;
+		int temp_max, temp_max_ind;
+		for (int i = 1; i<=22; i++) { //chromosomes
+			chr = Integer.toString(i);
+			for (int k = 0; k<cluster_names.length - 1; k++) { //clusters
+				manifest = "";
+				patsort = new ArrayList<Integer>(); 
+				blacklist = new ArrayList<Integer>();
+				
+				/* The following block jsut sorts patients by event count very inefficiently. *
+				while (patsort.size() < pats.size()) { //sort patients by event count
+					temp_max = Integer.MIN_VALUE;
+					temp_max_ind = -1;
+					for (int t = 0; t<pats.size(); t++) {
+						if (Utils.indexOf(blacklist, t)==-1) {
+							if (event_count[i-1][k][t] > temp_max) {
+								temp_max = event_count[i-1][k][t];
+								temp_max_ind = t;
+							}
+						}
+					}
+					patsort.add(temp_max_ind);
+					blacklist.add(temp_max_ind);
+				}
+				
+				/* NPD: Won't need to combine germline and somatic in new code since it's already combined. *
+				for (int p : patsort) { //patients
+					toWrite[i-1][k][p][0] += toWrite[i-1][k][p][1]; //combine germline and somatic files
+					toWrite[i-1][k][p][0] = 
+							"browser hide all\n"
+								+ "track name=\"" + pats.get(p).replace(".germline.csv", "") 
+								+ "\" description=\" \" visibility=dense itemRgb=\"on\"\n" 
+								+ toWrite[i-1][k][p][0];
+					
+					toWrite[i-1][k][p][0] = 
+							"browser position chr" 
+							+ chr + ":" 
+							+ big_min[i-1][k] + "-" + big_max[i-1][k] + "\n" 
+							+ toWrite[i-1][k][p][0];
+					
+					FileOps.writeToFile(outDir + "/chr" + chr + "_" + cluster_names[k] + "/" + pats.get(p).replace(".germline", ""), toWrite[i-1][k][p][0]);
+					manifest += "https://raw.github.com/sidreddy96/lohcate/master/" + inDir.split("/")[inDir.split("/").length - 2] + "/browser_tracks/chr" + chr + "_" + cluster_names[k] + "/" + pats.get(p).replace(".germline", "") + "\n"; //you'll have to deal with this line as you please
+				}
+				FileOps.writeToFile(outDir + "/chr" + chr + "_" + cluster_names[k] + ".txt", manifest);
+			}
+		}
+	}
+	*/
+	
 	
 	/**
 	 * Define 'contiguous' regions of LOH, given our curated SNP calls.
@@ -1428,6 +1847,7 @@ public class Script {
 	 * @param regions_inDir region segmentation data
 	 * @param snps_inDir curated SNP calls
 	 */
+	/*
 	public static void scoreRegions(String regions_inDir, String snps_inDir, String outDir) {
 		File[] dirs = (new File(regions_inDir)).listFiles();
 		String[] load, pat_load;
@@ -1561,13 +1981,14 @@ public class Script {
 			if (arr.get(i).mLabel.equals(gene.mLabel))
 				return i;
 		return -1;
-	}
+	}*/
 	
 	/**
 	 * Parse curated SNP calls and region segmentation data into BED files that can be uploaded to the UCSC genome browser.
 	 * @param inDir curated SNP calls
 	 * @param regions_inDir region segmentation data
 	 */
+	/*
 	public static void genBrowserTracks(String inDir, String regions_inDir, String outDir) {
 		File[] files = (new File(inDir)).listFiles();
 		ArrayList<String> pats = new ArrayList<String>();
@@ -1626,8 +2047,7 @@ public class Script {
 										event_count[i-1][k][p]++;
 										if (split[j].split("\n")[0].indexOf("nonsynonymous")!=-1) { //if nonsynonymous
 											rgb[0] = 255; rgb[1] = 0; rgb[2] = 0; //red
-										}
-										else { //if synonymous
+										} else { //if synonymous
 											rgb[0] = 0; rgb[1] = 100; rgb[2] = 0; //dark green
 										}	
 										
@@ -1689,7 +2109,8 @@ public class Script {
 				FileOps.writeToFile(outDir + "/chr" + chr + "_" + cluster_names[k] + ".txt", manifest);
 			}
 		}
-	}
+	}*/
+	
 	
 	/**
 	 * Parse region score data into BED files that can be uploaded to the UCSC genome browser.
@@ -1932,20 +2353,24 @@ public class Script {
 				ClusterType.LOH.name(), 
 				ClusterType.LOH.name() + "_refLost", 
 				ClusterType.HETGermline.name(),
+				ClusterType.HETSomatic.name(),
 				
 				ClusterType.Dup.name() + logStr,
 				ClusterType.LOH.name() + logStr, 
 				ClusterType.LOH.name() + "_refLost" + logStr, 
 				ClusterType.HETGermline.name() + logStr,
+				ClusterType.HETSomatic.name() + logStr,
 				
-				ClusterType.Dup.name() + densityStr,
-				ClusterType.LOH.name() + densityStr, 
+				ClusterType.Dup.name()              + densityStr,
+				ClusterType.LOH.name()              + densityStr, 
 				ClusterType.LOH.name() + "_refLost" + densityStr, 
-				ClusterType.HETGermline.name() + densityStr,
+				ClusterType.HETGermline.name()      + densityStr,
+				ClusterType.HETSomatic.name()       + densityStr,
 				
-				ClusterType.Dup.name() + recurrenceStr, 
-				ClusterType.LOH.name() + recurrenceStr, 
+				ClusterType.Dup.name()         + recurrenceStr, 
+				ClusterType.LOH.name()         + recurrenceStr, 
 				ClusterType.HETGermline.name() + recurrenceStr,
+				ClusterType.HETSomatic.name()  + recurrenceStr
 		};
 		String headerStr = Utils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();
 
@@ -1979,22 +2404,22 @@ public class Script {
 				curateSNPCalls(root + "/naf-taf-inputs", root + "/snps", root + "/mouse_ears", platform); //args[2] --> 0::Illumina, 1::SOLiD
 				break;
 			case 1:
-				segmentRegionsAllFiles(root + "/snps", root + "/regions");
+				segmentRegionsAllFiles(root + "/snps", root + "/regions", root + "/browser_tracks");
 				
 				//No need for this function now: 
 				//pickupSomatics(root + "/snps", root + "/regions", root + "/curated_snps");
 				break;
 			case 2:
-				scoreRegions(root + "/regions", root + "/curated_snps", root + "/scored_regions");
+				//scoreRegions(root + "/regions", root + "/curated_snps", root + "/scored_regions");
 				break;
 			case 3:
-				genBrowserTracks(root + "/curated_snps", root + "/regions", root + "/browser_tracks");
+				//genBrowserTracks(root + "/curated_snps", root + "/regions", root + "/browser_tracks");
 				addScoreTracks(root + "/scored_regions", root + "/score_tracks"); //come back to this
 				break;
 			case 4:
 				//getGeneEnrichment(root + "/curated_snps", root + "/gene_enrichment.csv");
 				getGeneEnrichment(root + "/snps", root + "/gene_enrichment.csv");
-				Enrichment.genTopGeneLists(root + "/gene_enrichment.csv", root + "/gene_enrichment");
+				//Enrichment.genTopGeneLists(root + "/gene_enrichment.csv", root + "/gene_enrichment");
 				break;
 			case 5:
 				for (int i = 0; i<cluster_names.length - 1; i++)

@@ -150,6 +150,10 @@ public enum ColorPastel {
 	Dark_Warm_Brown(0x754C24, 117, 76, 36),	
 	Darker_Warm_Brown(0x603913, 96, 57, 19),	
 
+	Snow    (0xfffafa, 255, 250, 250),		 
+	Snow2	(0xeee9e9, 238, 233, 233),		
+	Snow3	(0xcdc9c9, 205, 201, 201),		 
+	Snow4	(0x8b8989, 139, 137, 137)	
 	;
 	
 	
@@ -158,18 +162,26 @@ public enum ColorPastel {
 	// Member variables
 	// ===================================
 	private int mHexCode;
-	private float mValueRed;
-	private float mValueGreen;
-	private float mValueBlue;
+	private int mValueRed;
+	private int mValueGreen;
+	private int mValueBlue;
 	private Color mColor;
 	
-	private ColorPastel(int hexCode, float valueRed, float valueGreen, float valueBlue) {
+	private ColorPastel(int hexCode, int valueRed, int valueGreen, int valueBlue) {
 		mHexCode    = hexCode;
 		mValueRed   = valueRed;
 		mValueGreen = valueGreen;
 		mValueBlue  = valueBlue;
 		mColor = new Color(mHexCode);
 	}
+	
+	public void getRGBValues(int[] rgb) {
+		rgb[0] = mValueRed;
+		rgb[1] = mValueGreen;
+		rgb[2] = mValueBlue;
+	}
+	
+	public int getHexCode() { return mHexCode; }
 	
 	public Color getColor() { return mColor; }
 }

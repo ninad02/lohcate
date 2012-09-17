@@ -28,6 +28,10 @@ public class Utils {
 	public static final String SemicolonStr = ";";
 	public static final String NAStr  = "N/A";
 	public static final String RangeDash = "-";
+	public static final String SpaceString = " ";
+	public static final String ColonString = ":";
+	public static final String DoubleQuoteStr = "\"";
+	public static final String DotStr = ".";
 	public static final int NumAutosomes = 22;
 	
 	public static final FileExtensionAndDelimiter FileExtensionCSV = new FileExtensionAndDelimiter(".csv", CommaStr);
