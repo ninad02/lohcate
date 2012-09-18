@@ -145,6 +145,43 @@ public class Utils {
 		return (double) numGC / (double) validLength;
 	}
 	
+	/** Given a two dimensional integer array, this fills all elements with the specified value. */
+	public static void arrayFill(int[][] theArray, int value) {
+		for (int[] subArray : theArray) {
+			Arrays.fill(subArray, value);
+		}
+	}
+	
+	/** Given a three dimensional integer array, this fills all the elements with the specified value. */
+	public static void arrayFill(int[][][] theArray, int value) {
+		for (int[][] subArray : theArray) {
+			arrayFill(subArray, value);
+		}
+	}
+	
+	/** Given a four dimensional integer array, thsi fills all the elements with the specified value. */
+	public static void arrayFill(int[][][][] theArray, int value) {
+		for (int[][][] subArray : theArray) {
+			arrayFill(subArray, value);
+		}
+	}
+	
+	/** This returns a new int[] array with the specified length and initialized to the specified values. */
+	public static int[] newIntArray(int numElements, int fillValue) {
+		int[] newArray = new int[numElements];
+		Arrays.fill(newArray, fillValue);
+		return newArray;
+	}
+	
+	/** This returns a new int[][] array with the specified dimensions and with all elements
+	 *  initialized to the specified value.
+	 */
+	public static int[][] newIntArray2D(int numElementsX, int numElementsY, int fillValue) {
+		int[][] newArray = new int[numElementsX][numElementsY];
+		arrayFill(newArray, fillValue);
+		return newArray;
+	}
+	
 	/** Given an arraylist of arraylists of a certain type, this adds numNewArraysToAdd new ArrayLists of
 	 *  that type to the target list.
 	 * @param targetList

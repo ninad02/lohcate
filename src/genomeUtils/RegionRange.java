@@ -3,8 +3,6 @@ package genomeUtils;
 import java.util.Comparator;
 
 import lohcateEnums.Chrom;
-import shared.Utils;
-
 
 public class RegionRange {
 	
@@ -52,7 +50,7 @@ public class RegionRange {
 	
 	/** Sets the range. */
 	public void set(Chrom chrom, int rangeStart, int rangeEnd, boolean makeFinalized, int numSitesInterrogated) {
-		if (rangeEnd < rangeStart) Utils.throwErrorAndExit("ERROR: RegionRange.set(): Range end must follow range start!");		
+		if (rangeEnd < rangeStart) throwErrorAndExit("ERROR: RegionRange.set(): Range end must follow range start!");		
 		
 		mChrom = chrom;		
 		mRangeStart = rangeStart;
@@ -63,13 +61,13 @@ public class RegionRange {
 	
 	/** Sets the range start. */
 	public void setRangeStart(int rangeStart) {
-		if (rangeStart > mRangeEnd) Utils.throwErrorAndExit("ERROR: RegionRange.setRangeStart() Range start must precede range end!");
+		if (rangeStart > mRangeEnd) throwErrorAndExit("ERROR: RegionRange.setRangeStart() Range start must precede range end!");
 		mRangeStart = rangeStart;
 	}
 	
 	/** Sets the range end.  */
 	public void setRangeEnd(int rangeEnd) {
-		if (rangeEnd < mRangeStart) Utils.throwErrorAndExit("ERROR: RegionRange.setRangeEnd(): Range end must follow range start!");
+		if (rangeEnd < mRangeStart) throwErrorAndExit("ERROR: RegionRange.setRangeEnd(): Range end must follow range start!");
 		mRangeEnd = rangeEnd;		
 	}
 	
@@ -158,6 +156,12 @@ public class RegionRange {
 				}
 			}
 		}		
+	}
+	
+	public static void throwErrorAndExit(String errorString) {
+		Exception e = new Exception(errorString);
+		e.printStackTrace();
+		System.exit(-1);	
 	}
 	
 	// ========================================================================

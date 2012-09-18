@@ -25,6 +25,29 @@ public class IOUtils {
 	}
 
 	// ========================================================================
+	/** Given a directory full path, this ensures that the directory path is created. */
+	public static void createDirectoryPath(String directoryFullPath, boolean lastElementIsFilename) {
+		File dirPath = new File(directoryFullPath);
+		if (lastElementIsFilename) {
+			dirPath = dirPath.getParentFile();			
+		}
+		
+		try {
+			if (!dirPath.isDirectory()) {
+				boolean result = dirPath.mkdirs();
+				if (!result) {
+					Utils.throwErrorAndExit("ERROR: Could not create directory: " + dirPath.getAbsolutePath());
+				}
+			}
+		} catch (SecurityException e) {
+			System.err.println("ERROR: Doesn't have necessary permissions to create directory: " + dirPath.getAbsolutePath());
+			System.err.println("       User must create directory him/herself first!");
+			e.printStackTrace();			
+		}
+	}
+	
+	
+	// ========================================================================
 	/** Given a filename string and a subdirectory to be created, this creates the subdirectory and returns the filename. */
 	public static String createSubdirectory(String inFilename, String newDirectoryName, boolean createDirectoryOnDisk) {
 		String parentPath = (new File(inFilename)).getParent();

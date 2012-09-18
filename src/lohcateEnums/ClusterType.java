@@ -13,6 +13,7 @@ public enum ClusterType {
 	
 	public static final ArrayList<String> namesLowercase = getClusterTypesLowercase();
 	public static final ClusterType[] DupLOHHetG = new ClusterType[] { Dup, LOH, HETGermline };
+	public static final ClusterType[] DupLOH = new ClusterType[]     { Dup, LOH };
 	
 	public static int getNumAberrantClusterTypes() { return 2; }
 	
