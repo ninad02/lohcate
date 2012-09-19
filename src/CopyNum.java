@@ -187,7 +187,7 @@ public class CopyNum {
 	public static ArrayList<Point> cnvSplit(Point r, ArrayList<Point> arr) { //splice, w/out insertion at end
 		ArrayList<Point> rtn = new ArrayList<Point>();
 		for (Point elem : arr) {
-			if (!Script.intersecting(r, elem))
+			if (!OldCode.intersecting(r, elem))
 				rtn.add(elem);
 			else {
 				if (r.x - elem.x > 0)
@@ -204,7 +204,7 @@ public class CopyNum {
 		ArrayList<Point> rtn = new ArrayList<Point>(), toAdd = new ArrayList<Point>();
 		toAdd.add(r);
 		for (Point elem : arr) { //iterate through 'template' arr
-			if (Script.intersecting(elem, r)) { //if takeover
+			if (OldCode.intersecting(elem, r)) { //if takeover
 				if (r.x - elem.x > 0)
 					rtn.add(new Point(elem.x, r.x, elem.score)); //add non-zero left region
 				if (elem.y - r.y > 0)

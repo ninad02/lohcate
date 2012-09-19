@@ -4,7 +4,7 @@ public class DBScanFaster extends DBSCAN2 {
 
 	private static final float AdjustedMinX = 0;
 	private static final float AdjustedMinY = 0;
-	private static final int EpsilonDivider = 3;   // keep at 2 for optimum performance
+	private static final int EpsilonDivider = 2;   // keep at 2 for optimum performance
 	
 	protected Block[][] mBlocks;
 	protected float mOffsetX;
@@ -122,10 +122,12 @@ public class DBScanFaster extends DBSCAN2 {
 		
 		double minDistanceToCenterPoint = Double.MAX_VALUE;
 		for (DBScanPoint thePoint : mPoints) {
-			double distanceToCenterPoint = Block.getCartesianDistanceSquared(centralX, centralY, thePoint.mFloint.mX, thePoint.mFloint.mY);
-			if (distanceToCenterPoint < minDistanceToCenterPoint) {
-				minDistanceToCenterPoint = distanceToCenterPoint;
-				centralClusterID = thePoint.mClusterAssigned;
+			if (Math.abs(thePoint.mFloint.mZ - Script.DefaultDiploidCopyNumber) <= 0.05) { 
+				double distanceToCenterPoint = Block.getCartesianDistanceSquared(centralX, centralY, thePoint.mFloint.mX, thePoint.mFloint.mY);
+				if (distanceToCenterPoint < minDistanceToCenterPoint) {
+					minDistanceToCenterPoint = distanceToCenterPoint;
+					centralClusterID = thePoint.mClusterAssigned;
+				}
 			}
 		}
 		
