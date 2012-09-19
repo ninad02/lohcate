@@ -92,7 +92,13 @@ public class DBScanFaster extends DBSCAN2 {
 					// All corners of the block fall within the range of the point.  Thus, all block.points
 					// within the block will then be within range of the point.  There is no need to test the
 					// block.points within the block.
-					addAll(neighbors, theBlock.mPointsInBlock);
+					
+					//addAll(neighbors, theBlock.mPointsInBlock);
+					for (DBScanPoint pointInBlock : theBlock.mPointsInBlock) {
+						if (point.getCartesianDistanceSquared(pointInBlock) <= mEpsilonSquared) {
+							neighbors.add(pointInBlock);
+						}						
+					}
 
 				} else if (numCornersInRange >= 1 && numCornersInRange < allCorners) {
 					// We must test each point within the block

@@ -95,8 +95,8 @@ public class Gene implements Comparable<Gene> {
 	public String countsToString(String delim) {
 		StringBuilder sb = new StringBuilder(8192);
 		
-		sb.append(getCountMutationType(SNVType.NonSynonymous))
-		  .append(delim).append(getCountMutationType(SNVType.Synonymous))
+		sb.append(getCountMutationType(SNVType.NonSynonymous_SNV))
+		  .append(delim).append(getCountMutationType(SNVType.Synonymous_SNV))
 		  .append(delim).append(getCountVariantLocation(VariantLocation.Germline))
 		  .append(delim).append(getCountVariantLocation(VariantLocation.Somatic))
 		  

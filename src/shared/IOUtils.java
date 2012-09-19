@@ -306,12 +306,24 @@ public class IOUtils {
 	/** Creates a new file and writes to it given the arguments. */
 	public static void writeOutputFile(String outFilename, Collection<String> stringsToWrite) {
 		try {
-			BufferedWriter out = new BufferedWriter(new FileWriter(outFilename));
+			//StringBuilder sb = new StringBuilder(1048576 / 4);			
+			
+			BufferedWriter out = new BufferedWriter(new FileWriter(outFilename), 1048576);
+			//BufferedWriter out = new BufferedWriter(new OutputStreamWriter(new BufferedOutputStream(new FileOutputStream(outFilename), 1048576)), 1048576);
 			
 			for (Iterator<String> iter = stringsToWrite.iterator(); iter.hasNext(); ) {
-				out.write(iter.next());
+				//sb.append(iter.next());
+				//sb.append("\n");
+				String lineToWrite = iter.next();
+				out.write(lineToWrite, 0, lineToWrite.length());
+				//out.write(iter.next());
 				out.newLine();
 			}
+			//char[] chars = new char[sb.length()];
+			//sb.getChars(0, sb.length(), chars, 0);
+			//FileWriter out = new FileWriter(outFilename);
+			//out.write(chars);
+			out.flush();
 			out.close();
 		} catch (IOException e) {
 			e.printStackTrace();

@@ -60,6 +60,7 @@ public class Script {
 	private static final int NON_HET_BALL_MINPTS = 30;
 	private static final int HET_BALL_MINPTS = 100, DUP_WEDGE_MINPTS = 100; //DBSCAN parameters for HET ball / DUP wedge detection
 	private static final float ClusterDiagonalLeeway = (float) 0.2;
+	public static final int DefaultDiploidCopyNumber = 2;
 	
 	private static final int REGION_SEGMENTATION_DIST_THRESHOLD = 2000000; //greatest possible distance between 2 'adjacent' points of LOH in a region of 'contiguous' LOH
 	
@@ -75,6 +76,8 @@ public class Script {
 	private static final int Col_NAFTAFInput_Position = 1;
 	private static final int Col_NAFTAFInput_FlankingStringNormal = 5;
 	private static final int Col_NAFTAFInput_FlankingStringTumor  = 6;
+	private static final int Col_NAFTAFInput_TotalCoverageNormal  = 7;
+	private static final int Col_NAFTAFInput_TotalCoverageTumor   = 8;
 	private static final int Col_NAFTAFInput_VariantRatioNormal   = 11;
 	private static final int Col_NAFTAFInput_VariantRatioTumor    = 12;
 	private static final int Col_NAFTAFInput_DbSNPString    = 13;
@@ -214,7 +217,16 @@ public class Script {
 				IOUtils.writeToBufferedWriter(out, headerStr, true);
 
 				// Now get the clusters
-				ClusterType[] clustersGermline = getClusters(allVariantRows, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
+				//PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
+				float[] copyNumRatios = getRoughCopyNumberRatioPerSite(allVariantRows, getAvgCoverageRatioPerChrom(allVariantRows));
+				//for (int r = 0; r < allVariantRows.size(); r++) {
+				//	outStream.print(allVariantRows.get(r));
+				//	outStream.println("\t" + copyNumRatios[r] + "\t" + (copyNumRatios[r] * 2));
+				//}
+				//IOUtils.closePrintStream(outStream);
+				//if (5 + 2 == 10 - 3) System.exit(-1);
+				
+				ClusterType[] clustersGermline = getClusters(allVariantRows, copyNumRatios, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
 				System.out.println("Got clusters");
 				
 				// Now initialize the data structure needed to plot
@@ -288,14 +300,16 @@ public class Script {
 						gene = germCols[8];
 						gene = (gene == "") ? Utils.NAStr : gene;
 					} else if (platform == SeqPlatform.Illumina) {
-						gene = germCols[Col_NAFTAFInput_HugoSymbol];
-						mutationType = germCols[Col_NAFTAFInput_MutationType].split("_SNV")[0];
+						gene         = germCols[Col_NAFTAFInput_HugoSymbol];
+						mutationType = germCols[Col_NAFTAFInput_MutationType];
 					}
 					
 					sb.append(fileExtDelim.mDelimiter).append(gene)
 					  .append(fileExtDelim.mDelimiter).append(mutationType)
 					  .append(fileExtDelim.mDelimiter).append(targetTissue)
-					  .append(fileExtDelim.mDelimiter).append(clusterType);
+					  .append(fileExtDelim.mDelimiter).append(clusterType)
+					  .append(fileExtDelim.mDelimiter).append(copyNumRatios[i] * DefaultDiploidCopyNumber);
+					
 					
 					IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 					IOUtils.flushBufferedWriter(out);
@@ -385,6 +399,109 @@ public class Script {
 		return xyShapeRend;
 	}
 
+	// ========================================================================
+	public static final float DefaultTumorNormalRatio = 1.0f;
+	public static final float TumorNormalRatioOfSomaticSite = -1.0f;
+	public static float[] getRoughCopyNumberRatioPerSite(ArrayList<String> rows, float[] ratioPerChrom) {
+		float[] copyNumRatio    =   new float[rows.size()];
+		boolean[] isSomaticSite = new boolean[rows.size()];
+		
+		String prevGene = "";
+		int rowOfFirstInstanceOfGene = -1;
+		
+		float ratioSum = 0;
+		int numRowsWithSameGene = 0;
+		
+		for (int row = 0; row < rows.size(); row++) {
+			String line = rows.get(row);
+			
+			Chrom chrom =      Chrom.getChrom( Utils.extractNthColumnValue(line, Col_NAFTAFInput_Chrom,      Utils.FileExtensionTSV.mDelimiter) );
+			String currentGene =               Utils.extractNthColumnValue(line, Col_NAFTAFInput_HugoSymbol, Utils.FileExtensionTSV.mDelimiter);
+			
+			int covgNormal = Integer.parseInt( Utils.extractNthColumnValue(line, Col_NAFTAFInput_TotalCoverageNormal, Utils.FileExtensionTSV.mDelimiter) );
+			int covgTumor  = Integer.parseInt( Utils.extractNthColumnValue(line, Col_NAFTAFInput_TotalCoverageTumor,  Utils.FileExtensionTSV.mDelimiter) );
+			
+			isSomaticSite[row] = (covgNormal <= 0);
+			float ratio = isSomaticSite[row] ? TumorNormalRatioOfSomaticSite : ((float) covgTumor / (float) covgNormal);
+			
+			if (currentGene.equalsIgnoreCase(prevGene)) {
+				if (!isSomaticSite[row]) {
+					numRowsWithSameGene++;
+					ratioSum += ratio;
+				} else {
+					// We have a somatic site, we take no action in this block
+				}
+			} else {
+				// New gene listed.  We must now write the ratios for the previous gene
+				if (row > 0) {
+					boolean onlySomaticRowsForGene = (numRowsWithSameGene <= 0);
+					float averageRatio = onlySomaticRowsForGene ? TumorNormalRatioOfSomaticSite : 
+						((ratioSum / (float) numRowsWithSameGene) / ratioPerChrom[chrom.ordinal()]);
+
+					for (int i = rowOfFirstInstanceOfGene; i <= row; i++) {					
+						copyNumRatio[i] = isSomaticSite[i] ? TumorNormalRatioOfSomaticSite : averageRatio;
+					}
+				}
+				
+				// New gene listed.  Thus, set a new row of first gene			
+				rowOfFirstInstanceOfGene = row;
+				prevGene = currentGene;
+				if (isSomaticSite[row]) {
+					ratioSum = numRowsWithSameGene = 0;
+				} else {
+					numRowsWithSameGene = 1;
+					ratioSum = ratio;					 					
+				}
+			}			
+		}
+		
+		return copyNumRatio;
+	}
+	
+	// ========================================================================
+	/** Tumor : Normal avg coverage ratio per chromosome. */
+	public static float[] getAvgCoverageRatioPerChrom(ArrayList<String> rows) {			
+		float[] ratios = new float[Chrom.values().length];
+		Arrays.fill(ratios, DefaultTumorNormalRatio);  // Fill with 1.0 since that's an equal ratio
+		
+		int totalCoverageTumor = 0;
+		int totalCoverageNormal = 0;
+		Chrom prevChrom = null;
+		
+		for (int row = 0; row < rows.size(); row++) {
+			String line = rows.get(row);
+			
+			Chrom chrom = Chrom.getChrom( Utils.extractNthColumnValue(line, Col_NAFTAFInput_Chrom, Utils.FileExtensionTSV.mDelimiter) );
+			
+			if ((prevChrom == null) || (chrom != prevChrom)) {
+				if (prevChrom != null) {
+					if (totalCoverageNormal > 0) {  // avoid div/0
+						ratios[prevChrom.ordinal()] = (float) totalCoverageTumor / (float) totalCoverageNormal;
+					}
+				}
+				
+				totalCoverageTumor = totalCoverageNormal = 0;
+				prevChrom = chrom;
+			}
+			
+			int covgNormal = Integer.parseInt( Utils.extractNthColumnValue(line, Col_NAFTAFInput_TotalCoverageNormal, Utils.FileExtensionTSV.mDelimiter) );
+			int covgTumor  = Integer.parseInt( Utils.extractNthColumnValue(line, Col_NAFTAFInput_TotalCoverageTumor,  Utils.FileExtensionTSV.mDelimiter) );
+			
+			totalCoverageNormal += covgNormal; 
+			totalCoverageTumor  += covgTumor; 			
+		}
+		
+		// We finished the loop without writing the ratio of the last chromosome
+		if (totalCoverageNormal > 0) {
+			ratios[prevChrom.ordinal()] = (float) totalCoverageTumor / (float) totalCoverageNormal;
+		}
+		
+		return ratios;
+	}
+	
+	
+	
+	
 	// ========================================================================
 	/*
 	public static void graphDistProbabilities(double[][] distProb, String chartTitleStr, String outFilenamePrefix) {
@@ -478,8 +595,7 @@ public class Script {
 			
 			// First, tally the variant allele frequencies into bins
 			for (int row = 0; row < rows.size(); row++) {
-				String[] components = rows.get(row).split("\t");
-				float vafNormal = extractVAFNormal(components, platform);
+				float vafNormal = extractVAFNormal(rows.get(row), platform);
 				if (Utils.inRangeLowerExclusive(vafNormal, mVAFNormalFrameLower, mVAFNormalFrameUpper)) {
 					int binNumber = (int) ((vafNormal - mVAFNormalFrameLower) / mBinSize);
 					mBinCount[binNumber]++;
@@ -518,45 +634,43 @@ public class Script {
 	 * @param load line-split FileOps.loadFromFile of naf-taf-input
 	 * @param som_start start index of .somatic.txt naf-taf-input data in 'load' parameter
 	 * This assumes header has been stripped out
-	 */
-	public static ClusterType[] getClusters(ArrayList<String> rows, int startingRowGermlineOrSomaticOrAll, SeqPlatform platform) {
-		
-		AlleleFrequencyStatsForSample afStatsSample = new AlleleFrequencyStatsForSample();
-		afStatsSample.tabulateAndPerformStatistics(rows, platform);
-		
-		// Now we adjust the frames based on the standard deviation
-		float vafNormalFrameAdjustedLower = afStatsSample.mCountMean - (NAF_STRIP_EXPANDER * afStatsSample.mStdDev);
-		float vafNormalFrameAdjustedUpper = afStatsSample.mCountMean + (NAF_STRIP_EXPANDER * afStatsSample.mStdDev);
-		//System.out.println("MEAN = " + count_mean + " | STD_DEV = " + std_dev);
-		//System.out.println("NAF FRAME = " + (count_mean - std_dev) + " - " + (count_mean + std_dev));
-		
-		//apply DBScan to points within NAF frame
-		ArrayList<Floint> points = new ArrayList<Floint>(rows.size());
-		for (int row = 0; row < rows.size(); row++) {
-			String line = rows.get(row);			
-			float vafNormal = extractVAFNormal(line, platform);
-			if (Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper)) {	
-				points.add(  new Floint(extractVAFTumor(line, platform), vafNormal)  );			
-			}
-		}
-	
-		//Vv.vV well/poorly tuned parameters for different data sets
+	 * 
+	 *  //Vv.vV well/poorly tuned parameters for different data sets
 		//data set --> (NAF_STRIP_EXPANDER, (HET_BALL_EPS, HET_BALL_MINPTS), (DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS))
 		//target-aml --> (1, (0.035, 100), (0.015, 100))
 		//target-all --> (1, (0.035, 100), (0.01, 100))
 		//pvera --> (1.25, (0.035, 100), (0.015, 100))
 		//hepato --> (1.25, (0.035, 100), (0.015, 100))
 		//renal-we --> (1, (0.05, 500), (0.02, 350))
+	 */
+	public static ClusterType[] getClusters(ArrayList<String> rows, float[] copyNumRatios, int startingRowGermlineOrSomaticOrAll, SeqPlatform platform) {
 		
+		// Get the allele frequency statistics, and adjust the frames based on the resulting standard deviation
+		AlleleFrequencyStatsForSample afStatsSample = new AlleleFrequencyStatsForSample();
+		afStatsSample.tabulateAndPerformStatistics(rows, platform);
+		float vafNormalFrameAdjustedLower = afStatsSample.mCountMean - (NAF_STRIP_EXPANDER * afStatsSample.mStdDev);
+		float vafNormalFrameAdjustedUpper = afStatsSample.mCountMean + (NAF_STRIP_EXPANDER * afStatsSample.mStdDev);
+		
+		//apply DBScan to points within NAF frame
+		double scalingFactor = DefaultDiploidCopyNumber;
+		//double scalingFactor = DefaultDiploidCopyNumber;
+		ArrayList<Floint> points = getValidPointsListForClustering(rows, copyNumRatios, scalingFactor, platform, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper);
+	
 		System.out.println("Begin clustering algorithm: " + (new Date()).toString());
 		
-		DBScanFaster dbscanner = new DBScanFaster(points, /* HET_BALL_EPS, HET_BALL_MINPTS*/ HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
-		//DBScanFast dbscanner = new DBScanFast(points, HET_BALL_EPS, HET_BALL_MINPTS); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+		//DBScanFaster dbscanner = new DBScanFaster(points, HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+		DBScanFaster dbscanner = new DBScanFaster(points, 0.002f /*HET_BALL_EPS */, DUP_WEDGE_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+		
 		dbscanner.cluster();
 		int clusterIDofHetBall = dbscanner.getCentralClusterID();
 		Boolean[] pointsWithinRadius = dbscanner.getPointsWithinMinRadiusOfCluster(clusterIDofHetBall);
 		int[] clusterAssignments = dbscanner.getClustAssignments();  // save and cache	
 		
+		int[] clusterTypeIDsFromAlgorithm = new int[ClusterType.values().length];		
+		clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()]  = -1;
+		clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()] = -2;
+		clusterTypeIDsFromAlgorithm[ClusterType.HETGermline.ordinal()] = clusterIDofHetBall;
+		clusterTypeIDsFromAlgorithm[ClusterType.Noise.ordinal()] = dbscanner.getClusterIDOfNoise();
 		
 		// Now, re-run DBScan, but with changed parameters		
 		//dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
@@ -580,11 +694,46 @@ public class Script {
 		int[] clusterAssignmentsNonHet = dbscannerNonHet.getClustAssignments();
 				
 		System.out.println("End clustering algorithm: " + (new Date()).toString());
-
-		int clusterIDofDup = -1;
-		int clusterIDofNull = -2;
+		
 		int nonHetIndex = -1;
 		for (int i = 0; i < clusterAssignments.length; i++) {
+			
+			if (isNonHetPoint[i]) {
+				++nonHetIndex;
+				
+				if (points.get(i).mZ > scalingFactor) {
+					clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];
+				} else {
+					clusterAssignments[i] = 5;
+				}
+				/*
+				if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+					// There is a collision of numeric cluster assignments.  This is due to the
+					// fact that we run DBScan on different input lists, thus leading to respective
+					// clusterIDs being assigned to each cluster for each run.  We need to ensure
+					// that we are performing no collisions.  If the hetball cluster is the first
+					// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+					// cluster ID.  Yes, this is kind of a hack.						
+					clusterAssignmentsNonHet[nonHetIndex] = 
+						(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+				}
+				//clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];  // assign for lower thresholds
+				clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];  // assign for lower thresholds
+				*/
+			} else {	
+				/*
+				if (pointsWithinRadius[i] == null) {
+					Utils.throwErrorAndExit("ERROR: Cannot possibly be a non-het point!");
+				} else if (pointsWithinRadius[i] == Boolean.FALSE) {					
+					if (pointOnDiagonal(points.get(i), ClusterDiagonalLeeway)) {
+						clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
+					} else {
+						clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
+					}
+				}*/
+			}
+			
+			/*
 			if (isNonHetPoint[i]) {
 				++nonHetIndex;
 				if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
@@ -603,12 +752,13 @@ public class Script {
 					Utils.throwErrorAndExit("ERROR: Cannot possibly be a non-het point!");
 				} else if (pointsWithinRadius[i] == Boolean.FALSE) {					
 					if (pointOnDiagonal(points.get(i), ClusterDiagonalLeeway)) {
-						clusterAssignments[i] = clusterIDofNull;
+						clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
 					} else {
-						clusterAssignments[i] = clusterIDofDup;   // only change if we're in a het ball region
+						clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
 					}
 				}
 			}
+			*/
 			
 			/*
 			if (isNonHetPoint[i]) { ++nonHetIndex; }  // make sure we're always at the correct index
@@ -634,17 +784,30 @@ public class Script {
 		}
 
 		// Now assign the cluster types
+		
+		return assignClusters(rows, platform, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper, clusterAssignments, clusterTypeIDsFromAlgorithm);
+	}
+	
+	// ========================================================================
+	// Convenience private function to break up caller function
+	private static ClusterType[] assignClusters(ArrayList<String> rows, 
+												SeqPlatform platform,
+												//int startingRowSomatic,												
+												float vafBoundLower, 
+												float vafBoundUpper,
+												int[] clusterAssignments,
+												int[] clusterTypeIDsFromAlgorithm) {
+		
 		int indexInClusterAssignments = -1;  // we need to keep a special index, since not all rows are used.
 		ClusterType[] returnClusters = new ClusterType[rows.size()];
 		
 		for (int row = 0; row < rows.size(); row++) {
 			
-			//String[] components = rows.get(row).split("\t");
 			String line = rows.get(row);
 			float vafNormal = extractVAFNormal(line, platform);
-			boolean vafInRangeNormal = Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper);
+			boolean vafInRangeNormal = Utils.inRangeLowerExclusive(vafNormal, vafBoundLower, vafBoundUpper);
 			
-			if ((row >= startingRowGermlineOrSomaticOrAll) && (!vafInRangeNormal)) {
+			if (/*(row >= startingRowSomatic) &&*/ (!vafInRangeNormal)) {
 				// The vafNormal is either very low (homozygous reference) or very high (homozygous common variant).
 				// We do some very simple decision making now (which should be replaced by formal clustering later)
 				// to partition the calls.
@@ -652,7 +815,7 @@ public class Script {
 				float hetBoundaryLower = 0.3333f;
 				float hetBoundaryUpper = 0.6667f;
 				float vafTumor = extractVAFTumor(line, platform);
-				if (Utils.inRangeLowerExclusive(vafNormal, justBelowZero, vafNormalFrameAdjustedLower)) {
+				if (Utils.inRangeLowerExclusive(vafNormal, justBelowZero, vafBoundLower)) {
 					// We are equal to or below the lower frame boundary
 					if (vafTumor <= hetBoundaryLower) {
 						// Normal: AA, Tumor: AA [Thus homozygous reference in both, no events]
@@ -664,7 +827,7 @@ public class Script {
 						// Normal: AA, Tumor: AB [made by: AA -> AB (somatic het mutation)
 						returnClusters[row] = ClusterType.HETSomatic;
 					}					
-				} else if (Utils.inRangeLowerExclusive(vafNormal, vafNormalFrameAdjustedUpper, MaxVariantAlleleFrequency)) {
+				} else if (Utils.inRangeLowerExclusive(vafNormal, vafBoundUpper, MaxVariantAlleleFrequency)) {
 					// We are above the upper frame boundary
 					if (vafTumor <= hetBoundaryLower) {
 						// Normal: BB, Tumor: AA [made by: BB -> AB (reverse somatic het mutation) -> A (LOH, loss of B)]
@@ -685,18 +848,18 @@ public class Script {
 			} else {	// Our vaf-normal is in range in somatic sites, or we're at a germline site regardless of vaf-normal value	
 				if (vafInRangeNormal) {
 					++indexInClusterAssignments;
-					int assignedClusterID = clusterAssignments[indexInClusterAssignments]; // we create a local variable for fast test modifications 
+					final int assignedClusterID = clusterAssignments[indexInClusterAssignments]; // we create a local variable for fast test modifications 
 					
-					if (assignedClusterID == clusterIDofHetBall) {
+					if (assignedClusterID        == clusterTypeIDsFromAlgorithm[ClusterType.HETGermline.ordinal()]) {
 						returnClusters[row] = ClusterType.HETGermline; //HET
 						
-					} else if (assignedClusterID == clusterIDofDup) {
+					} else if (assignedClusterID == clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()]) {
 						returnClusters[row] = ClusterType.Dup; //DUP
 						
-					} else if (assignedClusterID == clusterIDofNull) {
+					} else if (assignedClusterID == clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()]) {
 						returnClusters[row] = ClusterType.Null;  // we're on a diagonal
 						
-					} else if (assignedClusterID == dbscanner.getClusterIDOfNoise()) { 
+					} else if (assignedClusterID == clusterTypeIDsFromAlgorithm[ClusterType.Noise.ordinal()]) { 
 						returnClusters[row] = ClusterType.Noise;
 						
 					} else { //anything not in the HET ball / DUP wedge is considered part of a LOH sidelobe
@@ -710,10 +873,29 @@ public class Script {
 				}
 			}
 		}
-	
+		
 		return returnClusters;
 	}
 	
+	// ========================================================================
+	// Convenience function 
+	private static ArrayList<Floint> 
+		getValidPointsListForClustering(ArrayList<String> rows, float[] copyNumRatios, double scalingFactor, SeqPlatform platform, float vafBoundLower, float vafBoundUpper) {
+		ArrayList<Floint> points = new ArrayList<Floint>(rows.size());
+		
+		for (int row = 0; row < rows.size(); row++) {
+			String line = rows.get(row);			
+			float vafNormal = extractVAFNormal(line, platform);
+			if (Utils.inRangeLowerExclusive(vafNormal, vafBoundLower, vafBoundUpper)) {	
+				Floint thePoint = new Floint(extractVAFTumor(line, platform), vafNormal, copyNumRatios[row] * (float) scalingFactor);
+				points.add(thePoint);			
+			}
+		}
+		
+		return points;
+	}
+	
+	// ========================================================================	
 	// Tests whether the point lies roughly on the x = y diagonal, given a leeway from a ratio of 1.0
 	private static boolean pointOnDiagonal(Floint point, double leeway) {
 		double ratio = point.mY / point.mX;
@@ -722,6 +904,7 @@ public class Script {
 		return ( ((equalRatio - leeway) <= ratio) && (ratio <= (equalRatio + leeway)) );
 	}
 	
+	// ========================================================================
 	// Extracts and calculates the variant allele frequency depending on the platform 
 	private static float extractVAFNormal(String[] components, SeqPlatform platform) {
 		switch(platform) {
@@ -731,6 +914,7 @@ public class Script {
 		return Float.NaN;
 	}
 	
+	// ========================================================================
 	// Extracts and calculates the variant allele frequency in the normal depending on the platform tab-delimited file
 	private static float extractVAFNormal(String line, SeqPlatform platform) {
 		switch(platform) {
@@ -741,6 +925,7 @@ public class Script {
 		return Float.NaN;		
 	}
 	
+	// ========================================================================
 	private static float extractVAFTumor(String[] components, SeqPlatform platform) {
 		switch(platform) {
 		case Illumina: return  Float.parseFloat(components[Col_NAFTAFInput_VariantRatioTumor]);
@@ -749,6 +934,7 @@ public class Script {
 		return Float.NaN;
 	}
 	
+	// ========================================================================
 	// Extracts and calculates the variant allele frequency in the tumor depending on the platform tab-delimited file
 	private static float extractVAFTumor(String line, SeqPlatform platform) {
 		switch(platform) {
@@ -1593,8 +1779,8 @@ public class Script {
 										
 					if (mutationType != null) {
 						switch(mutationType) {
-						case NonSynonymous: theColorMutationType = ColorPastel.RGB_Red;    break;
-						case Synonymous:    theColorMutationType = ColorPastel.Dark_Green; break;					
+						case NonSynonymous_SNV: theColorMutationType = ColorPastel.RGB_Red;    break;
+						case Synonymous_SNV:    theColorMutationType = ColorPastel.Dark_Green; break;					
 						}
 					}
 					
@@ -1607,8 +1793,8 @@ public class Script {
 					
 					if (mutationType != null) {
 						switch(mutationType) {
-						case NonSynonymous: theColorMutationType = ColorPastel.Yellow_Orange; break;
-						case Synonymous:    theColorMutationType = ColorPastel.Light_Green;   break;						
+						case NonSynonymous_SNV: theColorMutationType = ColorPastel.Yellow_Orange; break;
+						case Synonymous_SNV:    theColorMutationType = ColorPastel.Light_Green;   break;						
 						}
 					}
 				}
@@ -2439,8 +2625,8 @@ public class Script {
 		String densityStr = "_density";
 		String[] columnHeaders = new String[] { 
 				"chr", "bp_start", "bp_end", "length", "gene", 
-				SNVType.NonSynonymous.toLowerCase(), 
-				SNVType.Synonymous.toLowerCase(), 
+				SNVType.NonSynonymous_SNV.toLowerCase(), 
+				SNVType.Synonymous_SNV.toLowerCase(), 
 				VariantLocation.Germline.toLowerCase(), 
 				VariantLocation.Somatic.toLowerCase(),
 				

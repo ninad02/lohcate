@@ -12,18 +12,24 @@ import java.util.GregorianCalendar;
  *
  */
 public class Floint implements Comparable<Floint> {
-	public float mX, mY;
+	public float mX, mY, mZ;
 	
-	public Floint(float x, float y) { 
+	public Floint(float x, float y, float z) { 
 		mX = x; 
 		mY = y; 				
+		mZ = z;
 	}
 	
 	public double getCartesianDistanceSquared(Floint rhs) {
 		return (this.mX - rhs.mX) * 
-			   (this.mX - rhs.mX) + 
+			   (this.mX - rhs.mX) +
+			   
 			   (this.mY - rhs.mY) * 
-			   (this.mY - rhs.mY);
+			   (this.mY - rhs.mY) +
+			   
+			   (this.mZ - rhs.mZ) *
+			   (this.mZ - rhs.mZ)
+			   ;
 	}
 	
 	public double getCartesianDistance(Floint rhs) {
