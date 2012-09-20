@@ -1151,7 +1151,7 @@ public class Script {
 										  String recurrenceNameRoot) {
 		
 		//String filePrefix = outDir + File.separator;
-		String filePrefix = "http://ron.cs.columbia.edu/ninad/LOHcate/renal/browser_tracks/LOH/toUpload";
+		String filePrefix = "http://ron.cs.columbia.edu/ninad/LOHcate/renal/browser_tracks/LOH/toUpload/";
 		
 		for (Chrom chrom : Chrom.values()) {
 			if (chrom.isInvalid()) continue;
@@ -1362,7 +1362,7 @@ public class Script {
 				break;
 			case 2:
 				getGeneEnrichment(root + File.separator + classifiedSites, 
-								  root + File.separator + "gene_enrichment.csv");
+								  root + File.separator + "gene_enrichment.tsv");
 				break;
 				
 			case 5:

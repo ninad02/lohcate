@@ -122,7 +122,7 @@ public class DBScanFaster extends DBSCAN2 {
 		
 		double minDistanceToCenterPoint = Double.MAX_VALUE;
 		for (DBScanPoint thePoint : mPoints) {
-			if (!Clustering.Doing3D || Math.abs(thePoint.mFloint.mZ - Script.DefaultDiploidCopyNumber) <= 0.05) { 
+			if (!Clustering.Doing3D || Math.abs(thePoint.mFloint.mZ - 0.51 * Clustering.ScalingFactor) <= 0.05) { 
 				double distanceToCenterPoint = Block.getCartesianDistanceSquared(centralX, centralY, thePoint.mFloint.mX, thePoint.mFloint.mY);
 				if (distanceToCenterPoint < minDistanceToCenterPoint) {
 					minDistanceToCenterPoint = distanceToCenterPoint;

@@ -26,9 +26,13 @@ import org.jfree.chart.title.LegendTitle;
 import org.jfree.data.xy.DefaultXYDataset;
 import org.jfree.data.xy.XYDataset;
 
+import com.carrotsearch.hppc.IntArrayList;
+
+import shared.ArrayUtils;
 import shared.FileOps;
 import shared.GraphUtils;
 import shared.IOUtils;
+import shared.NumberUtils;
 import shared.Utils;
 import shared.Utils.FileExtensionAndDelimiter;
 
@@ -51,9 +55,12 @@ public class Clustering {
 	
 	private static final float ClusterDiagonalLeeway = (float) 0.2;
 	
+	private static final float PValueUpperPlaneThresh = 0.025f;
+	
 	public static final boolean Doing3D = false;
-	public static final boolean UsePValue = false;
-
+	public static final boolean UsePValuePlane = false;	
+	public static float ScalingFactor = 4.0f;
+	
 	// ========================================================================
 	// INNER CLASS
 	// ========================================================================
@@ -87,6 +94,8 @@ public class Clustering {
 			tallyVariantAlleleFrequenciesIntoBins(rows, platform, true);
 			calculateSummaryStatistics();
 		}
+		
+		public float getValueNStandardDeviationsAway(float n) { return (mCountMean + (n * mStdDev)); }
 		
 		private void deduceBinValues() {
 			for (int i = 0; i < mBinValue.length; i++) {
@@ -196,11 +205,15 @@ public class Clustering {
 				IOUtils.writeToBufferedWriter(out, headerStr, true);
 
 				// Now get the clusters
-				//float[] copyNumRatios = getRoughCopyNumberRatioPerSite(allVariantRows, getAvgCoverageRatioPerChrom(allVariantRows));
+				float[] copyNumRatios = getRoughCopyNumberRatioPerSite(allVariantRows, getAvgCoverageRatioPerChrom(allVariantRows));
 				double[] imbalancePValues = Clustering.getPValuesTumorImbalance(allVariantRows);
-
-
-				ClusterType[] clustersGermline = Clustering.getClusters(allVariantRows, imbalancePValues, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
+				ClusterType[] clusters = null;
+				
+				if (UsePValuePlane) {
+					clusters = Clustering.getClusters_withPlane(allVariantRows, imbalancePValues, copyNumRatios, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
+				} else {
+					clusters = Clustering.getClusters_Old(allVariantRows, imbalancePValues, copyNumRatios, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
+				}
 
 				//				PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
 				//				for (int r = 0; r < allVariantRows.size(); r++) {
@@ -213,7 +226,7 @@ public class Clustering {
 				System.out.println("Got clusters");
 
 				// Now initialize the data structure needed to plot
-				int[] clusterTypeCounts = Utils.getClusterTypeCounts(clustersGermline);
+				int[] clusterTypeCounts = Utils.getClusterTypeCounts(clusters);
 				double[][][] clusterCoordinates = new double[clusterTypeCounts.length][2][];
 				for (int clusterTypeIndex = 0; clusterTypeIndex < clusterCoordinates.length; clusterTypeIndex++) {
 					clusterCoordinates[clusterTypeIndex][0] = new double[ clusterTypeCounts[clusterTypeIndex] ];
@@ -226,7 +239,7 @@ public class Clustering {
 				int startingRowGermlineOrSomaticOrAll = 0;  // 0 because header line has been stripped away
 				for (int i = startingRowGermlineOrSomaticOrAll; i < allVariantRows.size(); i++) {
 					String strRow = allVariantRows.get(i);
-					ClusterType clusterType = clustersGermline[i];
+					ClusterType clusterType = clusters[i];
 					int indexForClusterType = ++(clusterTypeIndex[clusterType.ordinal()]);  // increase the index of the data structure of the cluster type
 
 					String[] germCols = strRow.split(Utils.TabStr);
@@ -379,14 +392,14 @@ public class Clustering {
 			int varCovgTumor = Integer.parseInt(Utils.extractNthColumnValue(line, Script.Col_NAFTAFInput_VariantCoverageTumor, Utils.FileExtensionTSV.mDelimiter));
 			int totCovgTumor = Integer.parseInt(Utils.extractNthColumnValue(line, Script.Col_NAFTAFInput_TotalCoverageTumor, Utils.FileExtensionTSV.mDelimiter));
 			
-			BinomialDistribution bd = new BinomialDistribution(totCovgTumor, 0.5);
 			int maxRefOrVarCovg = Math.max(varCovgTumor, totCovgTumor - varCovgTumor);
-			pValues[row] = bd.cumulativeProbability(maxRefOrVarCovg);
+			pValues[row] = NumberUtils.cumulativeProbabilitySuccess(totCovgTumor, maxRefOrVarCovg, 0.5);
 		}
 		
 		return pValues;
 	}
 
+	// ========================================================================
 	public static float[] getRoughCopyNumberRatioPerSite(ArrayList<String> rows, float[] ratioPerChrom) {
 		float[] copyNumRatio    =   new float[rows.size()];
 		boolean[] isSomaticSite = new boolean[rows.size()];
@@ -499,7 +512,7 @@ public class Clustering {
 			//hepato --> (1.25, (0.035, 100), (0.015, 100))
 			//renal-we --> (1, (0.05, 500), (0.02, 350))
 	 */
-	public static ClusterType[] getClusters(ArrayList<String> rows, double[] copyNumRatios, String outFilenameFullPath, int startingRowGermlineOrSomaticOrAll, SeqPlatform platform) {
+	public static ClusterType[] getClusters_Old(ArrayList<String> rows, double[] imbalancePValues, float[] copyNumRatios, String outFilenameFullPath, int startingRowGermlineOrSomaticOrAll, SeqPlatform platform) {
 
 		// Get the allele frequency statistics, and adjust the frames based on the resulting standard deviation
 		AlleleFrequencyStatsForSample afStatsSample = new AlleleFrequencyStatsForSample();
@@ -507,10 +520,9 @@ public class Clustering {
 		float vafNormalFrameAdjustedLower = afStatsSample.mCountMean - (Clustering.NAF_STRIP_EXPANDER * afStatsSample.mStdDev);
 		float vafNormalFrameAdjustedUpper = afStatsSample.mCountMean + (Clustering.NAF_STRIP_EXPANDER * afStatsSample.mStdDev);
 
-		//apply DBScan to points within NAF frame
-		double scalingFactor = 1.0; //DefaultDiploidCopyNumber;
-		//double scalingFactor = DefaultDiploidCopyNumber;
-		ArrayList<Floint> points = Clustering.getValidPointsListForClustering(rows, copyNumRatios, scalingFactor, platform, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper);
+		//apply DBScan to points within NAF frame		
+		//double scalingFactor = DefaultDiploidCopyNumber;		
+		ArrayList<Floint> points = Clustering.getValidPointsListForClustering(rows, imbalancePValues, ScalingFactor, platform, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper);
 
 		System.out.println("Begin clustering algorithm: " + (new Date()).toString());
 
@@ -552,10 +564,6 @@ public class Clustering {
 			isNonHetPoint[i] = (clusterAssignments[i] != clusterIDofHetBall); 
 			if (isNonHetPoint[i]) {
 				nonHetPoints.add(points.get(i));
-
-				if (clusterAssignments[i] != dbscanner.getClusterIDOfNoise()) {
-					//clusterAssignments[i] = 5;
-				}
 			}
 		}
 		DBScanFaster dbscannerNonHet = new DBScanFaster(nonHetPoints, Clustering.NON_HET_BALL_EPS, Clustering.NON_HET_BALL_MINPTS, 0, 0, 1, 1);
@@ -677,6 +685,217 @@ public class Clustering {
 
 		return Clustering.assignClusters(rows, platform, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper, clusterAssignments, clusterTypeIDsFromAlgorithm);
 	}
+	
+	
+	// ========================================================================
+	public static ClusterType[] getClusters_withPlane(ArrayList<String> rows, double[] imbalancePValues, float[] copyNumRatios, String outFilenameFullPath, int startingRowGermlineOrSomaticOrAll, SeqPlatform platform) {
+
+		// Get the allele frequency statistics, and adjust the frames based on the resulting standard deviation
+		AlleleFrequencyStatsForSample afStatsSample = new AlleleFrequencyStatsForSample();
+		afStatsSample.tabulateAndPerformStatistics(rows, platform);
+		float vafNormalFrameAdjustedLower = afStatsSample.getValueNStandardDeviationsAway(-NAF_STRIP_EXPANDER); 								
+		float vafNormalFrameAdjustedUpper = afStatsSample.getValueNStandardDeviationsAway( NAF_STRIP_EXPANDER);
+
+		//apply DBScan to points within NAF frame
+		ArrayList<Floint> pointsUpperPlane = new ArrayList<Floint>();
+		ArrayList<Floint> pointsLowerPlane = new ArrayList<Floint>();
+		int[] indexMapToUpperLowerPlane    = new int[rows.size()];
+		IntArrayList mapToRowsFromUpper = new IntArrayList(rows.size());
+		IntArrayList mapToRowsFromLower = new IntArrayList(rows.size());
+
+		getValidPointsForClustering(rows, pointsUpperPlane, pointsLowerPlane, indexMapToUpperLowerPlane, 
+				                    mapToRowsFromUpper, mapToRowsFromLower, imbalancePValues, ScalingFactor, platform, 
+				                    vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper);		
+
+		System.out.println("Begin clustering algorithm: " + (new Date()).toString());
+
+		//DBScanFaster dbscanner = new DBScanFaster(points, HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+		
+		// Scan the lower plane
+		DBScanFaster dbscannerLowerPlane = new DBScanFaster(pointsLowerPlane, Clustering.HET_BALL_EPS, Clustering.HET_BALL_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+
+		dbscannerLowerPlane.cluster();
+		int clusterIDofHetBall       = dbscannerLowerPlane.getCentralClusterID();
+		Boolean[] pointsWithinRadius = dbscannerLowerPlane.getPointsWithinMinRadiusOfCluster(clusterIDofHetBall);
+		int[] clusterAssignments     = dbscannerLowerPlane.getClustAssignments();  // save and cache	
+
+		int[] clusterTypeIDsFromAlgorithm = new int[ClusterType.values().length];		
+		clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()]  = -1;
+		clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()] = -2;
+		clusterTypeIDsFromAlgorithm[ClusterType.HETGermline.ordinal()] = clusterIDofHetBall;
+		clusterTypeIDsFromAlgorithm[ClusterType.Noise.ordinal()] = dbscannerLowerPlane.getClusterIDOfNoise();
+
+
+		//		PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
+		//		for (int r = 0; r < rows.size(); r++) {
+		//			outStream.print(rows.get(r));
+		//			outStream.println("\t" + copyNumRatios[r] + "\t" + (copyNumRatios[r] * scalingFactor + "\t" + clusterAssign));
+		//		}
+		//		IOUtils.closePrintStream(outStream);
+
+		// Now, re-run DBScan, but with changed parameters		
+		//dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
+		//dbscanner.cluster();
+		//int clusterIDofHetBallWithWedge = dbscanner.getCentralClusterID();
+		//int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
+
+		// We now do a third pass, this time allowing only those points that are not part of the het cluster
+		// We then perform a lower neighbor threshold on these points so that they can be declared as LOH
+		ArrayList<Floint> nonHetPoints = new ArrayList<Floint>(pointsLowerPlane.size());
+		boolean[] isNonHetPoint                  = new boolean[pointsLowerPlane.size()];		
+		
+		for (int i = 0; i < clusterAssignments.length; i++) {
+			isNonHetPoint[i] = (clusterAssignments[i] != clusterIDofHetBall); 
+			if (isNonHetPoint[i]) {
+				nonHetPoints.add(pointsLowerPlane.get(i));
+			}
+		}
+		
+		DBScanFaster dbscannerLowerPlaneNonHet = new DBScanFaster(nonHetPoints, Clustering.NON_HET_BALL_EPS, Clustering.NON_HET_BALL_MINPTS, 0, 0, 1, 1);
+		dbscannerLowerPlaneNonHet.cluster();
+		int[] clusterAssignmentsNonHet = dbscannerLowerPlaneNonHet.getClustAssignments();
+
+		// UPPER PLANE
+		DBScanFaster dbscannerUpperPlane = new DBScanFaster(pointsUpperPlane, Clustering.NON_HET_BALL_EPS, Clustering.NON_HET_BALL_MINPTS, 0, 0, 1, 1);
+		dbscannerUpperPlane.cluster();
+		int[] clusterAssignmentsUpperPlane = dbscannerUpperPlane.getClustAssignments();
+		for (int ind = 0; ind < clusterAssignmentsUpperPlane.length; ind++) {
+			if (clusterAssignmentsUpperPlane[ind] == clusterIDofHetBall) {
+				clusterAssignmentsUpperPlane[ind] = 
+					(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1;
+			}
+		}
+		
+		System.out.println("End clustering algorithm: " + (new Date()).toString());
+
+		int nonHetIndex = -1;
+		for (int i = 0; i < clusterAssignments.length; i++) {
+
+			/*
+				if (isNonHetPoint[i]) {
+					++nonHetIndex;
+					if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+						// There is a collision of numeric cluster assignments.  This is due to the
+						// fact that we run DBScan on different input lists, thus leading to respective
+						// clusterIDs being assigned to each cluster for each run.  We need to ensure
+						// that we are performing no collisions.  If the hetball cluster is the first
+						// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+						// cluster ID.  Yes, this is kind of a hack.						
+						clusterAssignmentsNonHet[nonHetIndex] = 
+							(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+					}
+					clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];  // assign for lower thresholds
+					//clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];  // assign for lower thresholds
+
+				} else {	
+					/*
+					if (pointsWithinRadius[i] == null) {
+						Utils.throwErrorAndExit("ERROR: Cannot possibly be a non-het point!");
+					} else if (pointsWithinRadius[i] == Boolean.FALSE) {					
+						if (pointOnDiagonal(points.get(i), ClusterDiagonalLeeway)) {
+							clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
+						} else {
+							clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
+						}
+					}
+				}
+			 */
+
+			/*
+				if (isNonHetPoint[i]) {
+					++nonHetIndex;
+					if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+						// There is a collision of numeric cluster assignments.  This is due to the
+						// fact that we run DBScan on different input lists, thus leading to respective
+						// clusterIDs being assigned to each cluster for each run.  We need to ensure
+						// that we are performing no collisions.  If the hetball cluster is the first
+						// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+						// cluster ID.  Yes, this is kind of a hack.						
+						clusterAssignmentsNonHet[nonHetIndex] = 
+							(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+					}
+					clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];  // assign for lower thresholds
+				} else {								
+					if (pointsWithinRadius[i] == null) {
+						Utils.throwErrorAndExit("ERROR: Cannot possibly be a non-het point!");
+					} else if (pointsWithinRadius[i] == Boolean.FALSE) {					
+						if (pointOnDiagonal(points.get(i), ClusterDiagonalLeeway)) {
+							clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
+						} else {
+							clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
+						}
+					}
+				}
+			 */
+
+			/*
+			if (isNonHetPoint[i]) { ++nonHetIndex; }  // make sure we're always at the correct index
+
+			if (clusterAssignments[i] == DBSCAN2.ClusterIDOfNoise) {
+				if (isNonHetPoint[i]) {					
+					if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+						// There is a collision of numeric cluster assignments.  This is due to the
+						// fact that we run DBScan on different input lists, thus leading to respective
+						// clusterIDs being assigned to each cluster for each run.  We need to ensure
+						// that we are performing no collisions.  If the hetball cluster is the first
+						// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+						// cluster ID.  Yes, this is kind of a hack.						
+						clusterAssignmentsNonHet[nonHetIndex] = 
+								(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+					}
+					clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];  // assign for lower thresholds
+				} else {
+					clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
+				}
+			}
+			*/
+			
+			
+			if (isNonHetPoint[i]) { ++nonHetIndex; }  // make sure we're always at the correct index
+
+			if (clusterAssignments[i] == DBSCAN2.ClusterIDOfNoise) {
+				if (isNonHetPoint[i]) {					
+					if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+						// There is a collision of numeric cluster assignments.  This is due to the
+						// fact that we run DBScan on different input lists, thus leading to respective
+						// clusterIDs being assigned to each cluster for each run.  We need to ensure
+						// that we are performing no collisions.  If the hetball cluster is the first
+						// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+						// cluster ID.  Yes, this is kind of a hack.						
+						clusterAssignmentsNonHet[nonHetIndex] = 
+								(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+					}
+					if (pointOnDiagonal(pointsLowerPlane.get(i), ClusterDiagonalLeeway)) {
+						clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
+					} else {
+						clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];   
+					}
+				} else {
+					clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
+				}
+			}
+
+		}
+
+		
+		
+		// Now merge the two planes into one array
+		ArrayUtils.IntArray clusterAssignmentsFinal = new ArrayUtils.IntArray(pointsLowerPlane.size() + pointsUpperPlane.size());  		
+		for (int row = 0; row < rows.size(); row++) {
+			if (indexMapToUpperLowerPlane[row] != Integer.MAX_VALUE) {				
+				if (indexMapToUpperLowerPlane[row] >= 0) {
+					int trueIndex = indexMapToUpperLowerPlane[row];
+					clusterAssignmentsFinal.add(clusterAssignmentsUpperPlane[trueIndex]);
+				} else {
+					int trueIndex = -(indexMapToUpperLowerPlane[row] + 1);
+					clusterAssignmentsFinal.add(clusterAssignments[trueIndex]);
+				}
+			}
+		}
+		
+
+		return Clustering.assignClusters(rows, platform, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper, clusterAssignmentsFinal.mArray, clusterTypeIDsFromAlgorithm);
+	}
 
 	// ========================================================================
 	// Convenience private function to break up caller function
@@ -771,17 +990,55 @@ public class Clustering {
 		return returnClusters;
 	}
 
+	// ========================================================================	
+	private static void getValidPointsForClustering(ArrayList<String> rows,                // input
+													ArrayList<Floint> pointsUpperPlane,    // output
+													ArrayList<Floint> pointsLowerPlane,    // output
+													int[] indexMapToUpperLowerPlane,       // output - if positive, to upper plane, if negative, to lower plane, if does not map, contains Integer.MAX_VALUE													
+													IntArrayList mapToRowsFromUpper, 
+													IntArrayList mapToRowsFromLower,
+													double[] verticalFactor, double scalingFactor, 
+													SeqPlatform platform, 
+													float vafBoundLower, float vafBoundUpper) {
+		
+		pointsUpperPlane.clear();
+		pointsLowerPlane.clear();
+		for (int row = 0; row < rows.size(); row++) {
+			String line = rows.get(row);			
+			float vafNormal = Clustering.extractVAFNormal(line, platform);
+			if (Utils.inRangeLowerExclusive(vafNormal, vafBoundLower, vafBoundUpper)) {
+				Floint thePoint = new Floint(Clustering.extractVAFTumor(line, platform), vafNormal, (float) (verticalFactor[row] * scalingFactor));
+				
+				// Assume p-value as vertical row factor
+				if (verticalFactor[row] <= PValueUpperPlaneThresh) {
+					indexMapToUpperLowerPlane[row] =  pointsUpperPlane.size();
+					pointsUpperPlane.add(thePoint);
+					mapToRowsFromUpper.add(row);
+					//System.out.printf("(%g, %g, %g)\n", thePoint.mX, thePoint.mY, thePoint.mZ);										
+				} else {
+					indexMapToUpperLowerPlane[row] = -pointsLowerPlane.size() - 1;
+					pointsLowerPlane.add(thePoint);
+					mapToRowsFromLower.add(row);
+					
+				}
+				
+			} else {				
+				indexMapToUpperLowerPlane[row] = Integer.MAX_VALUE;
+			}
+		}
+	}
+	
 	// ========================================================================
 	// Convenience function 
 	static ArrayList<Floint> 
-	getValidPointsListForClustering(ArrayList<String> rows, double[] copyNumRatios, double scalingFactor, SeqPlatform platform, float vafBoundLower, float vafBoundUpper) {
+	getValidPointsListForClustering(ArrayList<String> rows, double[] verticalFactor, double scalingFactor, SeqPlatform platform, float vafBoundLower, float vafBoundUpper) {
 		ArrayList<Floint> points = new ArrayList<Floint>(rows.size());
 
 		for (int row = 0; row < rows.size(); row++) {
 			String line = rows.get(row);			
 			float vafNormal = Clustering.extractVAFNormal(line, platform);
 			if (Utils.inRangeLowerExclusive(vafNormal, vafBoundLower, vafBoundUpper)) {	
-				Floint thePoint = new Floint(Clustering.extractVAFTumor(line, platform), vafNormal, (float) (copyNumRatios[row] * scalingFactor));
+				Floint thePoint = new Floint(Clustering.extractVAFTumor(line, platform), vafNormal, (float) (verticalFactor[row] * scalingFactor));
 				points.add(thePoint);			
 			}
 		}
