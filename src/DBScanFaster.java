@@ -122,7 +122,7 @@ public class DBScanFaster extends DBSCAN2 {
 		
 		double minDistanceToCenterPoint = Double.MAX_VALUE;
 		for (DBScanPoint thePoint : mPoints) {
-			if (Math.abs(thePoint.mFloint.mZ - Script.DefaultDiploidCopyNumber) <= 0.05) { 
+			if (!Clustering.Doing3D || Math.abs(thePoint.mFloint.mZ - Script.DefaultDiploidCopyNumber) <= 0.05) { 
 				double distanceToCenterPoint = Block.getCartesianDistanceSquared(centralX, centralY, thePoint.mFloint.mX, thePoint.mFloint.mY);
 				if (distanceToCenterPoint < minDistanceToCenterPoint) {
 					minDistanceToCenterPoint = distanceToCenterPoint;
@@ -230,22 +230,6 @@ public class DBScanFaster extends DBSCAN2 {
 			if (getCartesianDistanceSquared(mLowerLeftCornerX + mBlockLength, mLowerLeftCornerY + mBlockLength, otherX, otherY) <= distanceSquared) {
 				numCornersWithinRange++;
 			}
-
-			
-			
-			/*
-			for (int xIndex = 0; xIndex < loopMax; xIndex++) {
-				float cornerX = mLowerLeftCornerX + (xIndex * mBlockLength);
-				
-				for (int yIndex = 0; yIndex < loopMax;  yIndex++) {
-					
-					float cornerY = mLowerLeftCornerY + (yIndex * mBlockLength);
-					float distanceActual = getCartesianDistanceSquared(cornerX, cornerY, otherX, otherY);
-					if (distanceActual <= distanceSquared) {
-						numCornersWithinRange++;
-					}
-				}
-			}*/
 			
 			return numCornersWithinRange;
 		}

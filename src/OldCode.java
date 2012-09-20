@@ -424,6 +424,7 @@ public class OldCode {
 	 * Parse region score data into BED files that can be uploaded to the UCSC genome browser.
 	 * @param inDir region score data
 	 */
+	/*
 	public static void addScoreTracks(String inDir, String outDir) {
 			
 		String[] col_names = {"recurrence", "het_density", "event_density"};
@@ -521,6 +522,7 @@ public class OldCode {
 			}
 		}
 	}
+	*/
 	
 	/**
 	 * helper method for addScoreTracks()

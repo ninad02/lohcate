@@ -27,8 +27,10 @@ public class Floint implements Comparable<Floint> {
 			   (this.mY - rhs.mY) * 
 			   (this.mY - rhs.mY) +
 			   
-			   (this.mZ - rhs.mZ) *
-			   (this.mZ - rhs.mZ)
+			   (Clustering.UsePValue ?
+					   (this.mZ - rhs.mZ) *
+					   (this.mZ - rhs.mZ) 
+					   : 0)
 			   ;
 	}
 	

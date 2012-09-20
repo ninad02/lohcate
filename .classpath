@@ -2,8 +2,9 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="E:/Research/Code/lohcate/lohcate/lib/jfreechart-1.0.14/lib/jcommon-1.0.17.jar"/>
-	<classpathentry kind="lib" path="E:/Research/Code/lohcate/lohcate/lib/jfreechart-1.0.14/lib/jfreechart-1.0.14.jar"/>
-	<classpathentry kind="lib" path="E:/Research/Code/lohcate/lohcate/lib/jfreechart-1.0.14/lib/jfreechart-1.0.14-swt.jar"/>
+	<classpathentry kind="lib" path="E:/Research/Code/lohcate/lohcate/lib/commons-math3-3.0.jar"/>
+	<classpathentry kind="lib" path="E:/Research/Code/lohcate/lohcate/lib/jcommon-1.0.17.jar"/>
+	<classpathentry kind="lib" path="E:/Research/Code/lohcate/lohcate/lib/jfreechart-1.0.14.jar"/>
+	<classpathentry kind="lib" path="E:/Research/Code/lohcate/lohcate/lib/jfreechart-1.0.14-swt.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
