@@ -7,6 +7,7 @@ import lohcateEnums.ClusterType;
 import lohcateEnums.SNVType;
 import lohcateEnums.VariantLocation;
 
+import shared.BucketCounter;
 import shared.Utils;
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
@@ -23,7 +24,7 @@ public class Gene implements Comparable<Gene> {
 	public ArrayList<ArrayList<String>> mPatients;
 	
 	public int[] mSNVTypeCounts;
-	public int[] mClusterTypeCounts;	
+	public BucketCounter mClusterTypeCounts;	
 	public int[] mVariantLocationCounts;
 	public int   mCountLOHreferenceLost;
 	public int mMinBasePairPosition, mMaxBasePairPosition;
@@ -34,7 +35,7 @@ public class Gene implements Comparable<Gene> {
 		initializePatients();
 				
 		mSNVTypeCounts         = new int[        SNVType.values().length];  // stores hit counts for synonymous, nonsynonymous
-		mClusterTypeCounts     = new int[    ClusterType.values().length];  //stores hit counts for LOH, dup, &c. variants
+		mClusterTypeCounts     = new BucketCounter(ClusterType.values().length, 0);		
 		mVariantLocationCounts = new int[VariantLocation.values().length];  // stores hit counts for germline, somatic
 		clearCounts();
 				
@@ -44,7 +45,7 @@ public class Gene implements Comparable<Gene> {
 	
 	public void clearCounts() {
 		Arrays.fill(mSNVTypeCounts,         0);
-		Arrays.fill(mClusterTypeCounts,     0);
+		mClusterTypeCounts.clear();
 		Arrays.fill(mVariantLocationCounts, 0);
 		mCountLOHreferenceLost = 0;
 	}
@@ -69,7 +70,9 @@ public class Gene implements Comparable<Gene> {
 		return mPatients.get(ct.ordinal());
 	}
 	
-	public void incrementCountForClusterType(ClusterType clusterType) {  mClusterTypeCounts[clusterType.ordinal()]++; }
+	public void incrementCountForClusterType(ClusterType clusterType) {
+		mClusterTypeCounts.increment(clusterType.ordinal());
+	}
 	
 	public void incrementCountForMutationType(SNVType mutationType) { mSNVTypeCounts[mutationType.ordinal()]++; }
 	
@@ -77,8 +80,7 @@ public class Gene implements Comparable<Gene> {
 	
 	public int getCountVariantLocation(VariantLocation varLoc) { return mVariantLocationCounts[varLoc.ordinal()]; }
 	public int getCountMutationType(SNVType mutationType)      { return mSNVTypeCounts[mutationType.ordinal()]; }
-	public int getCountClusterType(ClusterType clusterType)    { return mClusterTypeCounts[clusterType.ordinal()]; }
-	
+	public int getCountClusterType(ClusterType clusterType)    { return mClusterTypeCounts.getCount(clusterType.ordinal()); }	
 	
 	public float getRecurrence(int ind, int total) { return (float)mPatients.get(ind).size() / (float)total; }
 	

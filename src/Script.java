@@ -1216,6 +1216,7 @@ public class Script {
 		FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionTSV; 
 				
 		StringBuilder sb = new StringBuilder(4096);
+		BucketCounter clusterTypeCountsGene = new BucketCounter(ClusterType.values().length, 0);
 		
 		// A list of genes that we will keep binary sorted for efficieny purposes
 		ArrayList<Gene> genes = new ArrayList<Gene>(); 
@@ -1257,6 +1258,7 @@ public class Script {
 							genes.add(resultIndex, new Gene(geneName, chrom));							
 						}
 						Gene currentGene = genes.get(resultIndex);
+						clusterTypeCountsGene.clear();
 						
 						if (position > currentGene.mMaxBasePairPosition) { //get right-bound of gene's range of variants
 							currentGene.mMaxBasePairPosition = position; 
@@ -1336,11 +1338,14 @@ public class Script {
 			IOUtils.flushBufferedWriter(out);
 			
 			// Write samples for each gene out as well
+			ArrayList<String> patientsAllClusters = new ArrayList<String>();
 			for (ClusterType ct : ClusterType.values()) {
 				if ((ct == ClusterType.Noise) || (ct == ClusterType.Null)) continue;
-				String geneOutFilename = outDir + File.separator + gene.mLabel + ".samples." + ct.name() + ".txt";
-				IOUtils.writeOutputFile(geneOutFilename, gene.getPatientsForClusterType(ct));				
+				patientsAllClusters.add(ct.name());
+				patientsAllClusters.addAll(gene.getPatientsForClusterType(ct));
 			}
+			String geneOutFilename = outDir + File.separator + gene.mLabel + ".samples.txt";
+			IOUtils.writeOutputFile(geneOutFilename, patientsAllClusters);
 			
 		}
 		IOUtils.closeBufferedWriter(out);
