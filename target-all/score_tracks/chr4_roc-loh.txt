@@ -1,3 +1,0 @@
-https://raw.github.com/sidreddy96/lohcate/master/target-all/score_tracks/chr4_roc-loh/recurrence.csv
-https://raw.github.com/sidreddy96/lohcate/master/target-all/score_tracks/chr4_roc-loh/het_density.csv
-https://raw.github.com/sidreddy96/lohcate/master/target-all/score_tracks/chr4_roc-loh/event_density.csv

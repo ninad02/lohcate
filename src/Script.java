@@ -220,6 +220,7 @@ public class Script {
 			for (CopyNumberRegionsByChromosome regionsInOneSample : regionsInSamples) {
 				CopyNumberRegionsByChromosome regionsInOneSampleMerged = mergeRegionsWithConstraints(regionsInOneSample, clusterType, maxBasePairsContiguousRegionForCluster);
 				regionsInSamplesForOneClusterType.add(regionsInOneSampleMerged);
+				printSegmentedRegionsToFile(outDir, regionsInOneSampleMerged, clusterType);
 			}
 		}
 
@@ -414,6 +415,43 @@ public class Script {
 		}
 		
 		return target;
+	}
+
+	// ========================================================================
+	/** Given the merged segmented regions in one sample, this method prints the regions to file. */
+	public static void printSegmentedRegionsToFile(String outDir, CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType) {
+				
+		String outFilename = outDir + File.separator + "Regions.GISTIC." + clusterType.name() + "." + regionsInSample.mSampleName + ".txt";
+		StringBuilder sb = new StringBuilder(2048);
+		String delim = Utils.FileExtensionTSV.mDelimiter;
+		
+		double copyNum = (clusterType == ClusterType.Amp) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);
+		double copyNumRatio = copyNum / DefaultDiploidCopyNumber;
+		double log2Ratio = Math.log10(copyNumRatio) / Math.log10(2);
+		double log2RatioGisticCol = log2Ratio - 1.0;
+		double log2CopyNum = Math.log10(copyNum) / Math.log10(2);
+		double log2CopyNumGistic = log2CopyNum - 1.0;
+		
+		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);
+		// Go chromosome by chromosome
+		for (Chrom chrom : Chrom.Autosomes) {				
+			
+			ArrayList<CopyNumberRegionRange> regionsInChrom = regionsInSample.mRegionsByChrom.get(chrom.getCode());			
+			for (CopyNumberRegionRange cnrr : regionsInChrom) {
+				sb.setLength(0);
+				
+				sb.append(regionsInSample.mSampleName)
+				  .append(delim).append(chrom.ordinal())
+				  .append(delim).append(cnrr.getRangeStart())
+				  .append(delim).append(cnrr.getRangeEnd())
+				  .append(delim).append(cnrr.getNumSitesInterrogated())
+				  .append(delim).append(log2Ratio);
+				
+				IOUtils.writeToBufferedWriter(out, sb.toString(), true);
+			}
+		}
+		
+		IOUtils.closeBufferedWriter(out);
 	}
 	
 	// ========================================================================
@@ -1336,7 +1374,11 @@ public class Script {
 				.append(fileExtDelim.mDelimiter).append(gene.countsToString(fileExtDelim.mDelimiter));
 			IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 			IOUtils.flushBufferedWriter(out);
-			
+		}
+		IOUtils.closeBufferedWriter(out);
+		
+		// Now write out individual gene outputs
+		for (Gene gene : genes) {
 			// Write samples for each gene out as well
 			ArrayList<String> patientsAllClusters = new ArrayList<String>();
 			for (ClusterType ct : ClusterType.values()) {
@@ -1345,10 +1387,8 @@ public class Script {
 				patientsAllClusters.addAll(gene.getPatientsForClusterType(ct));
 			}
 			String geneOutFilename = outDir + File.separator + gene.mLabel + ".samples.txt";
-			IOUtils.writeOutputFile(geneOutFilename, patientsAllClusters);
-			
+			IOUtils.writeOutputFile(geneOutFilename, patientsAllClusters);				
 		}
-		IOUtils.closeBufferedWriter(out);
 	}
 	
 	

@@ -57,10 +57,15 @@ public class Clustering {
 	private static final float ClusterDiagonalLeeway = (float) 0.2;	
 	
 	public static final boolean Doing3D = false;
+	
 	public static final boolean UsePValuePlane = true;	
-	public static final boolean MultipleTestingCorrect = false;
+	
+	public static final boolean MultipleTestingCorrect = true;
+	
 	private static final boolean AssignAmplifications = true;
+	
 	private static final boolean ForcePointsOnDiagonalAsNull = false;
+	
 	public static final float PValueBinDistAlpha_UpperPlaneThresh = 0.025f;
 	public static float ScalingFactor = 1.0f;
 	public static final float AmplificationThreshold = 2.5f;
