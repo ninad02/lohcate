@@ -42,6 +42,12 @@ public class RegionRange {
 	/** Returns the chromosome. */
 	public Chrom getChromosome() { return mChrom; }
 	
+	/** Increments the number of sites interrogated by the given amount. */
+	public void incrementSitesInterrogated(int numSitesToAdd) { mNumSitesInterrogated += numSitesToAdd; }
+	
+	/** Returns the number of sites interrogated in the region. */
+	public int getNumSitesInterrogated() { return mNumSitesInterrogated; }
+	
 	/** Makes the range finalized. */
 	public void makeFinalized() { mRangeFinalized = true; }
 	

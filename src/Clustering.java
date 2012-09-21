@@ -4,6 +4,7 @@ import java.awt.geom.Ellipse2D;
 import java.awt.geom.Ellipse2D.Double;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -53,13 +54,16 @@ public class Clustering {
 	private static final int HET_BALL_MINPTS = 100; //DBSCAN parameters for HET ball / DUP wedge detection
 	private static final int DUP_WEDGE_MINPTS = 100;
 	
-	private static final float ClusterDiagonalLeeway = (float) 0.2;
-	
-	private static final float PValueUpperPlaneThresh = 0.025f;
+	private static final float ClusterDiagonalLeeway = (float) 0.2;	
 	
 	public static final boolean Doing3D = false;
-	public static final boolean UsePValuePlane = false;	
-	public static float ScalingFactor = 4.0f;
+	public static final boolean UsePValuePlane = true;	
+	public static final boolean MultipleTestingCorrect = false;
+	private static final boolean AssignAmplifications = true;
+	private static final boolean ForcePointsOnDiagonalAsNull = false;
+	public static final float PValueBinDistAlpha_UpperPlaneThresh = 0.025f;
+	public static float ScalingFactor = 1.0f;
+	public static final float AmplificationThreshold = 2.5f;
 	
 	// ========================================================================
 	// INNER CLASS
@@ -165,7 +169,7 @@ public class Clustering {
 		IOUtils.createDirectoryPath(outDir, false);
 		IOUtils.createDirectoryPath(vafComparisonPlotDir, false);
 
-		String[] columnHeaders = new String[] { "chr", "pos", "n_vaf", "t_vaf", "allele_freq", "gene", "mutation_type", "germ_som", "cluster" };
+		String[] columnHeaders = new String[] { "chr", "pos", "n_vaf", "t_vaf", "dbsnp", "gene", "mutation_type", "germ_som", "cluster" };
 		String headerStr = Utils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();		
 
 		int fileIndex = 0;
@@ -215,12 +219,15 @@ public class Clustering {
 					clusters = Clustering.getClusters_Old(allVariantRows, imbalancePValues, copyNumRatios, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
 				}
 
-				//				PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
-				//				for (int r = 0; r < allVariantRows.size(); r++) {
-				//	outStream.print(allVariantRows.get(r));
-				//					outStream.println("\t" + copyNumRatios[r] + "\t" + (copyNumRatios[r] * 2));
-				//				}
-				//				IOUtils.closePrintStream(outStream);
+				boolean toPrintWithCopyNum = false;
+				if (toPrintWithCopyNum) {
+					PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
+					for (int r = 0; r < allVariantRows.size(); r++) {
+						outStream.print(allVariantRows.get(r));					
+						outStream.println("\t" + copyNumRatios[r] + "\t" + (copyNumRatios[r] * 2));
+					}
+					IOUtils.closePrintStream(outStream);
+				}
 
 
 				System.out.println("Got clusters");
@@ -337,7 +344,7 @@ public class Clustering {
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
 		
 		XYItemRenderer itemRenderer = Clustering.getXYItemRendererHelper(5);		
-		itemRenderer.setSeriesPaint(ClusterType.Dup.ordinal(), ColorPastel.Dark_Red.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.Amp.ordinal(), ColorPastel.Dark_Red.getColor());
 		itemRenderer.setSeriesPaint(ClusterType.LOH.ordinal(), ColorPastel.Yellow_Green.getColor());
 		itemRenderer.setSeriesPaint(ClusterType.HETGermline.ordinal(), ColorPastel.Dark_Yellow.getColor());
 		itemRenderer.setSeriesPaint(ClusterType.HETSomatic.ordinal(), ColorPastel.Gray_80.getColor());
@@ -535,7 +542,7 @@ public class Clustering {
 		int[] clusterAssignments = dbscanner.getClustAssignments();  // save and cache	
 
 		int[] clusterTypeIDsFromAlgorithm = new int[ClusterType.values().length];		
-		clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()]  = -1;
+		clusterTypeIDsFromAlgorithm[ClusterType.Amp.ordinal()]  = -1;
 		clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()] = -2;
 		clusterTypeIDsFromAlgorithm[ClusterType.HETGermline.ordinal()] = clusterIDofHetBall;
 		clusterTypeIDsFromAlgorithm[ClusterType.Noise.ordinal()] = dbscanner.getClusterIDOfNoise();
@@ -675,7 +682,7 @@ public class Clustering {
 						clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];   
 					}
 				} else {
-					clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
+					clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Amp.ordinal()];   // only change if we're in a het ball region
 				}
 			}
 
@@ -704,7 +711,9 @@ public class Clustering {
 		IntArrayList mapToRowsFromLower = new IntArrayList(rows.size());
 
 		getValidPointsForClustering(rows, pointsUpperPlane, pointsLowerPlane, indexMapToUpperLowerPlane, 
-				                    mapToRowsFromUpper, mapToRowsFromLower, imbalancePValues, ScalingFactor, platform, 
+				                    mapToRowsFromUpper, mapToRowsFromLower, 
+				                    imbalancePValues, ScalingFactor, copyNumRatios, 
+				                    platform, 
 				                    vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper);		
 
 		System.out.println("Begin clustering algorithm: " + (new Date()).toString());
@@ -720,7 +729,7 @@ public class Clustering {
 		int[] clusterAssignments     = dbscannerLowerPlane.getClustAssignments();  // save and cache	
 
 		int[] clusterTypeIDsFromAlgorithm = new int[ClusterType.values().length];		
-		clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()]  = -1;
+		clusterTypeIDsFromAlgorithm[ClusterType.Amp.ordinal()]  = -1;
 		clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()] = -2;
 		clusterTypeIDsFromAlgorithm[ClusterType.HETGermline.ordinal()] = clusterIDofHetBall;
 		clusterTypeIDsFromAlgorithm[ClusterType.Noise.ordinal()] = dbscannerLowerPlane.getClusterIDOfNoise();
@@ -763,6 +772,17 @@ public class Clustering {
 			if (clusterAssignmentsUpperPlane[ind] == clusterIDofHetBall) {
 				clusterAssignmentsUpperPlane[ind] = 
 					(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1;
+			}			
+			int indexIntoOriginalRows = mapToRowsFromUpper.get(ind);
+			float copyNum = copyNumRatios[indexIntoOriginalRows] * Script.DefaultDiploidCopyNumber;
+			if (AssignAmplifications && (copyNum > AmplificationThreshold)) {
+				clusterAssignmentsUpperPlane[ind] = clusterTypeIDsFromAlgorithm[ClusterType.Amp.ordinal()];
+			}
+			
+			if (ForcePointsOnDiagonalAsNull) {
+				if (pointOnDiagonal(pointsUpperPlane.get(ind), ClusterDiagonalLeeway)) {
+					clusterAssignmentsUpperPlane[ind] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
+				}
 			}
 		}
 		
@@ -871,7 +891,7 @@ public class Clustering {
 						clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];   
 					}
 				} else {
-					clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
+					clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Amp.ordinal()];   // only change if we're in a het ball region
 				}
 			}
 
@@ -966,8 +986,8 @@ public class Clustering {
 					if (assignedClusterID        == clusterTypeIDsFromAlgorithm[ClusterType.HETGermline.ordinal()]) {
 						returnClusters[row] = ClusterType.HETGermline; //HET
 
-					} else if (assignedClusterID == clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()]) {
-						returnClusters[row] = ClusterType.Dup; //DUP
+					} else if (assignedClusterID == clusterTypeIDsFromAlgorithm[ClusterType.Amp.ordinal()]) {
+						returnClusters[row] = ClusterType.Amp; //DUP
 
 					} else if (assignedClusterID == clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()]) {
 						returnClusters[row] = ClusterType.Null;  // we're on a diagonal
@@ -997,12 +1017,15 @@ public class Clustering {
 													int[] indexMapToUpperLowerPlane,       // output - if positive, to upper plane, if negative, to lower plane, if does not map, contains Integer.MAX_VALUE													
 													IntArrayList mapToRowsFromUpper, 
 													IntArrayList mapToRowsFromLower,
-													double[] verticalFactor, double scalingFactor, 
+													double[] verticalFactor, double scalingFactor,
+													float[] copyNumRatios,
 													SeqPlatform platform, 
 													float vafBoundLower, float vafBoundUpper) {
 		
 		pointsUpperPlane.clear();
 		pointsLowerPlane.clear();
+		double alphaAdjusted = MultipleTestingCorrect ? 
+				(PValueBinDistAlpha_UpperPlaneThresh * 0.008 /* Light FDR */) : PValueBinDistAlpha_UpperPlaneThresh;
 		for (int row = 0; row < rows.size(); row++) {
 			String line = rows.get(row);			
 			float vafNormal = Clustering.extractVAFNormal(line, platform);
@@ -1010,7 +1033,7 @@ public class Clustering {
 				Floint thePoint = new Floint(Clustering.extractVAFTumor(line, platform), vafNormal, (float) (verticalFactor[row] * scalingFactor));
 				
 				// Assume p-value as vertical row factor
-				if (verticalFactor[row] <= PValueUpperPlaneThresh) {
+				if (verticalFactor[row] <= alphaAdjusted && !isCopyNumInDiploidRange(copyNumRatios[row])) {
 					indexMapToUpperLowerPlane[row] =  pointsUpperPlane.size();
 					pointsUpperPlane.add(thePoint);
 					mapToRowsFromUpper.add(row);
@@ -1026,6 +1049,13 @@ public class Clustering {
 				indexMapToUpperLowerPlane[row] = Integer.MAX_VALUE;
 			}
 		}
+	}
+	
+	// ========================================================================
+	private static boolean isCopyNumInDiploidRange(float copyNumRatio) {
+		float copyNum = copyNumRatio * Script.DefaultDiploidCopyNumber;
+		float threshold = 0.2f;
+		return ((Script.DefaultDiploidCopyNumber - threshold) < copyNum && copyNum < (Script.DefaultDiploidCopyNumber + threshold));
 	}
 	
 	// ========================================================================

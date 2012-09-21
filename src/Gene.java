@@ -65,6 +65,10 @@ public class Gene implements Comparable<Gene> {
 		return patientList.size();
 	}
 	
+	public ArrayList<String> getPatientsForClusterType(ClusterType ct) {
+		return mPatients.get(ct.ordinal());
+	}
+	
 	public void incrementCountForClusterType(ClusterType clusterType) {  mClusterTypeCounts[clusterType.ordinal()]++; }
 	
 	public void incrementCountForMutationType(SNVType mutationType) { mSNVTypeCounts[mutationType.ordinal()]++; }
@@ -100,25 +104,25 @@ public class Gene implements Comparable<Gene> {
 		  .append(delim).append(getCountVariantLocation(VariantLocation.Germline))
 		  .append(delim).append(getCountVariantLocation(VariantLocation.Somatic))
 		  
-		  .append(delim).append(getCountClusterType(ClusterType.Dup))
+		  .append(delim).append(getCountClusterType(ClusterType.Amp))
 		  .append(delim).append(getCountClusterType(ClusterType.LOH))
 		  .append(delim).append(mCountLOHreferenceLost)
 		  .append(delim).append(getCountClusterType(ClusterType.HETGermline))
 		  .append(delim).append(getCountClusterType(ClusterType.HETSomatic))
 		  
-		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.Dup)))
+		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.Amp)))
 		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.LOH)))
 		  .append(delim).append(Utils.log(mCountLOHreferenceLost))
 		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.HETGermline)))
 		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.HETSomatic)))
 		  
-		  .append(delim).append(getDensityClusterType(ClusterType.Dup))
+		  .append(delim).append(getDensityClusterType(ClusterType.Amp))
 		  .append(delim).append(getDensityClusterType(ClusterType.LOH))
 		  .append(delim).append(mCountLOHreferenceLost / (float) getRangeLength())
 		  .append(delim).append(getDensityClusterType(ClusterType.HETGermline))
 		  .append(delim).append(getDensityClusterType(ClusterType.HETSomatic))
 		  
-		  .append(delim).append(getNumPatientsForClusterType(ClusterType.Dup))
+		  .append(delim).append(getNumPatientsForClusterType(ClusterType.Amp))
 		  .append(delim).append(getNumPatientsForClusterType(ClusterType.LOH))
 		  .append(delim).append(getNumPatientsForClusterType(ClusterType.HETGermline))
 		  .append(delim).append(getNumPatientsForClusterType(ClusterType.HETSomatic));

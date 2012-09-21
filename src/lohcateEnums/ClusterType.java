@@ -3,7 +3,7 @@ package lohcateEnums;
 import java.util.ArrayList;
 
 public enum ClusterType {
-	Dup,
+	Amp,
 	LOH,	
 	HETGermline,
 	
@@ -12,9 +12,9 @@ public enum ClusterType {
 	Null;
 	
 	public static final ArrayList<String> namesLowercase = getClusterTypesLowercase();
-	public static final ClusterType[] DupLOHHetG = new ClusterType[] { Dup, LOH, HETGermline };
-	public static final ClusterType[] DupLOH = new ClusterType[]     { Dup, LOH };
-	public static final ClusterType[] OnlyLOH = new ClusterType[]     { LOH };
+	public static final ClusterType[] AmpLOHHetG = new ClusterType[] { Amp, LOH, HETGermline };
+	public static final ClusterType[] AmpLOH = new ClusterType[]     { Amp, LOH };
+	public static final ClusterType[] OnlyLOH = new ClusterType[]         { LOH };
 	
 	public static int getNumAberrantClusterTypes() { return 2; }
 	

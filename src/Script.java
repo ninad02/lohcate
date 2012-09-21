@@ -211,8 +211,8 @@ public class Script {
 		};  
 		
 		ArrayList<ArrayList<CopyNumberRegionsByChromosome>> regionsInSamplesPerClusterType = new ArrayList<ArrayList<CopyNumberRegionsByChromosome>>();
-		for (int clusterIndex = 0; clusterIndex < ClusterType.DupLOHHetG.length; clusterIndex++) {
-			ClusterType clusterType = ClusterType.DupLOHHetG[clusterIndex];
+		for (int clusterIndex = 0; clusterIndex < ClusterType.AmpLOHHetG.length; clusterIndex++) {
+			ClusterType clusterType = ClusterType.AmpLOHHetG[clusterIndex];
 			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = new ArrayList<CopyNumberRegionsByChromosome>();
 			regionsInSamplesPerClusterType.add(regionsInSamplesForOneClusterType);			
 			int maxBasePairsContiguousRegionForCluster = maxBasePairsContiguousRegion[clusterIndex];
@@ -227,8 +227,8 @@ public class Script {
 		
 		// Now we want to determine the recurrent regions
 		ArrayList<CopyNumberRegionsByChromosome> regionsRecurrentPerClusterType = new ArrayList<CopyNumberRegionsByChromosome>();
-		for (int clusterIndex = 0; clusterIndex < ClusterType.DupLOHHetG.length; clusterIndex++) {
-			ClusterType clusterType = ClusterType.DupLOHHetG[clusterIndex];
+		for (int clusterIndex = 0; clusterIndex < ClusterType.AmpLOHHetG.length; clusterIndex++) {
+			ClusterType clusterType = ClusterType.AmpLOHHetG[clusterIndex];
 			
 			CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType = 
 					determineRecurrentRegions(regionsInSamplesPerClusterType.get(clusterIndex), clusterType);
@@ -240,8 +240,8 @@ public class Script {
 		System.out.println("Scoring regions...");
 		// Now, we need to go through the recurrent regions and score them, based on the 
 		// contents of the individual samples that make up the recurrent regions.
-		for (int clusterIndex = 0; clusterIndex < ClusterType.DupLOHHetG.length; clusterIndex++) {
-			ClusterType clusterType = ClusterType.DupLOHHetG[clusterIndex];
+		for (int clusterIndex = 0; clusterIndex < ClusterType.AmpLOHHetG.length; clusterIndex++) {
+			ClusterType clusterType = ClusterType.AmpLOHHetG[clusterIndex];
 
 			CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType = regionsRecurrentPerClusterType.get(clusterIndex);
 			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = regionsInSamplesPerClusterType.get(clusterIndex);
@@ -450,7 +450,8 @@ public class Script {
 						
 						int maxEndIndexInclusive = regionToExtend.getRangeStart() + maxBasePairsContiguousRegion - 1;						
 						if (currentRegion.getRangeStart() <= maxEndIndexInclusive) {
-							regionToExtend.setRangeEnd(currentRegion.getRangeEnd());
+							regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
+							regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());
 						} else {
 							// The current region is out of bounds.  We simply set
 							// the current region as the new region to extend.
@@ -658,6 +659,9 @@ public class Script {
 					sb.append(cnrr.mCopyNumberClusterType);
 					sb.append(delimiter).append(cnrr.mRecurrenceScore);
 					sb.append(delimiter).append(cnrr.toString());
+					sb.append(delimiter).append(cnrr.getChromosome().ordinal());
+					sb.append(delimiter).append(cnrr.getRangeStart());
+					sb.append(delimiter).append(cnrr.getRangeEnd());
 					
 					double densityClusterType =        ((double) cnrr.mClusterTypeCounts.getCount(cnrr.mCopyNumberClusterType.ordinal()) / (double) cnrr.getRangeLength());
 					double densityClusterHetGermline = ((double) cnrr.mClusterTypeCounts.getCount(ClusterType.HETGermline.ordinal())     / (double) cnrr.getRangeLength());
@@ -1205,7 +1209,9 @@ public class Script {
 	 * Generate 'master' gene enrichment table (used to generate histograms).
 	 * @param inDir curated SNP calls
 	 */
-	public static void getGeneEnrichment(String inDir, String outFilename) {
+	public static void getGeneEnrichment(String inDir, String outDir) {
+		String outFilename = outDir + File.separator + "geneEnrichment." + Utils.FileExtensionTSV.mExtension;
+		IOUtils.createDirectoryPath(outDir, false);
 		File[] files = (new File(inDir)).listFiles();
 		FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionTSV; 
 				
@@ -1291,25 +1297,25 @@ public class Script {
 				VariantLocation.Germline.toLowerCase(), 
 				VariantLocation.Somatic.toLowerCase(),
 				
-				ClusterType.Dup.name(),
+				ClusterType.Amp.name(),
 				ClusterType.LOH.name(), 
 				ClusterType.LOH.name() + "_refLost", 
 				ClusterType.HETGermline.name(),
 				ClusterType.HETSomatic.name(),
 				
-				ClusterType.Dup.name() + logStr,
+				ClusterType.Amp.name() + logStr,
 				ClusterType.LOH.name() + logStr, 
 				ClusterType.LOH.name() + "_refLost" + logStr, 
 				ClusterType.HETGermline.name() + logStr,
 				ClusterType.HETSomatic.name() + logStr,
 				
-				ClusterType.Dup.name()              + densityStr,
+				ClusterType.Amp.name()              + densityStr,
 				ClusterType.LOH.name()              + densityStr, 
 				ClusterType.LOH.name() + "_refLost" + densityStr, 
 				ClusterType.HETGermline.name()      + densityStr,
 				ClusterType.HETSomatic.name()       + densityStr,
 				
-				ClusterType.Dup.name()         + recurrenceStr, 
+				ClusterType.Amp.name()         + recurrenceStr, 
 				ClusterType.LOH.name()         + recurrenceStr, 
 				ClusterType.HETGermline.name() + recurrenceStr,
 				ClusterType.HETSomatic.name()  + recurrenceStr
@@ -1328,6 +1334,14 @@ public class Script {
 				.append(fileExtDelim.mDelimiter).append(gene.countsToString(fileExtDelim.mDelimiter));
 			IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 			IOUtils.flushBufferedWriter(out);
+			
+			// Write samples for each gene out as well
+			for (ClusterType ct : ClusterType.values()) {
+				if ((ct == ClusterType.Noise) || (ct == ClusterType.Null)) continue;
+				String geneOutFilename = outDir + File.separator + gene.mLabel + ".samples." + ct.name() + ".txt";
+				IOUtils.writeOutputFile(geneOutFilename, gene.getPatientsForClusterType(ct));				
+			}
+			
 		}
 		IOUtils.closeBufferedWriter(out);
 	}
@@ -1344,6 +1358,7 @@ public class Script {
 		String vafPlots         = "vafPlots";
 		String regions          = "regions";
 		String browserTracks    = "browser_tracks";
+		String geneEnrichment   = "gene_enrichment";
 		
 		
 		String root = args[0]; //project directory
@@ -1362,7 +1377,7 @@ public class Script {
 				break;
 			case 2:
 				getGeneEnrichment(root + File.separator + classifiedSites, 
-								  root + File.separator + "gene_enrichment.tsv");
+								  root + File.separator + geneEnrichment);
 				break;
 				
 			case 5:
