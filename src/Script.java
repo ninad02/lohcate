@@ -425,12 +425,11 @@ public class Script {
 		StringBuilder sb = new StringBuilder(2048);
 		String delim = Utils.FileExtensionTSV.mDelimiter;
 		
-		double copyNum = (clusterType == ClusterType.Amp) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);
-		double copyNumRatio = copyNum / DefaultDiploidCopyNumber;
-		double log2Ratio = Math.log10(copyNumRatio) / Math.log10(2);
-		double log2RatioGisticCol = log2Ratio - 1.0;
-		double log2CopyNum = Math.log10(copyNum) / Math.log10(2);
-		double log2CopyNumGistic = log2CopyNum - 1.0;
+		
+		double copyNum = (clusterType == ClusterType.Amp) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);		
+//		double log2RatioGisticCol = log2Ratio - 1.0;
+//		double log2CopyNum = Math.log10(copyNum) / Math.log10(2);
+//		double log2CopyNumGistic = log2CopyNum - 1.0;
 		
 		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);
 		// Go chromosome by chromosome
@@ -439,6 +438,13 @@ public class Script {
 			ArrayList<CopyNumberRegionRange> regionsInChrom = regionsInSample.mRegionsByChrom.get(chrom.getCode());			
 			for (CopyNumberRegionRange cnrr : regionsInChrom) {
 				sb.setLength(0);
+				
+				double errorFactor = Math.random() / 10;  // Get between 0 and 0.1
+				boolean addPositiveError = (Math.random() >= 0.5);
+				copyNum += (addPositiveError) ? errorFactor : -errorFactor;
+				double copyNumRatio = copyNum / DefaultDiploidCopyNumber;
+				double log2Ratio = Math.log10(copyNumRatio) / Math.log10(2);
+
 				
 				sb.append(regionsInSample.mSampleName)
 				  .append(delim).append(chrom.ordinal())

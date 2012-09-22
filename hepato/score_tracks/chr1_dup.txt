@@ -1,3 +1,0 @@
-https://raw.github.com/sidreddy96/lohcate/master/hepato/score_tracks/chr1_dup/recurrence.csv
-https://raw.github.com/sidreddy96/lohcate/master/hepato/score_tracks/chr1_dup/het_density.csv
-https://raw.github.com/sidreddy96/lohcate/master/hepato/score_tracks/chr1_dup/event_density.csv
