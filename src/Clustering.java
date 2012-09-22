@@ -174,7 +174,7 @@ public class Clustering {
 		IOUtils.createDirectoryPath(outDir, false);
 		IOUtils.createDirectoryPath(vafComparisonPlotDir, false);
 
-		String[] columnHeaders = new String[] { "chr", "pos", "n_vaf", "t_vaf", "dbsnp", "gene", "mutation_type", "germ_som", "cluster" };
+		String[] columnHeaders = new String[] { "chr", "pos", "VAF_Normal", "VAF_Tumor", "dbsnp", "gene", "mutation_type", "germ_som", "cluster" };
 		String headerStr = Utils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();		
 
 		int fileIndex = 0;

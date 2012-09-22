@@ -140,7 +140,7 @@ public class Enrichment {
 			toWrite = pathways.get(i) + ",";
 			for (String elem : path_genes.get(i)) { //iterate through genes in pathway
 				try {
-					toWrite += elem + ";" + Utils.log(Float.parseFloat(load.split("," + elem + ",")[1].split("\n")[0].split(",")[4 + clust])) + "|" + load.split("," + elem + ",")[1].split("\n")[0].split(",")[4 + Script.cluster_names.length - 1] + ",";
+					toWrite += elem + ";" + Utils.log(Float.parseFloat(load.split("," + elem + ",")[1].split("\n")[0].split(",")[4 + clust])) + "|" + load.split("," + elem + ",")[1].split("\n")[0].split(",")[4 + Enrichment.cluster_names.length - 1] + ",";
 					//|^| I've tentatively added a feature to the gene-wiring diagram annotator that colors each gene with two colors, so the preliminary tables will have to include two 'scores' for each gene. But for now, I've commented out the downstream two-color option, so you will only see the first score manifest itself. Even so, I don't want to have to come back and change genPrelimTable(), so let's leave this the way it is.
 				} catch (Exception e) { System.out.println("throwing " + elem); }
 			}
@@ -386,9 +386,9 @@ public class Enrichment {
 	 * @param roster_inDir KEGG Pathways gene::pathway roster table
 	 */
 	public static void annotatePathways(String en_inDir, String roster_inDir, String outDir) {
-		for (int i = 0; i<Script.cluster_names.length - 1; i++) {
-			genPrelimTable(en_inDir, roster_inDir, outDir + "/" + Script.cluster_names[i] + ".csv", i);
-			annotateDiagrams(outDir + "/" + Script.cluster_names[i] + ".csv", outDir);
+		for (int i = 0; i<Enrichment.cluster_names.length - 1; i++) {
+			genPrelimTable(en_inDir, roster_inDir, outDir + "/" + Enrichment.cluster_names[i] + ".csv", i);
+			annotateDiagrams(outDir + "/" + Enrichment.cluster_names[i] + ".csv", outDir);
 		}
 	}
 	
@@ -457,8 +457,8 @@ public class Enrichment {
 		ArrayList<Integer> top, g1top;
 		float temp_max, temp_max_g1;
 		int temp_max_ind, temp_max_ind_g1;
-		for (int i = 0; i<Script.cluster_names.length - 1; i++) { //iterate through {dup, loh}
-			System.out.println(Script.cluster_names[i]);
+		for (int i = 0; i<Enrichment.cluster_names.length - 1; i++) { //iterate through {dup, loh}
+			System.out.println(Enrichment.cluster_names[i]);
 			//FileOps.writeToFile(outDir + "/gene_enrichment_top_" + Script.cluster_names[i] + ".csv", trim(i, load[0]) + "\n");
 			//FileOps.writeToFile(outDir + "/g1/gene_enrichment_top_" + Script.cluster_names[i] + ".csv", trim(i, load[0]) + "\n");
 			ArrayList<Integer> blacklist = new ArrayList<Integer>();
@@ -496,8 +496,8 @@ public class Enrichment {
 			
 			for (int g = 0; g<top.size(); g++) { //iterate through top genes
 				try {
-					FileOps.appendToFile(outDir + "/gene_enrichment_top_" + Script.cluster_names[i] + ".csv", trim(i, load[top.get(g)]) + "\n");
-					FileOps.appendToFile(outDir + "/g1/gene_enrichment_top_" + Script.cluster_names[i] + ".csv", trim(i, load[g1top.get(g)]) + "\n");
+					FileOps.appendToFile(outDir + "/gene_enrichment_top_" + Enrichment.cluster_names[i] + ".csv", trim(i, load[top.get(g)]) + "\n");
+					FileOps.appendToFile(outDir + "/g1/gene_enrichment_top_" + Enrichment.cluster_names[i] + ".csv", trim(i, load[g1top.get(g)]) + "\n");
 				} catch (Exception e) { }//e.printStackTrace(); }
 			}
 		}
@@ -505,14 +505,14 @@ public class Enrichment {
 	
 	public static String trim(int cluster, String param) {
 		String rtn = "";
-		for (int i = 0; i<param.split(",").length - (2 * Script.cluster_names.length); i++) //avoid recurrence/variant count columns
+		for (int i = 0; i<param.split(",").length - (2 * Enrichment.cluster_names.length); i++) //avoid recurrence/variant count columns
 			rtn += param.split(",")[i] + ",";
 		if (param.indexOf("chr,range,")!=-1)
 			rtn += "event_count,het_count,recurrence\n";
 		else
-			rtn += param.split(",")[param.split(",").length - Script.cluster_names.length - (Script.cluster_names.length - cluster)] + "," //avoid the recurrence columns (there's 1 for each cluster) & move left [cluster_names.length - cluster] columns
-					+ param.split(",")[param.split(",").length - Script.cluster_names.length - 1] + "," //this method is a little more robust than just using [baseColOfClusterTypes], but it doesn't matter that much which indexing method you choose
-					+ param.split(",")[param.split(",").length - (Script.cluster_names.length - cluster)] + "\n";
+			rtn += param.split(",")[param.split(",").length - Enrichment.cluster_names.length - (Enrichment.cluster_names.length - cluster)] + "," //avoid the recurrence columns (there's 1 for each cluster) & move left [cluster_names.length - cluster] columns
+					+ param.split(",")[param.split(",").length - Enrichment.cluster_names.length - 1] + "," //this method is a little more robust than just using [baseColOfClusterTypes], but it doesn't matter that much which indexing method you choose
+					+ param.split(",")[param.split(",").length - (Enrichment.cluster_names.length - cluster)] + "\n";
 		return rtn;
 	}
 	
@@ -541,5 +541,7 @@ public class Enrichment {
 		String grab = FileOps.getHTML("http://www.ebi.ac.uk/QuickGO/GSearch?q=" + query);
 		return Utils.rmLeadingSpaces(grab.split("<span class=\"obsolete_false\">")[1].split("</span>")[0].replace("\n", ""));
 	}
+
+	public static String[] cluster_names = {"dup", "loh", "roc-loh", "het"}; //het needs to be the last element of cluster_names, but more elem.s can be added to the 'front' (as long as you handle them in the getClusters() method )
 	
 }

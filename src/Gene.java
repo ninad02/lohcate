@@ -4,7 +4,7 @@ import java.util.Comparator;
 
 import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
-import lohcateEnums.SNVType;
+import lohcateEnums.MutationType;
 import lohcateEnums.VariantLocation;
 
 import shared.BucketCounter;
@@ -23,10 +23,10 @@ public class Gene implements Comparable<Gene> {
 	public Chrom mChrom;
 	public ArrayList<ArrayList<String>> mPatients;
 	
-	public int[] mSNVTypeCounts;
+	public BucketCounter mMutationTypeCounts;	
 	public BucketCounter mClusterTypeCounts;	
-	public int[] mVariantLocationCounts;
-	public int   mCountLOHreferenceLost;
+	public BucketCounter mVariantLocationCounts;
+	public int mCountLOHreferenceLost;
 	public int mMinBasePairPosition, mMaxBasePairPosition;
 	
 	public Gene(String name, Chrom chrom) {		
@@ -34,9 +34,9 @@ public class Gene implements Comparable<Gene> {
 		mChrom = chrom;
 		initializePatients();
 				
-		mSNVTypeCounts         = new int[        SNVType.values().length];  // stores hit counts for synonymous, nonsynonymous
-		mClusterTypeCounts     = new BucketCounter(ClusterType.values().length, 0);		
-		mVariantLocationCounts = new int[VariantLocation.values().length];  // stores hit counts for germline, somatic
+		mMutationTypeCounts    = new BucketCounter(MutationType.values().length,    0);  // stores hit counts for synonymous, nonsynonymous
+		mClusterTypeCounts     = new BucketCounter(ClusterType.values().length,     0);				
+		mVariantLocationCounts = new BucketCounter(VariantLocation.values().length, 0);  // stores hit counts for germline, somatic
 		clearCounts();
 				
 		mMinBasePairPosition = Integer.MAX_VALUE;
@@ -44,9 +44,9 @@ public class Gene implements Comparable<Gene> {
 	}
 	
 	public void clearCounts() {
-		Arrays.fill(mSNVTypeCounts,         0);
+		mMutationTypeCounts.clear();
 		mClusterTypeCounts.clear();
-		Arrays.fill(mVariantLocationCounts, 0);
+		mVariantLocationCounts.clear();		
 		mCountLOHreferenceLost = 0;
 	}
 	
@@ -70,19 +70,15 @@ public class Gene implements Comparable<Gene> {
 		return mPatients.get(ct.ordinal());
 	}
 	
-	public void incrementCountForClusterType(ClusterType clusterType) {
-		mClusterTypeCounts.increment(clusterType.ordinal());
-	}
+	public void incrementCountForClusterType(ClusterType clusterType)    { mClusterTypeCounts.increment(clusterType.ordinal()); }	
+	public void incrementCountForMutationType(MutationType mutationType) { mMutationTypeCounts.increment(mutationType.ordinal()); } 			
+	public void incrementCountForVariantLocation(VariantLocation varLoc) { mVariantLocationCounts.increment(varLoc.ordinal()); }
 	
-	public void incrementCountForMutationType(SNVType mutationType) { mSNVTypeCounts[mutationType.ordinal()]++; }
-	
-	public void incrementCountForVariantLocation(VariantLocation varLoc) { mVariantLocationCounts[varLoc.ordinal()]++; }
-	
-	public int getCountVariantLocation(VariantLocation varLoc) { return mVariantLocationCounts[varLoc.ordinal()]; }
-	public int getCountMutationType(SNVType mutationType)      { return mSNVTypeCounts[mutationType.ordinal()]; }
+	public int getCountVariantLocation(VariantLocation varLoc) { return mVariantLocationCounts.getCount(varLoc.ordinal()); }
+	public int getCountMutationType(MutationType mutationType) { return mMutationTypeCounts.getCount(mutationType.ordinal()); }
 	public int getCountClusterType(ClusterType clusterType)    { return mClusterTypeCounts.getCount(clusterType.ordinal()); }	
 	
-	public float getRecurrence(int ind, int total) { return (float)mPatients.get(ind).size() / (float)total; }
+	public float getRecurrence(int ind, int total) { return (float) mPatients.get(ind).size() / (float) total; }
 	
 	public int getRangeLength() { return (mMaxBasePairPosition - mMinBasePairPosition + 1); }
 	
@@ -90,7 +86,7 @@ public class Gene implements Comparable<Gene> {
 		return (float) getCountVariantLocation(varLoc) / (float) getRangeLength();
 	}
 	
-	public float getDensityMutationType(SNVType mutationType) {
+	public float getDensityMutationType(MutationType mutationType) {
 		return (float) getCountMutationType(mutationType) / (float) getRangeLength();
 	}
 	
@@ -101,8 +97,8 @@ public class Gene implements Comparable<Gene> {
 	public String countsToString(String delim) {
 		StringBuilder sb = new StringBuilder(8192);
 		
-		sb.append(getCountMutationType(SNVType.NonSynonymous_SNV))
-		  .append(delim).append(getCountMutationType(SNVType.Synonymous_SNV))
+		sb.append(getCountMutationType(MutationType.NonSynonymous_SNV))
+		  .append(delim).append(getCountMutationType(MutationType.Synonymous_SNV))
 		  .append(delim).append(getCountVariantLocation(VariantLocation.Germline))
 		  .append(delim).append(getCountVariantLocation(VariantLocation.Somatic))
 		  

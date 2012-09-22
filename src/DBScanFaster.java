@@ -1,10 +1,21 @@
 import java.util.ArrayList;
 
+/**
+ * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
+ * @author Ninad Dewal, Siddharth G. Reddy, David Wheeler
+ * Human Genome Sequencing Center, Baylor College of Medicine (Houston, TX)
+ * 
+ * This is an optimized version of DBSCAN that divides the Cartesian coordinate plane into
+ * grid blocks.  The search space for neighbor searching is reduced by examining only those
+ * points within the possible neighboring blocks that fall within the epsilon distance.
+ * 
+ */
+
 public class DBScanFaster extends DBSCAN2 {
 
 	private static final float AdjustedMinX = 0;
 	private static final float AdjustedMinY = 0;
-	private static final int EpsilonDivider = 2;   // keep at 2 for optimum performance
+	private static final int EpsilonDivider = 2;   // keep at 2 or 3 for optimum performance
 	
 	protected Block[][] mBlocks;
 	protected float mOffsetX;
@@ -93,7 +104,7 @@ public class DBScanFaster extends DBSCAN2 {
 					// within the block will then be within range of the point.  There is no need to test the
 					// block.points within the block.
 					
-					//addAll(neighbors, theBlock.mPointsInBlock);
+					//addAll(neighbors, theBlock.mPointsInBlock);  // -- disable for now to allow for 3D clustering
 					for (DBScanPoint pointInBlock : theBlock.mPointsInBlock) {
 						if (point.getCartesianDistanceSquared(pointInBlock) <= mEpsilonSquared) {
 							neighbors.add(pointInBlock);
@@ -210,8 +221,7 @@ public class DBScanFaster extends DBSCAN2 {
 		/** Given a point, this returns how many corners of the block lie within the
 		 *  passed-in distance^2.  
 		 */
-		public int numCornersWithinDistance(float otherX, float otherY, float distanceSquared) {
-			int loopMax = 2;  // We hard-set this value because it forces each loop below to run twice
+		public int numCornersWithinDistance(float otherX, float otherY, float distanceSquared) {			
 			
 			// Cycle through the corners.  We don't use a loop in order for runtime efficiency
 			int numCornersWithinRange = 0;

@@ -6,13 +6,14 @@ import java.util.ListIterator;
 
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
- * D Wheeler & SG Reddy
+ * @author Ninad Dewal, Siddharth G. Reddy, David Wheeler
  * Human Genome Sequencing Center, Baylor College of Medicine (Houston, TX)
  * 
- * An implementation of the DBSCAN (density-based spatial clustering of applications with noise) algorithm.
- * Link --> https://en.wikipedia.org/wiki/DBSCAN
+ * The superclass for faster versions of DBSCAN.  Subclasses can override this method's 
+ * getNeighbors() method, which is the speed bottleneck.  
  * 
- * @author Ninad Dewal
+ * A summary of the DBSCAN algorithm (density-based spatial clustering of applications with noise) is given at: 
+ * Link --> https://en.wikipedia.org/wiki/DBSCAN
  *
  */
 public class DBSCAN2 {

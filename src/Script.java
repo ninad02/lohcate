@@ -16,7 +16,7 @@ import org.jfree.chart.renderer.xy.XYDotRenderer;
 import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
 import lohcateEnums.ColorPastel;
-import lohcateEnums.SNVType;
+import lohcateEnums.MutationType;
 import lohcateEnums.SeqPlatform;
 import lohcateEnums.VariantLocation;
 import shared.BucketCounter;
@@ -36,8 +36,6 @@ import shared.Utils.FileExtensionAndDelimiter;
  *
  */
 public class Script {
-	
-	public static String[] cluster_names = {"dup", "loh", "roc-loh", "het"}; //het needs to be the last element of cluster_names, but more elem.s can be added to the 'front' (as long as you handle them in the getClusters() method )
 	
 	public static final int DefaultDiploidCopyNumber = 2;
 	
@@ -107,6 +105,7 @@ public class Script {
 			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0) {
 				rows.set(rowIndex, null);
 			} else {
+				// Do some light GC filtering
 				String gcString = Utils.extractNthColumnValue(row, Col_NAFTAFInput_FlankingStringTumor, Utils.FileExtensionTSV.mDelimiter); 
 				double fractionGCNormal = Utils.calcFractionGC(gcString);
 				if ((fractionGCNormal < GCContentThresholdLow) || (fractionGCNormal >= GCContentThresholdHigh)) {
@@ -1040,7 +1039,7 @@ public class Script {
 				final Chrom chrom  = Chrom.getChrom                       (Utils.extractNthColumnValue(line, ColCuratedTSV_Chrom,    Utils.TabStr));					
 				final int position = Integer.parseInt                     (Utils.extractNthColumnValue(line, ColCuratedTSV_Position, Utils.TabStr));
 				final ClusterType clusterTypeForSite = ClusterType.getClusterType(Utils.extractNthColumnValue(line, ColCuratedTSV_Cluster,      Utils.TabStr));
-				final SNVType mutationType = SNVType.getSNVType                  (Utils.extractNthColumnValue(line, ColCuratedTSV_MutationType, Utils.TabStr));
+				final MutationType mutationType = MutationType.getSNVType                  (Utils.extractNthColumnValue(line, ColCuratedTSV_MutationType, Utils.TabStr));
 				final VariantLocation varLoc = VariantLocation.getVariantLocation(Utils.extractNthColumnValue(line, ColCuratedTSV_VariantLocation, Utils.TabStr));
 				
 				boolean addSite = false;
@@ -1311,7 +1310,7 @@ public class Script {
 							currentGene.mMinBasePairPosition = position;
 						}
 												
-						SNVType mutationType = SNVType.getSNVType(components[ColCuratedTSV_MutationType]);
+						MutationType mutationType = MutationType.getSNVType(components[ColCuratedTSV_MutationType]);
 						if (mutationType != null) {
 							currentGene.incrementCountForMutationType(mutationType);  // increment synonymous or nonsynonymous variant count
 						}
@@ -1338,8 +1337,8 @@ public class Script {
 		String densityStr = "_density";
 		String[] columnHeaders = new String[] { 
 				"chr", "bp_start", "bp_end", "length", "gene", 
-				SNVType.NonSynonymous_SNV.toLowerCase(), 
-				SNVType.Synonymous_SNV.toLowerCase(), 
+				MutationType.NonSynonymous_SNV.toLowerCase(), 
+				MutationType.Synonymous_SNV.toLowerCase(), 
 				VariantLocation.Germline.toLowerCase(), 
 				VariantLocation.Somatic.toLowerCase(),
 				
@@ -1431,21 +1430,22 @@ public class Script {
 								  root + File.separator + geneEnrichment);
 				break;
 				
+			// Everything below this point is Sidd's original code	
 			case 5:
-				for (int i = 0; i<cluster_names.length - 1; i++)
-					Enrichment.getPathwayEnrichment(root + "/gene_enrichment.csv", root + "/kegg_pathways_roster.tsv", root + "/kegg/pathway_enrichment/" + cluster_names[i] + ".csv", i);
+				for (int i = 0; i<Enrichment.cluster_names.length - 1; i++)
+					Enrichment.getPathwayEnrichment(root + "/gene_enrichment.csv", root + "/kegg_pathways_roster.tsv", root + "/kegg/pathway_enrichment/" + Enrichment.cluster_names[i] + ".csv", i);
 				break;
 			case 6:
 				Enrichment.annotatePathways(root + "/gene_enrichment.csv", root + "/kegg_pathways_roster.tsv", root + "/KEGG");
 				break;
 			case 7:
 				Enrichment.getGOTermCounts(root + "/gene_enrichment.csv", root + "/gene_association.goa_human", root + "/GO/counts/go_term_counts.csv");
-				for (int i = 0; i<cluster_names.length - 1; i++) {
-					Enrichment.getGOTermCounts(root + "/gene_enrichment/gene_enrichment_top_" + cluster_names[i] + ".csv", root + "/gene_association.goa_human", root + "/GO/counts/go_term_counts_top_" + cluster_names[i] + ".csv");
-					Enrichment.getGOTermEnrichment(root + "/GO/counts/go_term_counts.csv", root + "/GO/counts/go_term_counts_top_" + Script.cluster_names[i] + ".csv", root + "/GO/enrichment/go_term_enrichment_top_" + Script.cluster_names[i] + ".csv");
+				for (int i = 0; i<Enrichment.cluster_names.length - 1; i++) {
+					Enrichment.getGOTermCounts(root + "/gene_enrichment/gene_enrichment_top_" + Enrichment.cluster_names[i] + ".csv", root + "/gene_association.goa_human", root + "/GO/counts/go_term_counts_top_" + Enrichment.cluster_names[i] + ".csv");
+					Enrichment.getGOTermEnrichment(root + "/GO/counts/go_term_counts.csv", root + "/GO/counts/go_term_counts_top_" + Enrichment.cluster_names[i] + ".csv", root + "/GO/enrichment/go_term_enrichment_top_" + Enrichment.cluster_names[i] + ".csv");
 					
-					Enrichment.getGOTermCounts(root + "/gene_enrichment/g1/gene_enrichment_top_" + cluster_names[i] + ".csv", root + "/gene_association.goa_human", root + "/GO/g1/counts/go_term_counts_top_" + cluster_names[i] + ".csv");
-					Enrichment.getGOTermEnrichment(root + "/GO/g1/counts/go_term_counts.csv", root + "/GO/g1/counts/go_term_counts_top_" + Script.cluster_names[i] + ".csv", root + "/GO/g1/enrichment/go_term_enrichment_top_" + Script.cluster_names[i] + ".csv");
+					Enrichment.getGOTermCounts(root + "/gene_enrichment/g1/gene_enrichment_top_" + Enrichment.cluster_names[i] + ".csv", root + "/gene_association.goa_human", root + "/GO/g1/counts/go_term_counts_top_" + Enrichment.cluster_names[i] + ".csv");
+					Enrichment.getGOTermEnrichment(root + "/GO/g1/counts/go_term_counts.csv", root + "/GO/g1/counts/go_term_counts_top_" + Enrichment.cluster_names[i] + ".csv", root + "/GO/g1/enrichment/go_term_enrichment_top_" + Enrichment.cluster_names[i] + ".csv");
 				}
 				break;
 		}

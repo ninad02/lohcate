@@ -1,6 +1,6 @@
 package lohcateEnums;
 
-public enum SNVType {
+public enum MutationType {
 	NonSynonymous_SNV    ("nonsynonymous_SNV"),
 	Synonymous_SNV       ("synonymous_SNV"),
 	
@@ -27,11 +27,11 @@ public enum SNVType {
 	private String mUpperCase;
 	private String mPrintName;
 	
-	private SNVType() {
+	private MutationType() {
 		this(null);
 	}
 	
-	private SNVType(String printName) {
+	private MutationType(String printName) {
 		mLowerCase = name().toLowerCase();
 		mUpperCase = name().toUpperCase();
 		mPrintName = (printName == null) ? name() : printName;		
@@ -40,8 +40,8 @@ public enum SNVType {
 	public String toUpperCase() { return mUpperCase; }
 	public String toLowerCase() { return mLowerCase; }
 	
-	public static SNVType getSNVType(String snvType) {
-		for (SNVType enumType : values()) {
+	public static MutationType getSNVType(String snvType) {
+		for (MutationType enumType : values()) {
 			
 			if ( snvType.equalsIgnoreCase(enumType.name()) ||
 				 snvType.equalsIgnoreCase(enumType.mPrintName)) {
