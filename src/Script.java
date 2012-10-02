@@ -41,9 +41,9 @@ public class Script {
 	
 	private static final int REGION_SEGMENTATION_DIST_THRESHOLD = 2000000; //greatest possible distance between 2 'adjacent' points of LOH in a region of 'contiguous' LOH
 	
-	static final String GermlineSuffix = "." + VariantLocation.Germline.toLowerCase();	
-	static final String NovelStr  = "novel";	
-	static final String ChromPrefix = "chr";
+	public static final String GermlineSuffix = "." + VariantLocation.Germline.toLowerCase();	
+	public static final String NovelStr  = "novel";	
+	public static final String ChromPrefix = "chr";
 	public static final String MissingGeneNameValue = ".";
 	public static final float MaxVariantAlleleFrequency = 1.0f;
 	public static final String GenBrowserTrack = ".genBrowserTrack";
@@ -427,7 +427,6 @@ public class Script {
 		
 		double copyNumBase = (clusterType == ClusterType.Amp) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);		
 //		double log2RatioGisticCol = log2Ratio - 1.0;
-//		double log2CopyNum = Math.log10(copyNum) / Math.log10(2);
 //		double log2CopyNumGistic = log2CopyNum - 1.0;
 		
 		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);
@@ -442,6 +441,7 @@ public class Script {
 				boolean addPositiveError = (Math.random() >= 0.5);
 				double copyNum = copyNumBase + ((addPositiveError) ? errorFactor : -errorFactor);
 				double copyNumRatio = copyNum / DefaultDiploidCopyNumber;
+				double log2CopyNum = Math.log10(copyNum) / Math.log10(2);
 				double log2Ratio = Math.log10(copyNumRatio) / Math.log10(2);
 
 				
