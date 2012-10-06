@@ -104,12 +104,15 @@ public class DBScanFaster extends DBSCAN2 {
 					// within the block will then be within range of the point.  There is no need to test the
 					// block.points within the block.
 					
-					//addAll(neighbors, theBlock.mPointsInBlock);  // -- disable for now to allow for 3D clustering
-					for (DBScanPoint pointInBlock : theBlock.mPointsInBlock) {
-						if (point.getCartesianDistanceSquared(pointInBlock) <= mEpsilonSquared) {
-							neighbors.add(pointInBlock);
+					if (Clustering.Doing3D) {
+						for (DBScanPoint pointInBlock : theBlock.mPointsInBlock) {
+							if (point.getCartesianDistanceSquared(pointInBlock) <= mEpsilonSquared) {
+								neighbors.add(pointInBlock);
+							}						
 						}						
-					}
+					} else {
+						addAll(neighbors, theBlock.mPointsInBlock, true);
+					}					
 
 				} else if (numCornersInRange >= 1 && numCornersInRange < allCorners) {
 					// We must test each point within the block

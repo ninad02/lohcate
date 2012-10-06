@@ -70,7 +70,7 @@ public class DBSCAN2 {
 	 */
 	public void cluster() {
 		mClusterIndex = ClusterIDOfNoise; // start at default
-		ArrayList<DBScanPoint> neighbors = new ArrayList<DBScanPoint>(30000);
+		ArrayList<DBScanPoint> neighbors = new ArrayList<DBScanPoint>(3000000);
 		
 		for (DBScanPoint thePoint : mPoints) {				
 			if (!thePoint.getVisited()) { 
@@ -90,7 +90,7 @@ public class DBSCAN2 {
 	protected void expandCluster(DBScanPoint point, ArrayList<DBScanPoint> neighbors, int clusterIndex) {
 		point.mClusterAssigned = clusterIndex;   // assign our 'core' point to cluster c
 		
-		ArrayList<DBScanPoint> neighborsOfNeighbor = new ArrayList<DBScanPoint>(30000);		
+		ArrayList<DBScanPoint> neighborsOfNeighbor = new ArrayList<DBScanPoint>(3000000);		
 		
 		// We perform a loop on the neighbors list, which can grow 
 		// in size during the body of the loop.  Thus, neighbors list becomes
@@ -107,7 +107,7 @@ public class DBSCAN2 {
 				if (neighborsOfNeighbor.size() >= mMinPts) { //if neighbor's neighborhood is dense enough
 					//then let's iterate through them as well (they might be 'eligible' for inclusion in cluster c)
 					//addAllToNextPosition(iter, neighborsOfNeighbor);
-					addAll(neighbors, neighborsOfNeighbor);
+					addAll(neighbors, neighborsOfNeighbor, false);
 				}
 			}
 
@@ -119,9 +119,11 @@ public class DBSCAN2 {
 	
 	// We create this function because it is ironically more efficient than the ArrayList.addAll() method,
 	// which stupidly allocates memory to create an extra and needless temporary array in its implementaion.
-	public static void addAll(Collection<DBScanPoint> listToWhichToAdd, Collection<DBScanPoint> elementsToAdd) {
+	public static void addAll(Collection<DBScanPoint> listToWhichToAdd, Collection<DBScanPoint> elementsToAdd, boolean forceAdd) {
 		for (DBScanPoint element : elementsToAdd) {
-			listToWhichToAdd.add(element);
+			if (forceAdd || (element.mClusterAssigned == ClusterIDOfNoise)) {
+				listToWhichToAdd.add(element);
+			}
 		}
 	}
 	

@@ -52,19 +52,18 @@ public class Clustering {
 	private static final int NON_HET_BALL_MINPTS = 30;
 	
 	private static final int HET_BALL_MINPTS = 100; //DBSCAN parameters for HET ball / DUP wedge detection
-	private static final int DUP_WEDGE_MINPTS = 100;
-	
-	private static final float ClusterDiagonalLeeway = (float) 0.2;	
+	private static final int DUP_WEDGE_MINPTS = 100;	
 	
 	public static final boolean Doing3D = false;
 	
 	public static final boolean UsePValuePlane = true;	
 	
-	public static final boolean MultipleTestingCorrect = true;
+	public static final boolean MultipleTestingCorrect = false;
 	
 	private static final boolean AssignAmplifications = true;
 	
 	private static final boolean ForcePointsOnDiagonalAsNull = false;
+	private static final float ClusterDiagonalLeeway = (float) 0.2;	
 	
 	public static final float PValueBinDistAlpha_UpperPlaneThresh = 0.025f;
 	public static float ScalingFactor = 1.0f;
