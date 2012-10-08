@@ -111,7 +111,7 @@ public class DBScanFaster extends DBSCAN2 {
 							}						
 						}						
 					} else {
-						addAll(neighbors, theBlock.mPointsInBlock, true);
+						addAll(neighbors, theBlock.mPointsInBlock);
 					}					
 
 				} else if (numCornersInRange >= 1 && numCornersInRange < allCorners) {

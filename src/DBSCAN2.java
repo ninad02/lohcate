@@ -105,7 +105,7 @@ public class DBSCAN2 {
 			DBScanPoint theNeighbor = neighbors.get(i);
 
 			if (i % 10000 == 0) {
-				System.out.printf("Num Neighbors Processed (%d) out of %d for cluster: (%d)\n", i, mPoints.size(), clusterIndex);
+				System.out.printf("\tNum Neighbors Processed (%d) out of %d for cluster: (%d)\n", i, mPoints.size(), clusterIndex);
 			}
 			
 			if (!theNeighbor.getVisited()) {
@@ -117,8 +117,7 @@ public class DBSCAN2 {
 				if (neighborsOfNeighbor.size() >= mMinPts) { //if neighbor's neighborhood is dense enough
 					//then let's iterate through them as well (they might be 'eligible' for inclusion in cluster c)
 					//System.out.printf("Neighbors: %d, NeighborsToAdd: %d, Total: %d\n", neighbors.size(), neighborsOfNeighbor.size(), neighbors.size() + neighborsOfNeighbor.size());
-					//addAllToNextPosition(iter, neighborsOfNeighbor);
-					addAll(neighbors, neighborsOfNeighbor, false);
+					addAllElementsNotAlreadyAdded(neighbors, neighborsOfNeighbor);
 				}
 			}
 
@@ -127,18 +126,27 @@ public class DBSCAN2 {
 			}
 		}
 	}
+
+	// ========================================================================
+	// We create this function because it is ironically more efficient than the ArrayList.addAll() method,
+	// which stupidly allocates memory to create an extra and needless temporary array in its implementaion.
+	// This adds a point if it wasn't already added.
+	protected static void addAllElementsNotAlreadyAdded(Collection<DBScanPoint> listToWhichToAdd, Collection<DBScanPoint> elementsToAdd) {
+		for (DBScanPoint element : elementsToAdd) {
+			if (!element.mAdded) {
+				listToWhichToAdd.add(element);
+				element.mAdded = true;
+			}
+		}	
+	}
+	
 	
 	// ========================================================================
 	// We create this function because it is ironically more efficient than the ArrayList.addAll() method,
 	// which stupidly allocates memory to create an extra and needless temporary array in its implementaion.
-	public static void addAll(Collection<DBScanPoint> listToWhichToAdd, Collection<DBScanPoint> elementsToAdd, boolean forceAdd) {
+	public static void addAll(Collection<DBScanPoint> listToWhichToAdd, Collection<DBScanPoint> elementsToAdd) {
 		for (DBScanPoint element : elementsToAdd) {
-			//if (forceAdd || (element.mClusterAssigned == ClusterIDOfNoise)) {
-			if (forceAdd || !element.mAdded) {
-				listToWhichToAdd.add(element);
-				element.mAdded = true;
-			}
-			//}
+			listToWhichToAdd.add(element);
 		}
 	}
 	
