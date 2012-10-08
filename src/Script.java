@@ -1415,7 +1415,7 @@ public class Script {
 		switch (Integer.parseInt(args[1])) { //args[1] --> 'switchboard' parameter
 			case 0:
 				SeqPlatform platform = SeqPlatform.getPlatform(Integer.parseInt(args[2]));
-				Clustering.curateSNPCalls(root + File.separator + nafTafInptus, 
+				Clustering.classifySites(root + File.separator + nafTafInptus, 
 						       root + File.separator + classifiedSites, 
 						       root + File.separator + vafPlots, 
 						       platform); //args[2] --> 0::Illumina, 1::SOLiD

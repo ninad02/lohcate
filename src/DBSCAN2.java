@@ -26,13 +26,16 @@ public class DBSCAN2 {
 	protected int mMinPts; //neighborhood density parameter	
 	protected int mClusterIndex;
 	
+	// ========================================================================
 	public int getClusterIDOfNoise() { return ClusterIDOfNoise; }
 	
+	// ========================================================================
 	public DBSCAN2(ArrayList<Floint> points, float epsilon, int minPoints) {
 		this.mPoints = addPoints( points, new ArrayList<DBScanPoint>(points.size()) );
 		changeParams(epsilon, minPoints);
 	}
 	
+	// ========================================================================
 	/** Creates DBScanPoint object wrappers for the points. */
 	protected static ArrayList<DBScanPoint> addPoints(ArrayList<Floint> points, ArrayList<DBScanPoint> targetList) {
 		for (Floint floint : points) {
@@ -42,6 +45,7 @@ public class DBSCAN2 {
 		return targetList;
 	}
 	
+	// ========================================================================
 	/** Changes the parameter values
 	 *  @param newEpsilon   The new distance desired.  Enter a negative number for no change
 	 *  @param newMinPoints The new number of points required for density.  Enter a negative number for no change.
@@ -65,6 +69,7 @@ public class DBSCAN2 {
 		mClusterIndex = ClusterIDOfNoise;  // reset our cluster index
 	}
 	
+	// ========================================================================
 	/**
 	 * Clusters points[] using DBSCAN
 	 */
@@ -87,6 +92,7 @@ public class DBSCAN2 {
 		}
 	}
 	
+	// ========================================================================
 	protected void expandCluster(DBScanPoint point, ArrayList<DBScanPoint> neighbors, int clusterIndex) {
 		point.mClusterAssigned = clusterIndex;   // assign our 'core' point to cluster c
 		
@@ -98,6 +104,10 @@ public class DBSCAN2 {
 		for (int i = 0; i < neighbors.size(); i++) {
 			DBScanPoint theNeighbor = neighbors.get(i);
 
+			if (i % 10000 == 0) {
+				System.out.printf("Num Neighbors Processed (%d) out of %d for cluster: (%d)\n", i, mPoints.size(), clusterIndex);
+			}
+			
 			if (!theNeighbor.getVisited()) {
 				//count++;
 				//System.out.println(count);
@@ -106,6 +116,7 @@ public class DBSCAN2 {
 				neighborsOfNeighbor = getNeighbors(theNeighbor, neighborsOfNeighbor, true); //grab neighbor's neighbors
 				if (neighborsOfNeighbor.size() >= mMinPts) { //if neighbor's neighborhood is dense enough
 					//then let's iterate through them as well (they might be 'eligible' for inclusion in cluster c)
+					//System.out.printf("Neighbors: %d, NeighborsToAdd: %d, Total: %d\n", neighbors.size(), neighborsOfNeighbor.size(), neighbors.size() + neighborsOfNeighbor.size());
 					//addAllToNextPosition(iter, neighborsOfNeighbor);
 					addAll(neighbors, neighborsOfNeighbor, false);
 				}
@@ -117,16 +128,21 @@ public class DBSCAN2 {
 		}
 	}
 	
+	// ========================================================================
 	// We create this function because it is ironically more efficient than the ArrayList.addAll() method,
 	// which stupidly allocates memory to create an extra and needless temporary array in its implementaion.
 	public static void addAll(Collection<DBScanPoint> listToWhichToAdd, Collection<DBScanPoint> elementsToAdd, boolean forceAdd) {
 		for (DBScanPoint element : elementsToAdd) {
-			if (forceAdd || (element.mClusterAssigned == ClusterIDOfNoise)) {
+			//if (forceAdd || (element.mClusterAssigned == ClusterIDOfNoise)) {
+			if (forceAdd || !element.mAdded) {
 				listToWhichToAdd.add(element);
+				element.mAdded = true;
 			}
+			//}
 		}
 	}
 	
+	// ========================================================================
 	// We must add elements to a list this way if the iterator for that list has already been invoked.
 	// If we do not add elements to the list via the iterator, the iterator will throw an exception.
 	public static void addAllToNextPosition(ListIterator<DBScanPoint> iter, Collection<DBScanPoint> elementsToAdd) {
@@ -135,6 +151,7 @@ public class DBSCAN2 {
 		}
 	}
 	
+	// ========================================================================
 	protected ArrayList<DBScanPoint> getNeighbors(DBScanPoint point, ArrayList<DBScanPoint> neighbors, boolean clearList) {
 		neighbors = (neighbors == null) ? new ArrayList<DBScanPoint>(20000) : neighbors; 
 		if (clearList) { 
@@ -149,6 +166,7 @@ public class DBSCAN2 {
 		return neighbors;
 	}
 		
+	// ========================================================================
 	public int[] getClustAssignments() {
 		int[] thePoints = new int[mPoints.size()];
 		for (int i = 0; i < thePoints.length; i++) {
@@ -157,6 +175,7 @@ public class DBSCAN2 {
 		return thePoints;
 	}
 	
+	// ========================================================================
 	/**
 	 * Returns the value in clust_assignments[] that occurs most often
 	 */

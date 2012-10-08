@@ -164,7 +164,7 @@ public class Clustering {
 	 * @param inDir naf-taf-inputs
 	 * @param opt 0::Illumina, 1::SOLiD
 	 */
-	public static void curateSNPCalls(String inDir, String outDir, String vafComparisonPlotDir, SeqPlatform platform) {
+	public static void classifySites(String inDir, String outDir, String vafComparisonPlotDir, SeqPlatform platform) {
 		File[] files = (new File(inDir)).listFiles();
 		StringBuilder sb = new StringBuilder(8192);
 		Utils.FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionTSV;		
@@ -187,7 +187,9 @@ public class Clustering {
 				String somaticFilename = file.getAbsolutePath().replace(VariantLocation.Germline.toLowerCase(), VariantLocation.Somatic.toLowerCase());
 				ArrayList<String> somaticSpecificVariantRows  = FileOps.readAllLinesFromFile(somaticFilename);
 				ArrayList<String> germlineSpecificVariantRows = FileOps.readAllLinesFromFile(file.getAbsolutePath());
-
+				System.out.println("\tRead All Lines...");
+				System.out.printf("\tNum Sites Total: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());				
+				
 				String headerStringGermline = germlineSpecificVariantRows.get(0);
 				String headerStringSomatic  = somaticSpecificVariantRows.get(0);
 
@@ -195,7 +197,8 @@ public class Clustering {
 				// middle of a naf-taf-input file. we're just avoiding those
 				germlineSpecificVariantRows = Script.curateSNPCalls_removeHeaderLinesFromRows(germlineSpecificVariantRows);
 				somaticSpecificVariantRows  = Script.curateSNPCalls_removeHeaderLinesFromRows(somaticSpecificVariantRows);
-
+				System.out.printf("\tNum Sites Retained after Header and GC Removal: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
+				
 				// Create a combined set of rows
 				ArrayList<String> allVariantRows = new ArrayList<String>(germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
 				allVariantRows.addAll(germlineSpecificVariantRows);
@@ -205,6 +208,8 @@ public class Clustering {
 				//Collections.sort(germlineSpecificVariantRows, LineComparatorTab);
 				//Collections.sort(somaticSpecificVariantRows,  LineComparatorTab);
 				Collections.sort(allVariantRows,              Script.LineComparatorTab);
+				System.out.println("\tAll Sites Finished Sorting...");
+				
 
 				String outFilename = samplenameRoot + fileExtDelim.mExtension;
 				String outFilenameFullPath = outDir + File.separator + outFilename; 
@@ -216,6 +221,7 @@ public class Clustering {
 				float[] copyNumRatios = getRoughCopyNumberRatioPerSite(allVariantRows, getAvgCoverageRatioPerChrom(allVariantRows));
 				double[] imbalancePValues = Clustering.getPValuesTumorImbalance(allVariantRows);
 				ClusterType[] clusters = null;
+				System.out.println("\tInferred Copy Number and Allelic Imbalance Per Site...");
 				
 				if (UsePValuePlane) {
 					clusters = Clustering.getClusters_withPlane(allVariantRows, imbalancePValues, copyNumRatios, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
@@ -720,6 +726,8 @@ public class Clustering {
 				                    platform, 
 				                    vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper);		
 
+		System.out.printf("Points Lower Plane: %d\n", pointsLowerPlane.size());
+		System.out.printf("Points Upper Plane: %d\n", pointsUpperPlane.size());
 		System.out.println("Begin clustering algorithm: " + (new Date()).toString());
 
 		//DBScanFaster dbscanner = new DBScanFaster(points, HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
