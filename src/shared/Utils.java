@@ -470,11 +470,41 @@ public class Utils {
 		}
 	}
 	
+	public static int incrementNum(int x) { return x + 1; }
+	
+	public static void TestModularity() {
+		
+		long numIter = Integer.MAX_VALUE - 1;
+
+		for (int i = 0; i < 5000000; i++);
+
+		int x = 0;
+		long time3 = System.currentTimeMillis();
+		for (int i = 0; i < numIter; i++) {
+			x = incrementNum(x);
+		}
+		long time4 = System.currentTimeMillis();
+
+		
+		x = 0;
+		long time1 = System.currentTimeMillis();		
+		for (int i = 0; i < numIter; i++) {
+			x = x + 1;
+		}
+		long time2 = System.currentTimeMillis();
+		
+		
+		System.out.println("Time for no function:\t" + (time2 - time1));
+		System.out.println("Time for function:   \t" + (time4 - time3));
+	}
+	
+	
 	public static void main(String[] args) {
 		//Test_removeNullElements();
 		//Test_extractRsNumberFromLine();
 		//TestExtractNthColumn();
-		TestExtractNthColumnRobust();
+		//TestExtractNthColumnRobust();
+		TestModularity();
 	}
 	
 	// ========================================================================
