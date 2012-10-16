@@ -88,6 +88,12 @@ public class Utils {
 		return -1;
 	}
 	
+	/** Given a number of bits n, this returns a mask of length n up to 64 bits. */
+	public static final int NumBitsInLong = 64;
+	public static long getMask(int numBitsDesiredInMask) {				
+		return (numBitsDesiredInMask == 0 ? 0 : -1L >>> (NumBitsInLong - numBitsDesiredInMask));
+	}
+	
 	// ========================================================================
 	/** Given a target collection, this adds elements from the source collection at the end
 	 *  of the target collection.  We create this function because it is ironically more 
@@ -187,10 +193,14 @@ public class Utils {
 	 * @param targetList
 	 * @param numNewArraysToAdd
 	 */
-	public static<T> void addNewEmptyArrayLists(ArrayList<ArrayList<T>> targetList, int numNewArraysToAdd) {
+	public static<T> ArrayList<ArrayList<T>> addNewEmptyArrayLists(ArrayList<ArrayList<T>> targetList, int numNewArraysToAdd) {
+		targetList = (targetList == null) ? new ArrayList<ArrayList<T>>() : targetList;
+		
 		for (int i = 0; i < numNewArraysToAdd; i++) {
 			targetList.add(new ArrayList<T>());
 		}
+		
+		return targetList;
 	}
 	
 	// removes last n elements from the list

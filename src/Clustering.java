@@ -78,9 +78,10 @@ public class Clustering {
 		
 		//NAF {het, loh, dup} FRAME definition via peak detection and parameter-tuned standard deviation expansion
 		//we have to avoid the often hugely dense peak of homozygous mutations (AF > 0.8) and the occasionally hugely dense peak of neg. tail noise / somatics / &c. (AF < 0.2)
-		float mVAFNormalFrameLower = 0.2f;
-		float mVAFNormalFrameUpper = 0.8f; 
-		float mBinSize             = 0.025f; //smoothing parameter
+		public static float mVAFNormalFrameLower = 0.2f;
+		public static float mVAFNormalFrameUpper = 0.8f; 
+		public static float mBinSize             = 0.025f; //smoothing parameter
+		
 		int   mNumBins;
 		int[]   mBinCount;    // The bins in which counts are binned and stored
 		float[] mBinValue;    // The value each bin represents
@@ -164,14 +165,20 @@ public class Clustering {
 	 * @param inDir naf-taf-inputs
 	 * @param opt 0::Illumina, 1::SOLiD
 	 */
-	public static void classifySites(String inDir, String outDir, String vafComparisonPlotDir, SeqPlatform platform) {
+	public static void classifySites(String inDir, String allelicBiasInFile, String outDir, String vafComparisonPlotDir, SeqPlatform platform) {
 		File[] files = (new File(inDir)).listFiles();
 		StringBuilder sb = new StringBuilder(8192);
 		Utils.FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionTSV;		
 
+		// TODO -- make column names static constants
+		System.out.println("Reading Allelic Bias file...");
+		AllelicBiasTable allelicBiasTable = AllelicBiasTable.readFileAndConstructTable(allelicBiasInFile, 3, 4);
+		System.out.println("Finished Reading Allelic Bias file...");
+		
 		// Create output directory
 		IOUtils.createDirectoryPath(outDir, false);
 		IOUtils.createDirectoryPath(vafComparisonPlotDir, false);
+		
 
 		String[] columnHeaders = new String[] { "chr", "pos", "VAF_Normal", "VAF_Tumor", "dbsnp", "gene", "mutation_type", "germ_som", "cluster" };
 		String headerStr = Utils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();		
@@ -218,23 +225,28 @@ public class Clustering {
 				IOUtils.writeToBufferedWriter(out, headerStr, true);
 
 				// Now get the clusters
+				float[] adjustedVAFNormal = new float[allVariantRows.size()];
+				float[] adjustedVAFTumor  = new float[allVariantRows.size()];
+				calculateAdjustedVAFs(allVariantRows, allelicBiasTable, adjustedVAFNormal, adjustedVAFTumor, platform);
 				float[] copyNumRatios = getRoughCopyNumberRatioPerSite(allVariantRows, getAvgCoverageRatioPerChrom(allVariantRows));
 				double[] imbalancePValues = Clustering.getPValuesTumorImbalance(allVariantRows);
 				ClusterType[] clusters = null;
 				System.out.println("\tInferred Copy Number and Allelic Imbalance Per Site...");
 				
 				if (UsePValuePlane) {
-					clusters = Clustering.getClusters_withPlane(allVariantRows, imbalancePValues, copyNumRatios, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
+					clusters = Clustering.getClusters_withPlane(allVariantRows, imbalancePValues, copyNumRatios, adjustedVAFNormal, adjustedVAFTumor, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
 				} else {
 					clusters = Clustering.getClusters_Old(allVariantRows, imbalancePValues, copyNumRatios, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
 				}
 
-				boolean toPrintWithCopyNum = false;
+				boolean toPrintWithCopyNum = true;
 				if (toPrintWithCopyNum) {
 					PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
 					for (int r = 0; r < allVariantRows.size(); r++) {
 						outStream.print(allVariantRows.get(r));					
-						outStream.println("\t" + copyNumRatios[r] + "\t" + (copyNumRatios[r] * 2));
+						outStream.printf("\t%g\t%g", copyNumRatios[r], (copyNumRatios[r] * 2));  
+						outStream.printf("\t%g\t%g", adjustedVAFNormal[r], adjustedVAFTumor[r]);
+						outStream.println("");
 					}
 					IOUtils.closePrintStream(outStream);
 				}
@@ -398,6 +410,34 @@ public class Clustering {
 		return xyShapeRend;
 	}
 
+	// ========================================================================
+	private static void calculateAdjustedVAFs(ArrayList<String> rows, AllelicBiasTable allelicBiasTable, 
+											  float[] adjustedVAFNormal, float[] adjustedVAFTumor, SeqPlatform platform) {
+		
+		final float defaultVAFNormal = 0.50f;
+		String delim = Utils.FileExtensionTSV.mDelimiter;
+		
+		for (int row = 0; row < rows.size(); row++) {
+			String line = rows.get(row);
+			
+			Chrom chrom =      Chrom.getChrom( Utils.extractNthColumnValue(line, Script.Col_NAFTAFInput_Chrom,    delim) );
+			int position =   Integer.parseInt( Utils.extractNthColumnValue(line, Script.Col_NAFTAFInput_Position, delim) );
+			float vafNormal = extractVAFNormal(line, platform);
+			float vafTumor  = extractVAFTumor(line, platform);
+			
+			float adjustmentFactor = 1.0f;  // Default
+			if (Utils.inRangeLowerExclusive(vafNormal, AlleleFrequencyStatsForSample.mVAFNormalFrameLower, AlleleFrequencyStatsForSample.mVAFNormalFrameUpper)) {
+				float avgVAFNormal = allelicBiasTable.getAvgVAF(chrom, position);
+				if (avgVAFNormal > 0) {
+					// Site exists in table
+					adjustmentFactor = defaultVAFNormal / avgVAFNormal;					
+				}
+			}
+			
+			adjustedVAFNormal[row] = Math.min(vafNormal * adjustmentFactor, 0.999999f);			
+			adjustedVAFTumor[row]  = Math.min(vafTumor  * adjustmentFactor, 0.999999f);
+		}		
+	}
 	// ========================================================================
 	public static double[] getPValuesTumorImbalance(ArrayList<String> rows) {
 		double[] pValues = new double[rows.size()];
@@ -705,13 +745,16 @@ public class Clustering {
 	
 	
 	// ========================================================================
-	public static ClusterType[] getClusters_withPlane(ArrayList<String> rows, double[] imbalancePValues, float[] copyNumRatios, String outFilenameFullPath, int startingRowGermlineOrSomaticOrAll, SeqPlatform platform) {
+	public static ClusterType[] getClusters_withPlane(ArrayList<String> rows, double[] imbalancePValues, float[] copyNumRatios, float[] adjustedVAFNormal, float[] adjustedVAFTumor, String outFilenameFullPath, int startingRowGermlineOrSomaticOrAll, SeqPlatform platform) {
 
 		// Get the allele frequency statistics, and adjust the frames based on the resulting standard deviation
 		AlleleFrequencyStatsForSample afStatsSample = new AlleleFrequencyStatsForSample();
 		afStatsSample.tabulateAndPerformStatistics(rows, platform);
-		float vafNormalFrameAdjustedLower = afStatsSample.getValueNStandardDeviationsAway(-NAF_STRIP_EXPANDER); 								
-		float vafNormalFrameAdjustedUpper = afStatsSample.getValueNStandardDeviationsAway( NAF_STRIP_EXPANDER);
+		//float vafNormalFrameAdjustedLower = afStatsSample.getValueNStandardDeviationsAway(-NAF_STRIP_EXPANDER); 								
+		//float vafNormalFrameAdjustedUpper = afStatsSample.getValueNStandardDeviationsAway( NAF_STRIP_EXPANDER);
+		float vafNormalFrameAdjustedLower = AlleleFrequencyStatsForSample.mVAFNormalFrameLower; 								
+		float vafNormalFrameAdjustedUpper = AlleleFrequencyStatsForSample.mVAFNormalFrameUpper;
+
 
 		//apply DBScan to points within NAF frame
 		ArrayList<Floint> pointsUpperPlane = new ArrayList<Floint>();
@@ -722,7 +765,8 @@ public class Clustering {
 
 		getValidPointsForClustering(rows, pointsUpperPlane, pointsLowerPlane, indexMapToUpperLowerPlane, 
 				                    mapToRowsFromUpper, mapToRowsFromLower, 
-				                    imbalancePValues, ScalingFactor, copyNumRatios, 
+				                    imbalancePValues, ScalingFactor, copyNumRatios,
+				                    adjustedVAFNormal, adjustedVAFTumor, 
 				                    platform, 
 				                    vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper);		
 
@@ -931,7 +975,7 @@ public class Clustering {
 
 	// ========================================================================
 	// Convenience private function to break up caller function
-	static ClusterType[] assignClusters(ArrayList<String> rows, 
+	private static ClusterType[] assignClusters(ArrayList<String> rows, 
 			SeqPlatform platform,
 			//int startingRowSomatic,												
 			float vafBoundLower, 
@@ -1031,6 +1075,7 @@ public class Clustering {
 													IntArrayList mapToRowsFromLower,
 													double[] verticalFactor, double scalingFactor,
 													float[] copyNumRatios,
+													float[] adjustedVAFNormal, float[] adjustedVAFTumor, 
 													SeqPlatform platform, 
 													float vafBoundLower, float vafBoundUpper) {
 		
@@ -1038,11 +1083,12 @@ public class Clustering {
 		pointsLowerPlane.clear();
 		double alphaAdjusted = MultipleTestingCorrect ? 
 				(PValueBinDistAlpha_UpperPlaneThresh * 0.008 /* Light FDR */) : PValueBinDistAlpha_UpperPlaneThresh;
+				
 		for (int row = 0; row < rows.size(); row++) {
 			String line = rows.get(row);			
 			float vafNormal = Clustering.extractVAFNormal(line, platform);
 			if (Utils.inRangeLowerExclusive(vafNormal, vafBoundLower, vafBoundUpper)) {
-				Floint thePoint = new Floint(Clustering.extractVAFTumor(line, platform), vafNormal, (float) (verticalFactor[row] * scalingFactor));
+				Floint thePoint = new Floint(adjustedVAFTumor[row], adjustedVAFNormal[row], (float) (verticalFactor[row] * scalingFactor));
 				
 				// Assume p-value as vertical row factor
 				if (verticalFactor[row] <= alphaAdjusted && !isCopyNumInDiploidRange(copyNumRatios[row])) {
@@ -1072,8 +1118,9 @@ public class Clustering {
 	
 	// ========================================================================
 	// Convenience function 
-	static ArrayList<Floint> 
-	getValidPointsListForClustering(ArrayList<String> rows, double[] verticalFactor, double scalingFactor, SeqPlatform platform, float vafBoundLower, float vafBoundUpper) {
+	private static ArrayList<Floint> 
+		getValidPointsListForClustering(ArrayList<String> rows, double[] verticalFactor, double scalingFactor, SeqPlatform platform, float vafBoundLower, float vafBoundUpper) {
+		
 		ArrayList<Floint> points = new ArrayList<Floint>(rows.size());
 
 		for (int row = 0; row < rows.size(); row++) {
