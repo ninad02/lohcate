@@ -49,7 +49,7 @@ public class Clustering {
 	private static final float DUP_WEDGE_LASSO = 0.015f;
 	
 	private static final float NON_HET_BALL_EPS = 0.065f;
-	private static final int NON_HET_BALL_MINPTS = 30;
+	private static final int NON_HET_BALL_MINPTS = 50;
 	
 	private static final int HET_BALL_MINPTS = 100; //DBSCAN parameters for HET ball / DUP wedge detection
 	private static final int DUP_WEDGE_MINPTS = 100;	
@@ -58,7 +58,7 @@ public class Clustering {
 	
 	public static final boolean UsePValuePlane = true;	
 	
-	public static final boolean MultipleTestingCorrect = false;
+	public static final boolean MultipleTestingCorrect = true;
 	
 	private static final boolean AssignAmplifications = true;
 	
@@ -78,8 +78,8 @@ public class Clustering {
 		
 		//NAF {het, loh, dup} FRAME definition via peak detection and parameter-tuned standard deviation expansion
 		//we have to avoid the often hugely dense peak of homozygous mutations (AF > 0.8) and the occasionally hugely dense peak of neg. tail noise / somatics / &c. (AF < 0.2)
-		public static float mVAFNormalFrameLower = 0.2f;
-		public static float mVAFNormalFrameUpper = 0.8f; 
+		public static float mVAFNormalFrameLower = 0.1f;
+		public static float mVAFNormalFrameUpper = 0.9f; 
 		public static float mBinSize             = 0.025f; //smoothing parameter
 		
 		int   mNumBins;
@@ -273,8 +273,8 @@ public class Clustering {
 
 					String[] germCols = strRow.split(Utils.TabStr);
 
-					float vafNormal = Clustering.extractVAFNormal(germCols, platform);
-					float vafTumor  = Clustering.extractVAFTumor (germCols, platform);
+					float vafNormal = adjustedVAFNormal[i]; //Clustering.extractVAFNormal(germCols, platform);
+					float vafTumor  = adjustedVAFTumor[i]; //Clustering.extractVAFTumor (germCols, platform);
 					clusterCoordinates[ clusterType.ordinal() ][0][indexForClusterType] = vafTumor;
 					clusterCoordinates[ clusterType.ordinal() ][1][indexForClusterType] = vafNormal;
 
@@ -425,17 +425,30 @@ public class Clustering {
 			float vafNormal = extractVAFNormal(line, platform);
 			float vafTumor  = extractVAFTumor(line, platform);
 			
-			float adjustmentFactor = 1.0f;  // Default
+			float offset = 0.0f;  // Default
+			float adjustmentFactor = 1.0f;
 			if (Utils.inRangeLowerExclusive(vafNormal, AlleleFrequencyStatsForSample.mVAFNormalFrameLower, AlleleFrequencyStatsForSample.mVAFNormalFrameUpper)) {
 				float avgVAFNormal = allelicBiasTable.getAvgVAF(chrom, position);
 				if (avgVAFNormal > 0) {
 					// Site exists in table
-					adjustmentFactor = defaultVAFNormal / avgVAFNormal;					
+					adjustmentFactor = defaultVAFNormal / avgVAFNormal;
+					float absDiff = Math.abs(defaultVAFNormal - avgVAFNormal);
+					offset = (vafNormal > 0.50) ? -absDiff : ((vafNormal == 0) ? 0 : absDiff);					
 				}
 			}
 			
-			adjustedVAFNormal[row] = Math.min(vafNormal * adjustmentFactor, 0.999999f);			
-			adjustedVAFTumor[row]  = Math.min(vafTumor  * adjustmentFactor, 0.999999f);
+			boolean optionAdd = false;
+			if (optionAdd) {
+				adjustedVAFNormal[row] = vafNormal + offset;							
+				adjustedVAFTumor[row]  = vafTumor  + offset;				
+			} else {
+				adjustedVAFNormal[row] = vafNormal * adjustmentFactor;			
+				adjustedVAFTumor[row]  = vafTumor  * adjustmentFactor;				
+			}
+			
+			// Ensure within bounds
+			adjustedVAFNormal[row] = Math.min(1.0f, Math.max(0, adjustedVAFNormal[row]));							
+			adjustedVAFTumor[row]  = Math.min(1.0f, Math.max(0, adjustedVAFTumor[row]));
 		}		
 	}
 	// ========================================================================
@@ -790,20 +803,6 @@ public class Clustering {
 		clusterTypeIDsFromAlgorithm[ClusterType.HETGermline.ordinal()] = clusterIDofHetBall;
 		clusterTypeIDsFromAlgorithm[ClusterType.Noise.ordinal()] = dbscannerLowerPlane.getClusterIDOfNoise();
 
-
-		//		PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
-		//		for (int r = 0; r < rows.size(); r++) {
-		//			outStream.print(rows.get(r));
-		//			outStream.println("\t" + copyNumRatios[r] + "\t" + (copyNumRatios[r] * scalingFactor + "\t" + clusterAssign));
-		//		}
-		//		IOUtils.closePrintStream(outStream);
-
-		// Now, re-run DBScan, but with changed parameters		
-		//dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
-		//dbscanner.cluster();
-		//int clusterIDofHetBallWithWedge = dbscanner.getCentralClusterID();
-		//int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
-
 		// We now do a third pass, this time allowing only those points that are not part of the het cluster
 		// We then perform a lower neighbor threshold on these points so that they can be declared as LOH
 		ArrayList<Floint> nonHetPoints = new ArrayList<Floint>(pointsLowerPlane.size());
@@ -941,7 +940,7 @@ public class Clustering {
 						clusterAssignmentsNonHet[nonHetIndex] = 
 								(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
 					}
-					if (pointOnDiagonal(pointsLowerPlane.get(i), ClusterDiagonalLeeway)) {
+					if (ForcePointsOnDiagonalAsNull && pointOnDiagonal(pointsLowerPlane.get(i), ClusterDiagonalLeeway)) {
 						clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
 					} else {
 						clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];   
