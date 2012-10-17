@@ -164,6 +164,7 @@ public class Script {
 	
 	// ========================================================================
 	public static final float DefaultTumorNormalRatio = 1.0f;
+	public static final float DefaultNormalRatio = 1.0f;
 	public static final float TumorNormalRatioOfSomaticSite = -1.0f;
 
 	
