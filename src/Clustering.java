@@ -58,11 +58,14 @@ public class Clustering {
 	
 	public static final boolean UsePValuePlane = true;	
 	
+	public static final boolean CorrectAllelicBias = false;
 	public static final boolean UseBidrectionalAdditiveOffset = true;
 	
 	public static final boolean MultipleTestingCorrect = true;
 	
 	private static final boolean AssignAmplifications = true;
+	
+	
 	
 	private static final boolean ForcePointsOnDiagonalAsNull = false;
 	private static final float ClusterDiagonalLeeway = (float) 0.2;	
@@ -71,7 +74,7 @@ public class Clustering {
 	public static float ScalingFactor = 1.0f;
 	public static final float AmplificationThreshold = 2.5f;
 	
-	public static final float GermlineTrisomyThreshold = 1.5f;
+	public static final float GermlineTrisomyThreshold = Float.MAX_VALUE; // disable for now 1.5f;
 	
 	// ========================================================================
 	// INNER CLASS
@@ -82,8 +85,8 @@ public class Clustering {
 		
 		//NAF {het, loh, dup} FRAME definition via peak detection and parameter-tuned standard deviation expansion
 		//we have to avoid the often hugely dense peak of homozygous mutations (AF > 0.8) and the occasionally hugely dense peak of neg. tail noise / somatics / &c. (AF < 0.2)
-		public static float VAFNormalFrameLower = 0.1f;
-		public static float VAFNormalFrameUpper = 0.9f; 
+		public static float VAFNormalFrameLower = 0.2f;
+		public static float VAFNormalFrameUpper = 0.8f; 
 		public static float BinSize             = 0.025f; //smoothing parameter
 		
 		int   mNumBins;
@@ -176,7 +179,7 @@ public class Clustering {
 
 		// TODO -- make column names static constants
 		System.out.println("Reading Allelic Bias file...");
-		AllelicBiasTable allelicBiasTable = AllelicBiasTable.readFileAndConstructTable(allelicBiasInFile, 3, 4);
+		AllelicBiasTable allelicBiasTable = CorrectAllelicBias ? AllelicBiasTable.readFileAndConstructTable(allelicBiasInFile, 3, 4) : null;		
 		System.out.println("Finished Reading Allelic Bias file...");
 		
 		// Create output directory
@@ -450,15 +453,17 @@ public class Clustering {
 			float adjustmentFactor = 1.0f;
 			
 			// Perform adjustment calculations
-			if (Utils.inRangeLowerExclusive(vafNormal, AlleleFrequencyStatsForSample.VAFNormalFrameLower, AlleleFrequencyStatsForSample.VAFNormalFrameUpper)) {
-				boolean isGermlineChromGain = false; //copyNumRatioPerChromNormal[chrom.ordinal()] > GermlineTrisomyThreshold;
-				if (!isGermlineChromGain) {
-					float avgVAFNormal = allelicBiasTable.getAvgVAF(chrom, position);
-					if (avgVAFNormal > 0) {
-						// Site exists in table
-						adjustmentFactor = defaultVAFNormal / avgVAFNormal;
-						float absDiff = Math.abs(defaultVAFNormal - avgVAFNormal);
-						offset = (vafNormal > 0.50) ? -absDiff : ((vafNormal == defaultVAFNormal) ? 0 : absDiff);					
+			if (CorrectAllelicBias) {
+				if (Utils.inRangeLowerExclusive(vafNormal, AlleleFrequencyStatsForSample.VAFNormalFrameLower, AlleleFrequencyStatsForSample.VAFNormalFrameUpper)) {
+					boolean isGermlineChromGain = copyNumRatioPerChromNormal[chrom.ordinal()] > GermlineTrisomyThreshold;
+					if (!isGermlineChromGain) {
+						float avgVAFNormal = allelicBiasTable.getAvgVAF(chrom, position);
+						if (avgVAFNormal > 0) {
+							// Site exists in table
+							adjustmentFactor = defaultVAFNormal / avgVAFNormal;
+							float absDiff = Math.abs(defaultVAFNormal - avgVAFNormal);
+							offset = (vafNormal > 0.50) ? -absDiff : ((vafNormal == defaultVAFNormal) ? 0 : absDiff);					
+						}
 					}
 				}
 			}
@@ -805,10 +810,13 @@ public class Clustering {
 		// Get the allele frequency statistics, and adjust the frames based on the resulting standard deviation
 		AlleleFrequencyStatsForSample afStatsSample = new AlleleFrequencyStatsForSample();
 		afStatsSample.tabulateAndPerformStatistics(rows, platform);
-		//float vafNormalFrameAdjustedLower = afStatsSample.getValueNStandardDeviationsAway(-NAF_STRIP_EXPANDER); 								
-		//float vafNormalFrameAdjustedUpper = afStatsSample.getValueNStandardDeviationsAway( NAF_STRIP_EXPANDER);
-		float vafNormalFrameAdjustedLower = AlleleFrequencyStatsForSample.VAFNormalFrameLower; 								
-		float vafNormalFrameAdjustedUpper = AlleleFrequencyStatsForSample.VAFNormalFrameUpper;
+		float vafNormalFrameAdjustedLower = afStatsSample.getValueNStandardDeviationsAway(-NAF_STRIP_EXPANDER); 								
+		float vafNormalFrameAdjustedUpper = afStatsSample.getValueNStandardDeviationsAway( NAF_STRIP_EXPANDER);
+		
+		if (CorrectAllelicBias) {
+			vafNormalFrameAdjustedLower = AlleleFrequencyStatsForSample.VAFNormalFrameLower; 								
+			vafNormalFrameAdjustedUpper = AlleleFrequencyStatsForSample.VAFNormalFrameUpper;
+		}
 
 
 		//apply DBScan to points within NAF frame
