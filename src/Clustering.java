@@ -58,7 +58,7 @@ public class Clustering {
 	
 	public static final boolean UsePValuePlane = true;	
 	
-	public static final boolean CorrectAllelicBias = false;
+	public static final boolean CorrectAllelicBias = true;
 	public static final boolean UseBidrectionalAdditiveOffset = true;
 	
 	public static final boolean MultipleTestingCorrect = true;
@@ -85,8 +85,8 @@ public class Clustering {
 		
 		//NAF {het, loh, dup} FRAME definition via peak detection and parameter-tuned standard deviation expansion
 		//we have to avoid the often hugely dense peak of homozygous mutations (AF > 0.8) and the occasionally hugely dense peak of neg. tail noise / somatics / &c. (AF < 0.2)
-		public static float VAFNormalFrameLower = 0.2f;
-		public static float VAFNormalFrameUpper = 0.8f; 
+		public static float VAFNormalFrameLower = CorrectAllelicBias ? 0.1f : 0.2f;
+		public static float VAFNormalFrameUpper = CorrectAllelicBias ? 0.9f : 0.8f; 
 		public static float BinSize             = 0.025f; //smoothing parameter
 		
 		int   mNumBins;
