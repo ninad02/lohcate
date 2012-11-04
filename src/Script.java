@@ -97,22 +97,58 @@ public class Script {
 	private static final int ColCuratedTSV_VariantLocation = 7;
 	private static final int ColCuratedTSV_Cluster = 8;
 	
+	private static final int MaxWindowLength = 100;
+	private static final int MaxSitesInWindowAllowed = 3;
+	
 	public static final GenomicCoordinateComparatorInTextFileLine LineComparatorTab = new GenomicCoordinateComparatorInTextFileLine();
 	
-	static ArrayList<String> curateSNPCalls_removeHeaderLinesFromRows(ArrayList<String> rows) {		
+	static ArrayList<String> curateSNPCalls_removeHeaderLinesFromRows(ArrayList<String> rows) {
+		int windowPositionStart = 0;
+		int windowRowStart = -1;
+		Chrom chromPrev = Chrom.c0;
+		int numSitesRemoved = 0;
+		
 		for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
 			String row = rows.get(rowIndex);
 			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0) {
 				rows.set(rowIndex, null);
 			} else {
 				// Do some light GC filtering
-				String gcString = Utils.extractNthColumnValue(row, Col_NAFTAFInput_FlankingStringTumor, Utils.FileExtensionTSV.mDelimiter); 
+				Chrom chrom = Chrom.getChrom(    Utils.extractNthColumnValue(row, Script.Col_NAFTAFInput_Chrom,               Utils.FileExtensionTSV.mDelimiter));
+				int position = Integer.parseInt( Utils.extractNthColumnValue(row, Script.Col_NAFTAFInput_Position,            Utils.FileExtensionTSV.mDelimiter));
+				String gcString =                Utils.extractNthColumnValue(row,        Col_NAFTAFInput_FlankingStringTumor, Utils.FileExtensionTSV.mDelimiter);
+				
+				if (chrom != chromPrev) {
+					windowPositionStart = position;
+					windowRowStart = rowIndex;
+					chromPrev = chrom;
+				} else if ((position - windowPositionStart) <= MaxWindowLength) {
+					int numSitesSpanned = rowIndex - windowRowStart + 1;
+					if (numSitesSpanned > MaxSitesInWindowAllowed) {
+						for (int rowToClean = windowRowStart; rowToClean <= rowIndex; rowToClean++) {
+							System.out.println("Removing:\t" + row);
+							rows.set(rowToClean, null);
+							numSitesRemoved++;
+						}
+						windowRowStart = rowIndex;
+						windowPositionStart = position;
+					}					
+				} else {
+					windowRowStart = rowIndex;
+					windowPositionStart = position;
+				}
+				
 				double fractionGCNormal = Utils.calcFractionGC(gcString);
 				if ((fractionGCNormal < GCContentThresholdLow) || (fractionGCNormal >= GCContentThresholdHigh)) {
-					rows.set(rowIndex, null);
+					//rows.set(rowIndex, null);
+				} else {
+					
 				}
+				// We also do some filtering regions with high density germline variants, which
+				// would suggest mapping errors rather than true germline variants.
 			}
 		}
+		System.out.println("\tNum Sites Removed in Windows: " + numSitesRemoved);
 		return Utils.removeNullElements(rows);		
 	}
 	
