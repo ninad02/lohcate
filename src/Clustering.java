@@ -59,7 +59,7 @@ public class Clustering {
 	
 	public static final boolean UsePValuePlane = true;	
 	
-	public static final boolean CorrectAllelicBias = true;
+	public static final boolean CorrectAllelicBias = false;
 	public static final boolean UseBidrectionalAdditiveOffset = true;
 	
 	public static final boolean MultipleTestingCorrect = true;
@@ -75,7 +75,7 @@ public class Clustering {
 	public static float ScalingFactor = 1.0f;
 	public static final float AmplificationThreshold = 2.5f;
 	
-	public static final float GermlineTrisomyThreshold = 1.4f; //Float.MAX_VALUE; // disable for now 1.5f;
+	public static final float GermlineTrisomyThreshold = 9.4f; //Float.MAX_VALUE; // disable for now 1.5f;
 	public static final float ExpectedVAFNormalTrisomy = 2.0f / 3.0f;
 	
 	// ========================================================================
