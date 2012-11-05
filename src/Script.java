@@ -88,23 +88,23 @@ public class Script {
 	private static final double GCContentThresholdHigh = 0.80;
 	
 	// Column constants for the curated TSV files (files that have a cluster column)
-	private static final int ColCuratedTSV_Chrom = 0;
+	private static final int ColCuratedTSV_Chrom    = 0;
 	private static final int ColCuratedTSV_Position = 1;
 	//private static final int ColCuratedTSV_VariantBaseTumor = 2;
 	private static final int ColCuratedTSV_VafTumor = 3;
-	private static final int ColCuratedTSV_Gene = 5;
+	private static final int ColCuratedTSV_Gene     = 5;
 	private static final int ColCuratedTSV_MutationType = 6;
 	private static final int ColCuratedTSV_VariantLocation = 7;
 	private static final int ColCuratedTSV_Cluster = 8;
 	
-	private static final int MaxWindowLength = 100;
+	private static final int MaxWindowLength = 1000;
 	private static final int MaxSitesInWindowAllowed = 3;
 	
 	public static final GenomicCoordinateComparatorInTextFileLine LineComparatorTab = new GenomicCoordinateComparatorInTextFileLine();
 	
 	static ArrayList<String> curateSNPCalls_removeHeaderLinesFromRows(ArrayList<String> rows) {
 		int windowPositionStart = 0;
-		int windowRowStart = -1;
+		int windowRowStart = 0;
 		Chrom chromPrev = Chrom.c0;
 		int numSitesRemoved = 0;
 		
@@ -118,34 +118,27 @@ public class Script {
 				int position = Integer.parseInt( Utils.extractNthColumnValue(row, Script.Col_NAFTAFInput_Position,            Utils.FileExtensionTSV.mDelimiter));
 				String gcString =                Utils.extractNthColumnValue(row,        Col_NAFTAFInput_FlankingStringTumor, Utils.FileExtensionTSV.mDelimiter);
 				
-				if (chrom != chromPrev) {
-					windowPositionStart = position;
-					windowRowStart = rowIndex;
-					chromPrev = chrom;
-				} else if ((position - windowPositionStart) <= MaxWindowLength) {
-					int numSitesSpanned = rowIndex - windowRowStart + 1;
+				int posDiff = position - windowPositionStart;
+				
+				if ((chrom != chromPrev) || (posDiff >= MaxWindowLength)) {
+					int numSitesSpanned = (rowIndex - 1) - windowRowStart + 1;
 					if (numSitesSpanned > MaxSitesInWindowAllowed) {
-						for (int rowToClean = windowRowStart; rowToClean <= rowIndex; rowToClean++) {
-							System.out.println("Removing:\t" + row);
+						for (int rowToClean = windowRowStart; rowToClean < rowIndex; rowToClean++) {
+							//System.out.println("Removing:\t" + rows.get(rowToClean));
 							rows.set(rowToClean, null);
 							numSitesRemoved++;
 						}
-						windowRowStart = rowIndex;
-						windowPositionStart = position;
-					}					
-				} else {
-					windowRowStart = rowIndex;
+					}	
+
 					windowPositionStart = position;
-				}
+					windowRowStart = rowIndex;
+					chromPrev = chrom;
+				} 
 				
 				double fractionGCNormal = Utils.calcFractionGC(gcString);
 				if ((fractionGCNormal < GCContentThresholdLow) || (fractionGCNormal >= GCContentThresholdHigh)) {
-					//rows.set(rowIndex, null);
-				} else {
-					
+					rows.set(rowIndex, null);
 				}
-				// We also do some filtering regions with high density germline variants, which
-				// would suggest mapping errors rather than true germline variants.
 			}
 		}
 		System.out.println("\tNum Sites Removed in Windows: " + numSitesRemoved);

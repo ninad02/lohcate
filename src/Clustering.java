@@ -59,7 +59,7 @@ public class Clustering {
 	
 	public static final boolean UsePValuePlane = true;	
 	
-	public static final boolean CorrectAllelicBias = false;
+	public static final boolean CorrectAllelicBias = true;
 	public static final boolean UseBidrectionalAdditiveOffset = true;
 	
 	public static final boolean MultipleTestingCorrect = true;
@@ -75,7 +75,7 @@ public class Clustering {
 	public static float ScalingFactor = 1.0f;
 	public static final float AmplificationThreshold = 2.5f;
 	
-	public static final float GermlineTrisomyThreshold = 9.4f; //Float.MAX_VALUE; // disable for now 1.5f;
+	public static final float GermlineTrisomyThreshold = 1.48f; //9.4f; //Float.MAX_VALUE; // disable for now 1.5f;
 	public static final float ExpectedVAFNormalTrisomy = 2.0f / 3.0f;
 	
 	// ========================================================================
@@ -922,7 +922,7 @@ public class Clustering {
 				clusterAssignmentsUpperPlane[ind] = clusterTypeIDsFromAlgorithm[ClusterType.Amp.ordinal()];
 			} else {
 				if (ForcePointsOnDiagonalAsNull) {
-					if (pointOnDiagonal(pointsUpperPlane.get(ind), ClusterDiagonalLeeway)) {
+					if (pointOnDiagonal(pointsUpperPlane.get(ind), ClusterDiagonalLeeway) && isCopyNumInDiploidRange(copyNum)) {
 						clusterAssignmentsUpperPlane[ind] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
 					}
 				}
@@ -1126,7 +1126,7 @@ public class Clustering {
 				Floint thePoint = new Floint(adjustedVAFTumor[row], adjustedVAFNormal[row], (float) (verticalFactor[row] * scalingFactor));
 				
 				// Assume p-value as vertical row factor
-				boolean tumorSigImbalanced = (verticalFactor[row] <= alphaAdjusted) && !isCopyNumInDiploidRange(copyNumRatios[row]) ;
+				boolean tumorSigImbalanced = (verticalFactor[row] <= alphaAdjusted); // && !isCopyNumRatioInDiploidRange(copyNumRatios[row]);
 				Chrom chrom = Chrom.getChrom( Utils.extractNthColumnValue(line, Script.Col_NAFTAFInput_Chrom,    Utils.FileExtensionTSV.mDelimiter) );
 				boolean normalSigImbalanced = (imbalancePValuesNormal[row] <= alphaAdjusted) && (copyNumRatioPerChromNormal[chrom.ordinal()] > GermlineTrisomyThreshold);
 				
@@ -1147,12 +1147,17 @@ public class Clustering {
 			}
 		}
 	}
+
+	// ========================================================================
+	private static boolean isCopyNumInDiploidRange(float copyNum) {
+		float threshold = 0.2f;
+		return ((Script.DefaultDiploidCopyNumber - threshold) < copyNum && copyNum < (Script.DefaultDiploidCopyNumber + threshold));		
+	}
 	
 	// ========================================================================
-	private static boolean isCopyNumInDiploidRange(float copyNumRatio) {
+	private static boolean isCopyNumRatioInDiploidRange(float copyNumRatio) {
 		float copyNum = copyNumRatio * Script.DefaultDiploidCopyNumber;
-		float threshold = 0.2f;
-		return ((Script.DefaultDiploidCopyNumber - threshold) < copyNum && copyNum < (Script.DefaultDiploidCopyNumber + threshold));
+		return isCopyNumInDiploidRange(copyNum);
 	}
 	
 	// ========================================================================
