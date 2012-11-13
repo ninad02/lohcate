@@ -28,7 +28,11 @@ import org.jfree.data.xy.DefaultXYDataset;
 import org.jfree.data.xy.XYDataset;
 
 import com.carrotsearch.hppc.IntArrayList;
+import com.martiansoftware.jsap.FlaggedOption;
+import com.martiansoftware.jsap.JSAP;
+import com.martiansoftware.jsap.JSAPResult;
 
+import shared.ArgumentParserUtils;
 import shared.ArrayUtils;
 import shared.FileOps;
 import shared.GraphUtils;
@@ -55,28 +59,115 @@ public class Clustering {
 	private static final int HET_BALL_MINPTS = 100; //DBSCAN parameters for HET ball / DUP wedge detection
 	private static final int DUP_WEDGE_MINPTS = 100;	
 	
-	public static final boolean Doing3D = false;
-	
+	public static final boolean Doing3D = false;	
 	public static final boolean UsePValuePlane = true;	
-	
-	public static final boolean CorrectAllelicBias = true;
-	public static final boolean UseBidrectionalAdditiveOffset = true;
-	
-	public static final boolean MultipleTestingCorrect = true;
-	
-	private static final boolean AssignAmplifications = true;
-	
-	
+		
+	public static final boolean UseBidrectionalAdditiveOffset = true;	
 	
 	private static final boolean ForcePointsOnDiagonalAsNull = true;
 	private static final float ClusterDiagonalLeeway = (float) 0.2;	
 	
 	public static final float PValueBinDistAlpha_UpperPlaneThresh = 0.025f;
-	public static float ScalingFactor = 1.0f;
-	public static final float AmplificationThreshold = 2.5f;
-	
-	public static final float GermlineTrisomyThreshold = 1.48f; //9.4f; //Float.MAX_VALUE; // disable for now 1.5f;
+	public static float ScalingFactor = 1.0f;			
 	public static final float ExpectedVAFNormalTrisomy = 2.0f / 3.0f;
+	
+	public static boolean correctAllelicBias() { return !ParamsBool.IgnoreAllelicBias.getValue(); } 
+	
+	// ========================================================================
+	// PARAMETER Registration
+	// ========================================================================
+	
+	public static enum ParamsNum {
+		AmplificationThreshold(2.2f, 'a', "ampThresh"),
+		DeletionThreshold     (1.8f, 'd', "delThresh"),
+		GermlineTrisomyThreshold(1.48f, JSAP.NO_SHORTFLAG, "germlineAneuploidyGainThreshold")
+		;
+		
+		private Number mDefaultValue;
+		private Number mValue;
+		private char mFlagShort;
+		private String mFlagLong;
+		
+		private ParamsNum(Number defaultValue, char flagShort, String flagLong) {
+			mValue = mDefaultValue = defaultValue;
+			mFlagShort = flagShort;
+			mFlagLong  = flagLong;
+		}
+		
+		public Number getValue() { return mValue; } 
+		public Number getDefault() { return mDefaultValue; }
+		public char getShortFlag() { return mFlagShort; }
+		public String getLongFlag() { return mFlagLong; }
+		public void setValue(Number theValue) { mValue = theValue; }
+		
+	}
+	
+	// ========================================================================
+	public static enum ParamsBool {
+		IgnoreAllelicBias(false, JSAP.NO_SHORTFLAG, "ignoreAllelicBias"),
+		IgnoreMultipleTesting(false, JSAP.NO_SHORTFLAG, "ignoreMultipleTesting")
+		;
+		
+		private boolean mValue;
+		private boolean mDefaultValue;
+		private char mFlagShort;
+		private String mFlagLong;
+
+		private ParamsBool(boolean defaultValue, char flagShort, String flagLong) {
+			mValue = mDefaultValue = defaultValue;
+			mFlagShort = flagShort;
+			mFlagLong  = flagLong;
+		}
+		
+		public boolean getValue() { return mValue; } 
+		public boolean getDefault() { return mDefaultValue; }
+		public char getShortFlag() { return mFlagShort; }
+		public String getLongFlag() { return mFlagLong; }
+		public void setValue(boolean value) { mValue = value; }
+	}
+	
+	
+	// ========================================================================
+	public static JSAP registerClusteringParameters(JSAP jsap) {
+		jsap = (jsap == null) ? new JSAP() : jsap;
+		
+		//ArgumentParserUtils.createSwitch(ParamsBool.IgnoreAllelicBias.name(), ParamsBool.IgnoreAllelicBias.getShortFlag(), ParamsBool.IgnoreAllelicBias.getLongFlag(), "Specifies whether allelic bias is to be ignored and not corrected", jsap);
+		ArgumentParserUtils.createSwitch(ParamsBool.IgnoreMultipleTesting.name(), ParamsBool.IgnoreMultipleTesting.getShortFlag(), ParamsBool.IgnoreMultipleTesting.getLongFlag(), "Specifies whether multiple testing correction is not to be done", jsap);
+		
+		FlaggedOption ampThreshold = new FlaggedOption(
+				ParamsNum.AmplificationThreshold.name()).setStringParser(JSAP.DOUBLE_PARSER)
+				.setDefault(ParamsNum.AmplificationThreshold.getDefault().toString())
+				.setShortFlag(ParamsNum.AmplificationThreshold.getShortFlag())
+				.setLongFlag(ParamsNum.AmplificationThreshold.getLongFlag())
+				.setUsageName("Copy_Number_Threshold_for_Amplification");
+		ArgumentParserUtils.registerJSAPParameter(jsap, ampThreshold);
+		
+		FlaggedOption delThreshold = new FlaggedOption(
+				ParamsNum.DeletionThreshold.name()).setStringParser(JSAP.DOUBLE_PARSER)
+				.setDefault(ParamsNum.DeletionThreshold.getDefault().toString())
+				.setShortFlag(ParamsNum.DeletionThreshold.getShortFlag())
+				.setLongFlag(ParamsNum.DeletionThreshold.getLongFlag())
+				.setUsageName("Copy_Number_Threshold_for_Deletion");
+		ArgumentParserUtils.registerJSAPParameter(jsap, delThreshold);
+
+
+		FlaggedOption germlineChromGainThreshold = new FlaggedOption(
+				ParamsNum.GermlineTrisomyThreshold.name()).setStringParser(JSAP.DOUBLE_PARSER)
+				.setDefault(ParamsNum.GermlineTrisomyThreshold.getDefault().toString())
+				.setShortFlag(ParamsNum.GermlineTrisomyThreshold.getShortFlag())
+				.setLongFlag(ParamsNum.GermlineTrisomyThreshold.getLongFlag())
+				.setUsageName("Copy_Number_Threshold_for_Germline_Chromosomal_Gain");
+		ArgumentParserUtils.registerJSAPParameter(jsap, germlineChromGainThreshold);		
+		
+		return jsap;
+	}
+	
+	// ========================================================================
+	public static void configureParameters(JSAPResult config) {
+		ParamsNum.AmplificationThreshold.setValue(  config.getDouble(ParamsNum.AmplificationThreshold.name()));
+		ParamsNum.GermlineTrisomyThreshold.setValue(config.getDouble(ParamsNum.GermlineTrisomyThreshold.name()));
+		//ParamsBool.IgnoreAllelicBias.setValue(     config.getBoolean(ParamsBool.IgnoreAllelicBias.name()));
+	}
 	
 	// ========================================================================
 	// INNER CLASS
@@ -87,8 +178,8 @@ public class Clustering {
 		
 		//NAF {het, loh, dup} FRAME definition via peak detection and parameter-tuned standard deviation expansion
 		//we have to avoid the often hugely dense peak of homozygous mutations (AF > 0.8) and the occasionally hugely dense peak of neg. tail noise / somatics / &c. (AF < 0.2)
-		public static float VAFNormalFrameLower = CorrectAllelicBias ? 0.1f : 0.2f;
-		public static float VAFNormalFrameUpper = CorrectAllelicBias ? 0.9f : 0.8f; 
+		public static float VAFNormalFrameLower = correctAllelicBias() ? 0.1f : 0.2f;
+		public static float VAFNormalFrameUpper = correctAllelicBias() ? 0.9f : 0.8f; 
 		public static float BinSize             = 0.025f; //smoothing parameter
 		
 		int   mNumBins;
@@ -181,7 +272,7 @@ public class Clustering {
 
 		// TODO -- make column names static constants
 		System.out.println("Reading Allelic Bias file...");
-		AllelicBiasTable allelicBiasTable = CorrectAllelicBias ? AllelicBiasTable.readFileAndConstructTable(allelicBiasInFile, 3, 4) : null;		
+		AllelicBiasTable allelicBiasTable = correctAllelicBias() ? AllelicBiasTable.readFileAndConstructTable(allelicBiasInFile, 3, 4) : null;		
 		System.out.println("Finished Reading Allelic Bias file...");
 		
 		// Create output directory
@@ -457,9 +548,9 @@ public class Clustering {
 			float adjustmentFactor = 1.0f;
 			
 			// Perform adjustment calculations
-			if (CorrectAllelicBias) {
+			if (correctAllelicBias()) {
 				if (Utils.inRangeLowerExclusive(vafNormal, AlleleFrequencyStatsForSample.VAFNormalFrameLower, AlleleFrequencyStatsForSample.VAFNormalFrameUpper)) {
-					boolean isGermlineChromGain = copyNumRatioPerChromNormal[chrom.ordinal()] > GermlineTrisomyThreshold;
+					boolean isGermlineChromGain = copyNumRatioPerChromNormal[chrom.ordinal()] > ParamsNum.GermlineTrisomyThreshold.getValue().doubleValue();
 					float avgVAFNormal = allelicBiasTable.getAvgVAF(chrom, position);
 					if (avgVAFNormal > 0) {
 						// Site exists in table
@@ -837,7 +928,7 @@ public class Clustering {
 		float vafNormalFrameAdjustedLower = afStatsSample.getValueNStandardDeviationsAway(-NAF_STRIP_EXPANDER); 								
 		float vafNormalFrameAdjustedUpper = afStatsSample.getValueNStandardDeviationsAway( NAF_STRIP_EXPANDER);
 		
-		if (CorrectAllelicBias) {
+		if (correctAllelicBias()) {
 			vafNormalFrameAdjustedLower = AlleleFrequencyStatsForSample.VAFNormalFrameLower; 								
 			vafNormalFrameAdjustedUpper = AlleleFrequencyStatsForSample.VAFNormalFrameUpper;
 		}
@@ -912,13 +1003,13 @@ public class Clustering {
 			int indexIntoOriginalRows = mapToRowsFromUpper.get(ind);
 			float copyNum = copyNumRatios[indexIntoOriginalRows] * Script.DefaultDiploidCopyNumber;
 			
-			if (AssignAmplifications && (copyNum > AmplificationThreshold)) {
+			if (copyNum > ParamsNum.AmplificationThreshold.getValue().doubleValue()) {
 				clusterAssignmentsUpperPlane[ind] = clusterTypeIDsFromAlgorithm[ClusterType.Amp.ordinal()];
 			}
 			
 			String line = rows.get(indexIntoOriginalRows);
 			Chrom chrom = Chrom.getChrom( Utils.extractNthColumnValue(line, Script.Col_NAFTAFInput_Chrom,    Utils.FileExtensionTSV.mDelimiter) );
-			if (copyNumRatioPerChromNormal[chrom.ordinal()] > GermlineTrisomyThreshold) {
+			if (copyNumRatioPerChromNormal[chrom.ordinal()] > ParamsNum.GermlineTrisomyThreshold.getValue().doubleValue()) {
 				clusterAssignmentsUpperPlane[ind] = clusterTypeIDsFromAlgorithm[ClusterType.Amp.ordinal()];
 			} else {
 				if (ForcePointsOnDiagonalAsNull) {
@@ -1115,8 +1206,9 @@ public class Clustering {
 		
 		pointsUpperPlane.clear();
 		pointsLowerPlane.clear();
-		double alphaAdjusted = MultipleTestingCorrect ? 
-				(PValueBinDistAlpha_UpperPlaneThresh * 0.008 /* Light FDR */) : PValueBinDistAlpha_UpperPlaneThresh;
+		double alphaAdjusted = ParamsBool.IgnoreMultipleTesting.getValue() ? 
+				 PValueBinDistAlpha_UpperPlaneThresh :
+				(PValueBinDistAlpha_UpperPlaneThresh * 0.008 /* Light FDR */);
 				
 		for (int row = 0; row < rows.size(); row++) {
 			String line = rows.get(row);			
@@ -1128,7 +1220,7 @@ public class Clustering {
 				// Assume p-value as vertical row factor
 				boolean tumorSigImbalanced = (verticalFactor[row] <= alphaAdjusted); // && !isCopyNumRatioInDiploidRange(copyNumRatios[row]);
 				Chrom chrom = Chrom.getChrom( Utils.extractNthColumnValue(line, Script.Col_NAFTAFInput_Chrom,    Utils.FileExtensionTSV.mDelimiter) );
-				boolean normalSigImbalanced = (imbalancePValuesNormal[row] <= alphaAdjusted) && (copyNumRatioPerChromNormal[chrom.ordinal()] > GermlineTrisomyThreshold);
+				boolean normalSigImbalanced = (imbalancePValuesNormal[row] <= alphaAdjusted) && (copyNumRatioPerChromNormal[chrom.ordinal()] > ParamsNum.GermlineTrisomyThreshold.getValue().doubleValue());
 				
 				if (tumorSigImbalanced || normalSigImbalanced) {
 					indexMapToUpperLowerPlane[row] =  pointsUpperPlane.size();
@@ -1150,8 +1242,7 @@ public class Clustering {
 
 	// ========================================================================
 	private static boolean isCopyNumInDiploidRange(float copyNum) {
-		float threshold = 0.2f;
-		return ((Script.DefaultDiploidCopyNumber - threshold) < copyNum && copyNum < (Script.DefaultDiploidCopyNumber + threshold));		
+		return (ParamsNum.DeletionThreshold.getValue().doubleValue() < copyNum) && (copyNum < ParamsNum.AmplificationThreshold.getValue().doubleValue());		
 	}
 	
 	// ========================================================================

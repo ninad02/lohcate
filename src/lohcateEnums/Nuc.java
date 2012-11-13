@@ -14,6 +14,7 @@ public enum Nuc implements Comparable<Nuc> {
 	// ============ MEMBER VARIABLES ==============
 	public final byte mCode;
 	final char mChar;
+	final String mString;
 	
 	// ========================================================================
 	/** Returns the number of valid allele types. */
@@ -53,6 +54,7 @@ public enum Nuc implements Comparable<Nuc> {
 	private Nuc(int code, char charValue) {
 		mCode = (byte) code;
 		mChar = charValue;
+		mString = "" + charValue;
 	}
 	
 	// ========================================================================
@@ -60,6 +62,9 @@ public enum Nuc implements Comparable<Nuc> {
 	
 	// ========================================================================
 	public char getChar() { return mChar; }
+	
+	// ========================================================================
+	public String getString() { return mString; } 
 	
 	// ========================================================================
 	/** Returns whether this is the null allele or not. */
@@ -83,6 +88,8 @@ public enum Nuc implements Comparable<Nuc> {
 	// ========================================================================
 	/** Returns the complement of this nucleotide. */
 	public Nuc getComplement() {
+		if (isNull()) return this;
+		
 		return getAllele(Nuc.numValid() - 1 - getCode());		
 	}
 

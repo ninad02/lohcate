@@ -35,11 +35,28 @@ public class NumberUtils {
 		return result;
 	}
 	
+
+	// ========================================================================	
+	public static boolean getRandomBit() {
+		return (Math.random() < 0.50);
+	}
+
+	public static int getRandomInteger(int minValue, int maxValue) {
+		return ((int) (Math.random() * ((long) maxValue - (long) minValue + 1))) + minValue;
+	}
+	
+	public static long getRandomLong(long minValue, long maxValue) {
+		return ((long) (Math.random() * (maxValue - minValue + 1))) + minValue;
+	}
+	
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
+		for (int i = 0; i < 10000; i++) {
+			System.out.println(getRandomInteger(0, 1));
+		}
 
 	}
 

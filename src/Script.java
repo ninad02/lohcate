@@ -13,12 +13,17 @@ import java.util.Comparator;
 
 import org.jfree.chart.renderer.xy.XYDotRenderer;
 
+import com.martiansoftware.jsap.FlaggedOption;
+import com.martiansoftware.jsap.JSAP;
+import com.martiansoftware.jsap.JSAPResult;
+
 import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
 import lohcateEnums.ColorPastel;
 import lohcateEnums.MutationType;
 import lohcateEnums.SeqPlatform;
 import lohcateEnums.VariantLocation;
+import shared.ArgumentParserUtils;
 import shared.BucketCounter;
 import shared.IOUtils;
 import shared.PrimitiveWrapper;
@@ -87,6 +92,9 @@ public class Script {
 	private static final double GCContentThresholdLow  = 0.05;
 	private static final double GCContentThresholdHigh = 0.80;
 	
+	private static final int MaxWindowLength = 1000;
+	private static final int MaxSitesInWindowAllowed = 3;
+	
 	// Column constants for the curated TSV files (files that have a cluster column)
 	private static final int ColCuratedTSV_Chrom    = 0;
 	private static final int ColCuratedTSV_Position = 1;
@@ -96,9 +104,6 @@ public class Script {
 	private static final int ColCuratedTSV_MutationType = 6;
 	private static final int ColCuratedTSV_VariantLocation = 7;
 	private static final int ColCuratedTSV_Cluster = 8;
-	
-	private static final int MaxWindowLength = 1000;
-	private static final int MaxSitesInWindowAllowed = 3;
 	
 	public static final GenomicCoordinateComparatorInTextFileLine LineComparatorTab = new GenomicCoordinateComparatorInTextFileLine();
 	
@@ -547,6 +552,7 @@ public class Script {
 		// First check that the file is a file of the desired extension		
 		int indexOfDelimiter = inFile.getName().indexOf(fileExtAndDelim.mExtension); 
 		if (indexOfDelimiter < 0) return null;
+		if (indexOfDelimiter != inFile.getName().length() - fileExtAndDelim.mExtension.length()) return null;
 		String samplenameRoot = inFile.getName().substring(0, indexOfDelimiter);
 		
 		StringBuilder sb = new StringBuilder(4096);
@@ -627,7 +633,9 @@ public class Script {
 	
 	// ========================================================================
 	private static boolean segmentRegionsOneFile_isValidCluster(ClusterType clusterType) {
-		return (clusterType != ClusterType.Noise && clusterType != ClusterType.Null && clusterType != ClusterType.HETSomatic);
+		return (clusterType != ClusterType.Noise && 
+				clusterType != ClusterType.Null  && 
+				clusterType != ClusterType.HETSomatic);
 	}
 	
 	// ========================================================================
@@ -1296,7 +1304,9 @@ public class Script {
 		Gene dummyGene = new Gene("", Chrom.c0);  // We'll use this gene for binary searching
 		
 		for (File file : files) { //iterate through curated SNP calls
-			if (file.getName().indexOf(fileExtDelim.mExtension) >= 0) {
+			
+			int indexOfDelimiter  = file.getName().indexOf(fileExtDelim.mExtension); 			
+			if (indexOfDelimiter == file.getName().length() - fileExtDelim.mExtension.length()) {
 				System.out.println(file.getName());
 				
 				// Load all lines into memory, extract the header row, and then sort by chrom/position
@@ -1431,7 +1441,6 @@ public class Script {
 	// ENTRY POINT
 	// ========================================================================
 	public static void main(String[] args) {
-		long sys_time_init = System.currentTimeMillis();
 		
 		String nafTafInptus     = "naf_taf_inputs";
 		String classifiedSites  = "sites_classified";
@@ -1440,28 +1449,83 @@ public class Script {
 		String browserTracks    = "browser_tracks";
 		String geneEnrichment   = "gene_enrichment";
 		
+		String taskClustering = "clustering";
+		String taskRegions = "regions";
+		String taskGenes = "genes";
 		
+		String[] argsMajor = (args.length > 0) ? (new String[] { args[0] }) : (new String[] { " " });
+		JSAP jsapTask = new JSAP();
+		
+		String lohcateTask = "TaskName";
+		FlaggedOption task = new FlaggedOption(lohcateTask).setStringParser(JSAP.STRING_PARSER).setRequired(true)
+				.setShortFlag('t').setLongFlag("task").setUsageName(lohcateTask);
+		task.setHelp("Indicate which task LOHcate should perform: {" + taskClustering + ", " + taskRegions + ", " + taskGenes + "}");
+		ArgumentParserUtils.registerJSAPParameter(jsapTask, task);
+		JSAPResult jsapResult = ArgumentParserUtils.parseAndCheck(argsMajor, jsapTask, LOHcate.class.getName());		
+		String taskName = jsapResult.getString(lohcateTask);		
+		
+		String rootFolderPath = "RootFolderPath";
+		FlaggedOption rootFolder = new FlaggedOption(rootFolderPath).setStringParser(JSAP.STRING_PARSER).setRequired(true)
+				.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("root").setUsageName(rootFolderPath);
+		rootFolder.setHelp("Indicate the root directory of the data");
+		ArgumentParserUtils.registerJSAPParameter(jsapTask, rootFolder);
+		
+		long sys_time_init = System.currentTimeMillis();	
+		
+		if (taskName.equals(taskClustering)) {
+			String allelicBiasFile = "AllelicBiasFile";
+			FlaggedOption allelicBias = new FlaggedOption(allelicBiasFile).setStringParser(JSAP.STRING_PARSER).setRequired(false)
+					.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("allelicBias").setUsageName(allelicBiasFile);
+			allelicBias.setHelp("Specify a file that has allelic biases");
+			ArgumentParserUtils.registerJSAPParameter(jsapTask, allelicBias);
+			Clustering.registerClusteringParameters(jsapTask);
+			
+			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
+			String rootFolderName      = jsapResult.getString(rootFolderPath);
+			String allelicBiasFilename = jsapResult.getString(allelicBiasFile);
+			Clustering.configureParameters(jsapResult);
+			
+			if (allelicBiasFilename == null) {
+				Clustering.ParamsBool.IgnoreAllelicBias.setValue(true);
+			}
+			
+			//SeqPlatform platform = SeqPlatform.getPlatform(Integer.parseInt(args[2]));
+			Clustering.classifySites(rootFolderName + File.separator + nafTafInptus,
+									 allelicBiasFilename,
+									 rootFolderName + File.separator + classifiedSites, 
+									 rootFolderName + File.separator + vafPlots, 
+					                 SeqPlatform.Illumina); //args[2] --> 0::Illumina, 1::SOLiD
+					                 
+		} else if (taskName.equals(taskRegions)) {
+			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
+			String rootFolderName = jsapResult.getString(rootFolderPath);
+			
+			segmentRegionsAllFiles(rootFolderName + File.separator + classifiedSites, 
+								   rootFolderName + File.separator + regions,
+								   rootFolderName + File.separator + browserTracks);
+			
+		} else if (taskName.equals(taskGenes)) {
+			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
+			String rootFolderName = jsapResult.getString(rootFolderPath);
+			
+			getGeneEnrichment(rootFolderName + File.separator + classifiedSites, 
+							  rootFolderName + File.separator + geneEnrichment);			
+		}
+		
+		/*
 		String root = args[0]; //project directory
 		switch (Integer.parseInt(args[1])) { //args[1] --> 'switchboard' parameter
-			case 0:
-				SeqPlatform platform = SeqPlatform.getPlatform(Integer.parseInt(args[2]));
-				Clustering.classifySites(root + File.separator + nafTafInptus,
-										 args[3],
-						                 root + File.separator + classifiedSites, 
-						                 root + File.separator + vafPlots, 
-						                 platform); //args[2] --> 0::Illumina, 1::SOLiD
+			case 0:				
 				break;
 			case 1:
-				segmentRegionsAllFiles(root + File.separator + classifiedSites, 
-						               root + File.separator + regions,
-						               root + File.separator + browserTracks);
+				
 				break;
 			case 2:
-				getGeneEnrichment(root + File.separator + classifiedSites, 
-								  root + File.separator + geneEnrichment);
+				
 				break;
 				
 			// Everything below this point is Sidd's original code	
+				/*
 			case 5:
 				for (int i = 0; i<Enrichment.cluster_names.length - 1; i++)
 					Enrichment.getPathwayEnrichment(root + "/gene_enrichment.csv", root + "/kegg_pathways_roster.tsv", root + "/kegg/pathway_enrichment/" + Enrichment.cluster_names[i] + ".csv", i);
@@ -1479,7 +1543,8 @@ public class Script {
 					Enrichment.getGOTermEnrichment(root + "/GO/g1/counts/go_term_counts.csv", root + "/GO/g1/counts/go_term_counts_top_" + Enrichment.cluster_names[i] + ".csv", root + "/GO/g1/enrichment/go_term_enrichment_top_" + Enrichment.cluster_names[i] + ".csv");
 				}
 				break;
-		}
+				
+		}*/
 		
 		System.out.println("Time elapsed: " + (System.currentTimeMillis()-sys_time_init)/1000 + " seconds");
 	}

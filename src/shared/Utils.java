@@ -544,6 +544,10 @@ public class Utils {
 			mDelimiter = delimiter;
 		}
 	}
+	
+	public static void ensureTrue(boolean condition, String errorString) {
+		if (!condition) throwErrorAndExit(errorString);
+	}
 
 	public static void throwErrorAndExit(String errorString) {
 		Exception e = new Exception(errorString);

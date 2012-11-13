@@ -83,7 +83,7 @@ public class ArrayUtils {
 	public static<T> void reverseArray(T[] theArray) {
 		T tempVal;
 		int oppositeIndex;
-		for (int i = 0; i < theArray.length / 2; i++) {
+		for (int i = 0; i < (theArray.length >>> 2); i++) {
 			oppositeIndex = theArray.length - i - 1;
 			tempVal = theArray[i];
 			theArray[i] = theArray[oppositeIndex];
