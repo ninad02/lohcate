@@ -1,5 +1,7 @@
+import genomeUtils.GenotypeUtils;
 import genomeUtils.RegionRange;
 import genomeUtils.RegionRange.RegionRangeOverlap;
+import genomeUtils.SNVMap;
 import static genomeUtils.RegionRange.RegionRangeOverlap.*;
 
 import java.io.BufferedReader;
@@ -10,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.ListIterator;
 
 import org.jfree.chart.renderer.xy.XYDotRenderer;
 
@@ -21,6 +24,7 @@ import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
 import lohcateEnums.ColorPastel;
 import lohcateEnums.MutationType;
+import lohcateEnums.Nuc;
 import lohcateEnums.SeqPlatform;
 import lohcateEnums.VariantLocation;
 import shared.ArgumentParserUtils;
@@ -100,6 +104,7 @@ public class Script {
 	private static final int ColCuratedTSV_Position = 1;
 	//private static final int ColCuratedTSV_VariantBaseTumor = 2;
 	private static final int ColCuratedTSV_VafTumor = 3;
+	private static final int ColCuratedTSV_dbSNP    = 4;
 	private static final int ColCuratedTSV_Gene     = 5;
 	private static final int ColCuratedTSV_MutationType = 6;
 	private static final int ColCuratedTSV_VariantLocation = 7;
@@ -221,6 +226,7 @@ public class Script {
 		File[] files = (new File(inDir)).listFiles();
 		ArrayList<CopyNumberRegionsByChromosome> regionsInSamples = new ArrayList<CopyNumberRegionsByChromosome>();
 		ArrayList<File> validFilesList = new ArrayList<File>(files.length);
+		SNVMap snvMap = new SNVMap();
 		
 		// Create our output directories
 		IOUtils.createDirectoryPath(outDir, false);
@@ -228,12 +234,15 @@ public class Script {
 		
 		// First we determine the regions from each sample
 		for (File file : files) {
-			CopyNumberRegionsByChromosome regionsInOneSample = segmentRegionsOneFile(file, outDir);
+			CopyNumberRegionsByChromosome regionsInOneSample = segmentRegionsOneFile(file, outDir, snvMap);
 			if (regionsInOneSample != null) {
 				regionsInSamples.add(regionsInOneSample);
 				validFilesList.add(file);
 			}
 		}
+		
+		// Print out the map
+		snvMap.printMe(true, outDir + File.separator + "AllSites.txt");
 		
 		// Now we have all the contiguous regions from all the samples.  Find the regions of the cluster type
 		
@@ -254,7 +263,7 @@ public class Script {
 			for (CopyNumberRegionsByChromosome regionsInOneSample : regionsInSamples) {
 				CopyNumberRegionsByChromosome regionsInOneSampleMerged = mergeRegionsWithConstraints(regionsInOneSample, clusterType, maxBasePairsContiguousRegionForCluster);
 				regionsInSamplesForOneClusterType.add(regionsInOneSampleMerged);
-				printSegmentedRegionsToFile(outDir, regionsInOneSampleMerged, clusterType);
+				printSegmentedRegionsToFile(outDir, regionsInOneSampleMerged, clusterType, snvMap);
 			}
 		}
 
@@ -466,7 +475,7 @@ public class Script {
 		
 		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);
 		// Go chromosome by chromosome
-		for (Chrom chrom : Chrom.Autosomes) {				
+		for (Chrom chrom : Chrom.Autosomes) {							
 			
 			ArrayList<CopyNumberRegionRange> regionsInChrom = regionsInSample.mRegionsByChrom.get(chrom.getCode());			
 			for (CopyNumberRegionRange cnrr : regionsInChrom) {
@@ -492,6 +501,119 @@ public class Script {
 		}
 		
 		IOUtils.closeBufferedWriter(out);
+	}
+	
+	
+	public static void printSegmentedRegionsToFile(String outDir, CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType, SNVMap snvMap) {
+		
+		String outFilename = outDir + File.separator + "Regions.GISTIC." + clusterType.name() + "." + regionsInSample.mSampleName + ".txt";
+		StringBuilder sb = new StringBuilder(2048);
+		String delim = Utils.FileExtensionTSV.mDelimiter;
+		CopyNumberRegionRange dummyRange = new CopyNumberRegionRange(ClusterType.HETGermline, Chrom.c0, 0);		
+		double dummyRangeCopyNumberBase = 2.0;
+		
+		double copyNumBase = (clusterType == ClusterType.Amp) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);		
+//		double log2RatioGisticCol = log2Ratio - 1.0;
+//		double log2CopyNumGistic = log2CopyNum - 1.0;
+		
+		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);
+		// Go chromosome by chromosome
+		for (Chrom chrom : Chrom.Autosomes) {				
+			
+			int numSitesOnChrom = snvMap.getNumSitesOnChromosome(chrom);
+			if (numSitesOnChrom <= 0) continue;
+			
+			ListIterator<CopyNumberRegionRange> regionsInChromIter = regionsInSample.mRegionsByChrom.get(chrom.getCode()).listIterator();
+			CopyNumberRegionRange currentRegion = null;
+			int indexInMap = 0;
+			boolean dummyRangeValid = false;
+						
+			while (regionsInChromIter.hasNext()) {
+				currentRegion = regionsInChromIter.next();
+				if (currentRegion.afterRange(chrom, snvMap.getPosition(chrom, indexInMap))) {
+					printSegmentedRegionsToFile_Helper(currentRegion, sb, delim, copyNumBase, regionsInSample.mSampleName, out);
+					currentRegion = null;
+				} else {
+					break;
+				}
+			}
+			
+			// We could have broken the loop because the current region encloses the
+			
+			for (indexInMap = 0; indexInMap < numSitesOnChrom; indexInMap++) {
+				int mapPosition = snvMap.getPosition(chrom, indexInMap);
+				
+				if ((currentRegion == null) || currentRegion.beforeRange(chrom, mapPosition)) {
+					if (dummyRangeValid) {
+						if (dummyRange.isFinalized()) {
+							printSegmentedRegionsToFile_Helper(dummyRange, sb, delim, dummyRangeCopyNumberBase, regionsInSample.mSampleName, out);
+							dummyRange.set(chrom, mapPosition, mapPosition, false, 1);
+						} else {
+							boolean extendResult = dummyRange.extendRange(chrom, mapPosition);
+							if (!extendResult) {
+								String errorString = "ERROR: printSegmentedRegionsToFile(): Could not extend range! " + chrom + "\t" + mapPosition + "\t" + dummyRange;
+								Utils.ensureTrue(extendResult, errorString);	
+							}
+														
+						}
+					} else {
+						dummyRange.set(chrom, mapPosition, mapPosition, false, 1);
+						dummyRangeValid = true;
+					}
+					
+				} else if (currentRegion.inRange(chrom, mapPosition)) {
+					if (dummyRangeValid) {
+						printSegmentedRegionsToFile_Helper(dummyRange, sb, delim, dummyRangeCopyNumberBase, regionsInSample.mSampleName, out);
+						dummyRangeValid = false;
+					}
+					
+					// Print this region to file 
+					printSegmentedRegionsToFile_Helper(currentRegion, sb, delim, copyNumBase, regionsInSample.mSampleName, out);				
+					
+					// Now change the loop index to move to the map position just after the end of this region
+					int indexOfRegionEndInMap = snvMap.getIndexOfPositionInMap(chrom, currentRegion.getRangeEnd());
+					if (indexOfRegionEndInMap < 0) {
+						String errorString = "ERROR: printSegmentedRegionsToFile(): Region end (" + currentRegion.getRangeEnd() + "must exist in map!";
+						Utils.ensureTrue(false, errorString);						
+					}
+					indexInMap = indexOfRegionEndInMap;  // indexInMap will be incremented at loop end
+					
+					// Now move to the next cna-affected region
+					currentRegion = regionsInChromIter.hasNext() ? regionsInChromIter.next() : null;
+					
+				} else if (currentRegion.afterRange(chrom, mapPosition)) {
+					Utils.ensureTrue(false, "ERROR: printSegmentedRegionsToFile(): Impossible for region to precede position!");
+				} else {
+					Utils.ensureTrue(false, "ERROR: printSegmentedRegionsToFile(): Impossible state!");
+				}
+			}
+			
+			
+		}
+		
+		IOUtils.closeBufferedWriter(out);
+	}
+	
+	// ========================================================================
+	private static void printSegmentedRegionsToFile_Helper(CopyNumberRegionRange cnrr, StringBuilder sb, String delim, double copyNumBase, String sampleName, BufferedWriter out) {
+		sb.setLength(0);
+		
+		double errorFactor = Math.random() / 10;  // Get between 0 and 0.1
+		boolean addPositiveError = (Math.random() >= 0.5);
+		double copyNum = copyNumBase + ((addPositiveError) ? errorFactor : -errorFactor);
+		double copyNumRatio = copyNum / DefaultDiploidCopyNumber;
+		double log2CopyNum = Math.log10(copyNum) / Math.log10(2);
+		double log2Ratio = Math.log10(copyNumRatio) / Math.log10(2);
+
+		
+		sb.append(sampleName)
+		  .append(delim).append(cnrr.getChromosome())
+		  .append(delim).append(cnrr.getRangeStart())
+		  .append(delim).append(cnrr.getRangeEnd())
+		  .append(delim).append(cnrr.getNumSitesInterrogated())
+		  .append(delim).append(log2Ratio);
+		
+		IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 	}
 	
 	// ========================================================================
@@ -546,7 +668,7 @@ public class Script {
 	
 	// ========================================================================
 	/** The continuation of the @method segmentRegionsAllFiles method, but by individual. */ 
-	public static CopyNumberRegionsByChromosome segmentRegionsOneFile(File inFile, String outDir) {
+	public static CopyNumberRegionsByChromosome segmentRegionsOneFile(File inFile, String outDir, SNVMap snvMap) {
 		FileExtensionAndDelimiter fileExtAndDelim = Utils.FileExtensionTSV;		
 		
 		// First check that the file is a file of the desired extension		
@@ -579,6 +701,11 @@ public class Script {
 			final Chrom chrom  = Chrom.getChrom                       (Utils.extractNthColumnValue(line, ColCuratedTSV_Chrom,    Utils.TabStr));					
 			final int position = Integer.parseInt                     (Utils.extractNthColumnValue(line, ColCuratedTSV_Position, Utils.TabStr));
 			final ClusterType clusterType = ClusterType.getClusterType(Utils.extractNthColumnValue(line, ColCuratedTSV_Cluster,  Utils.TabStr));
+			final String rsColumnValue =                              (Utils.extractNthColumnValue(line, ColCuratedTSV_dbSNP,    Utils.TabStr));
+			final int rsId = (rsColumnValue.indexOf(NovelStr) >= 0 || rsColumnValue.indexOf(Utils.NAStr) >= 0) ? 0 : GenotypeUtils.getNumberFromRsId(rsColumnValue);
+			
+			// Register the site in the map
+			snvMap.registerSNV(chrom, position, rsId, Nuc.N, Nuc.N, true, true);
 			
 			// If the chromosome has changed, we set that we have no current region
 			if ((chrom != chromPreviousRow) && (currentRegion != null)) {

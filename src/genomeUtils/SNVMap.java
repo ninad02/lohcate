@@ -56,17 +56,29 @@ public class SNVMap {
 	
 	private static void printMe(ArrayList<LongArrayList> tableToPrint, BufferedWriter out, boolean orderedByPosition) {
 		Nuc[] nucs = new Nuc[NumAllelesInCallSet];
+		StringBuilder sb = new StringBuilder(2048);
+		int novelCounter = 0;
 		for (Chrom chrom : Chrom.values()) {
 			LongArrayList listOfSites = tableToPrint.get(chrom.ordinal());
 			for (int i = 0; i < listOfSites.size(); i++) {
 				long compactUnit = listOfSites.get(i);
-				IOUtils.writeToBufferedWriter(out, "" + chrom.ordinal(), false);
-				IOUtils.writeToBufferedWriter(out, "\t" + extractPositionFromCompactForm(compactUnit, !orderedByPosition), false);
-				IOUtils.writeToBufferedWriter(out, "\trs" + extractRsIdFromCompactForm(compactUnit, !orderedByPosition), false);
-				IOUtils.writeToBufferedWriter(out, "\tNucleotides: " + getStringForBytes(extractNucleotideIDsFromCompactForm(compactUnit, nucs)), false);
+				sb.setLength(0);
 				
-				IOUtils.writeToBufferedWriter(out, "\tBitString: " + Long.toBinaryString(compactUnit), false);
-				IOUtils.writeToBufferedWriter(out, "", true);
+				int rsID = extractRsIdFromCompactForm(compactUnit, !orderedByPosition);
+				if (rsID == 0) {
+					sb.append("novel_").append(++novelCounter);
+				} else {
+					sb.append(GenotypeUtils.RsPrefix).append(rsID);
+				}
+				
+				sb.append(Utils.TabStr).append(chrom.ordinal());
+				sb.append(Utils.TabStr).append(extractPositionFromCompactForm(compactUnit, !orderedByPosition));
+				
+				extractNucleotideIDsFromCompactForm(compactUnit, nucs);
+				sb.append(Utils.TabStr).append(nucs[0]).append(Utils.TabStr).append(nucs[1]);
+				sb.append(Utils.TabStr).append(Long.toBinaryString(compactUnit));
+
+				IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 			}
 		}
 	}
@@ -86,7 +98,7 @@ public class SNVMap {
 		
 		int resultIndex = getIndexOfPositionInMap(chrom, position);
 		if (!uniqueOnly || (resultIndex < 0)) {
-			int insertionIndex = -(resultIndex + 1);
+			int insertionIndex = (resultIndex < 0) ? -(resultIndex + 1) : resultIndex;
 			long compactUnit = compactSNPInfo(position, rsId, nuc1, nuc2, false);
 			mSNVsByPosition.get(chrom.ordinal()).insert(insertionIndex, compactUnit);
 			return Boolean.TRUE;
@@ -133,14 +145,14 @@ public class SNVMap {
 
 	
 	/** Extracts the position from the compact form. */
-	private static int extractPositionFromCompactForm(long compactUnit, boolean positionAndRsIdAreFlipped) {
-		return ((int) (compactUnit >>> (positionAndRsIdAreFlipped ? 6 : 33))) & MaskPosition;
+	private static int extractPositionFromCompactForm(long compactUnit, boolean makeRsIDMostSignificant) {
+		return ((int) (compactUnit >>> (makeRsIDMostSignificant ? 6 : 33))) & MaskPosition;
 	}
 	
 	
 	/** Extracts the RS ID from the compact form. */
-	private static int extractRsIdFromCompactForm(long compactUnit, boolean positionAndRsIdAreFlipped) {
-		return ((int) (compactUnit >>> (positionAndRsIdAreFlipped ? 37 : 6))) & MaskRsId;
+	private static int extractRsIdFromCompactForm(long compactUnit, boolean makeRsIDMostSignificant) {
+		return ((int) (compactUnit >>> (makeRsIDMostSignificant ? 37 : 6))) & MaskRsId;
 	}
 	
 	/** Extracts the nucleotide IDs as integers from the compact form. */
@@ -150,6 +162,21 @@ public class SNVMap {
 			compactUnit = (long) (compactUnit >>> ShiftNuc);
 		}
 		return nucleotideAlleles;
+	}
+	
+	private static final ExtractorFromCompactUnitRsID_rsIDFirst extractorRsID_rsIDFirst = new ExtractorFromCompactUnitRsID_rsIDFirst();
+	private static final ExtractorFromCompactUnitPosition_PositionFirst extractorPosition_PositionFirst = new ExtractorFromCompactUnitPosition_PositionFirst();
+	
+	private static interface ExtractorFromCompactUnit {
+		public long extractValue(long compactUnit);
+	}
+	
+	private static class ExtractorFromCompactUnitRsID_rsIDFirst implements ExtractorFromCompactUnit {
+		public long extractValue(long compactUnit) { return extractRsIdFromCompactForm(compactUnit, true); }
+	}
+	
+	private static class ExtractorFromCompactUnitPosition_PositionFirst implements ExtractorFromCompactUnit {
+		public long extractValue(long compactUnit) { return extractPositionFromCompactForm(compactUnit, false); }
 	}
 	
 	// ========================================================================
@@ -171,7 +198,7 @@ public class SNVMap {
 	/** Retrieves the nucleotides as byte variables for a particular chromosome and position. */
 	public Nuc[] getNucleotidesInMap(Chrom chrom, int position, Nuc[] nucleotideAlleles) {
 		LongArrayList arrayForChrom = getArrayForChrom(chrom, true);
-		int resultIndex = binarySearchValue(position, arrayForChrom, true);
+		int resultIndex = binarySearchValue(position, arrayForChrom, extractorPosition_PositionFirst);
 		if (resultIndex >= 0) {
 			return extractNucleotideIDsFromCompactForm(arrayForChrom.get(resultIndex), nucleotideAlleles);
 		} else { 
@@ -218,7 +245,22 @@ public class SNVMap {
 		
 	public int getIndexOfPositionInMap(final Chrom chrom, int position) {
 		LongArrayList arrayForChrom = getArrayForChrom(chrom, true);
-		return binarySearchValue(position, arrayForChrom, true);
+		return binarySearchValue(position, arrayForChrom, extractorPosition_PositionFirst);
+	}
+	
+	/** Returns the position at the specified index along the chromosomal positions. 
+	 * @param chrom
+	 * @param index
+	 * @return the position if a valid index is specified.  -1 for an invalid index
+	 */
+	public int getPosition(final Chrom chrom, final int index) {
+		LongArrayList arrayForChrom = getArrayForChrom(chrom, true);
+		return ((index >= 0 && index < arrayForChrom.size()) ? extractPositionFromCompactForm(arrayForChrom.get(index), false) : -1); 
+	}
+	
+	/** Returns the number of sites on a particular chromosome. */
+	public int getNumSitesOnChromosome(final Chrom chrom) {
+		return getArrayForChrom(chrom, true).size();
 	}
 	
 	public int getIndexOfRsIdInMap(final Chrom chrom, final int rsId) {
@@ -233,7 +275,7 @@ public class SNVMap {
 	
 	private int getIndexOfRsIdInMapHelper(final Chrom chrom, final int rsId) {
 		LongArrayList arrayForChrom = getArrayForChrom(chrom, false);
-		return binarySearchValue(rsId, arrayForChrom, false);		
+		return binarySearchValue(rsId, arrayForChrom, extractorRsID_rsIDFirst);		
 	}
 	
 	public int[] getPositionsBetweenPositionsInMap(final Chrom chrom, int positionStart, int positionEnd, boolean posOrRsID) {		
@@ -260,7 +302,7 @@ public class SNVMap {
 	/** Retrieves the rsId as an integer for a particular chromosome and position. */
 	public int getRsIdInMap(final Chrom chrom, int position) {
 		LongArrayList arrayForChrom = getArrayForChrom(chrom, true);
-		int resultIndex = binarySearchValue(position, arrayForChrom, true);
+		int resultIndex = binarySearchValue(position, arrayForChrom, extractorPosition_PositionFirst);
 		if (resultIndex >= 0) {
 			return extractRsIdFromCompactForm(arrayForChrom.get(resultIndex), false);
 		} else { 
@@ -396,18 +438,37 @@ public class SNVMap {
 	
 	/** Given a sample index and integer array, this performs a binary search
 	 *  for the sample index on the integer array.  If the sample index is 
-	 *  found, an index >= 0 is returned, else -1 is returned. */
-	private static int binarySearchValue(final int value, LongArrayList longArray, final boolean searchByPosition) {
+	 *  found, an index >= 0 is returned, else (-(insertion point) - 1) is returned. */
+	private static int binarySearchValue(final int value, LongArrayList longArray, ExtractorFromCompactUnit extractor) {
 		int lowerIndex = 0;
 		int upperIndex = longArray.size() - 1;
 		int midIndex = 0;
 		
+		// If empty array, we return with the insertion point at index 0
+		if (upperIndex < 0) return -1;
+		
+		// Shortcut Lower: Test if the value is <= than the lowest value the array.
+		// If so, then we don't perform the binary search, and we simply return.
+		long valueLowerIndex = (int) extractor.extractValue(longArray.get(lowerIndex));
+		if (value < valueLowerIndex) {
+			return ((-lowerIndex) - 1);			
+		} else if (value == valueLowerIndex) {
+			return lowerIndex;
+		} 
+
+		// Shortcut Upper: Test if the value is >= the high value in the array.
+		// If so, then we don't perform the binary search, and we simply return.
+		long valueUpperIndex = (int) extractor.extractValue(longArray.get(upperIndex));
+		if (value > valueUpperIndex) {
+			return (-(upperIndex + 1) - 1);
+		} else if (value == valueUpperIndex) {
+			return upperIndex;
+		}
+				
 		int valueAtMidIndex;
 		while (lowerIndex <= upperIndex) {
-			midIndex = (lowerIndex + upperIndex) >>> 1;  // right-shift by 1 to divide by 2;
-			valueAtMidIndex = searchByPosition ? 
-					extractPositionFromCompactForm(longArray.get(midIndex), false) :
-					extractRsIdFromCompactForm(    longArray.get(midIndex), true);
+			midIndex = (lowerIndex + upperIndex) >>> 1;  // right-shift by 1 to divide by 2; 
+			valueAtMidIndex = (int) extractor.extractValue(longArray.get(midIndex));
 			
 			if (value == valueAtMidIndex) {
 				return midIndex;
@@ -462,7 +523,7 @@ public class SNVMap {
 			
 			Chrom chrom = Chrom.getChrom((byte) NumberUtils.getRandomInteger(0, Chrom.values().length - 1));
 			int rsID = NumberUtils.getRandomInteger(0, 67108863);
-			int position = NumberUtils.getRandomInteger(0, 2147483647);
+			int position = trial + 1; //NumberUtils.getRandomInteger(0, 2147483647);
 			Boolean strand = NumberUtils.getRandomBit() ? Boolean.TRUE : Boolean.FALSE;			
 			Nuc nuc1 = Nuc.getAllele(NumberUtils.getRandomInteger(Nuc.A.getCode(), Nuc.N.getCode()));
 			Nuc nuc2 = Nuc.getAllele(NumberUtils.getRandomInteger(Nuc.A.getCode(), Nuc.N.getCode()));
