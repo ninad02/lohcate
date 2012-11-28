@@ -265,7 +265,7 @@ public class Clustering {
 	 * @param inDir naf-taf-inputs
 	 * @param opt 0::Illumina, 1::SOLiD
 	 */
-	public static void classifySites(String inDir, String allelicBiasInFile, String outDir, String vafComparisonPlotDir, SeqPlatform platform) {
+	public static void classifySites(String inDir, String allelicBiasInFile, String outDir, String vafComparisonPlotDir, String vafWaterfallPlotDir, SeqPlatform platform) {
 		File[] files = (new File(inDir)).listFiles();
 		StringBuilder sb = new StringBuilder(8192);
 		Utils.FileExtensionAndDelimiter fileExtDelim = Utils.FileExtensionTSV;		
@@ -278,6 +278,7 @@ public class Clustering {
 		// Create output directory
 		IOUtils.createDirectoryPath(outDir, false);
 		IOUtils.createDirectoryPath(vafComparisonPlotDir, false);
+		IOUtils.createDirectoryPath(vafWaterfallPlotDir, false);
 		
 
 		String[] columnHeaders = new String[] { "chr", "pos", "VAF_Normal", "VAF_Tumor", "dbsnp", "gene", "mutation_type", "germ_som", "cluster" };
@@ -297,8 +298,8 @@ public class Clustering {
 				System.out.println("\tRead All Lines...");
 				System.out.printf("\tNum Sites Total: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());				
 				
-				String headerStringGermline = germlineSpecificVariantRows.get(0);
-				String headerStringSomatic  = somaticSpecificVariantRows.get(0);
+				//String headerStringGermline = germlineSpecificVariantRows.get(0);
+				//String headerStringSomatic  = somaticSpecificVariantRows.get(0);
 
 				//upstream pipelines will randomly spit header lines into the 
 				// middle of a naf-taf-input file. we're just avoiding those
@@ -371,15 +372,18 @@ public class Clustering {
 
 				// Now initialize the data structure needed to plot
 				int[] clusterTypeCounts = Utils.getClusterTypeCounts(clusters);
-				double[][][] clusterCoordinates = new double[clusterTypeCounts.length][2][];
-				for (int clusterTypeIndex = 0; clusterTypeIndex < clusterCoordinates.length; clusterTypeIndex++) {
-					clusterCoordinates[clusterTypeIndex][0] = new double[ clusterTypeCounts[clusterTypeIndex] ];
-					clusterCoordinates[clusterTypeIndex][1] = new double[ clusterTypeCounts[clusterTypeIndex] ];
-				}
+				double[][][] clusterCoordinates  = getCoordinateArraysPerClusterType(clusterTypeCounts);
+				double[][][] waterfallPlotTumor  = getCoordinateArraysPerClusterType(clusterTypeCounts);
+				double[][][] waterfallPlotNormal = getCoordinateArraysPerClusterType(clusterTypeCounts);
+				
 				int[] clusterTypeIndex = new int[clusterTypeCounts.length];
 				Arrays.fill(clusterTypeIndex, -1);  
 
 				// Do the post-processing
+				Chrom prevChrom = Chrom.c0;
+				int prevPosition = 0;
+				long positionGenomeWide = 0;
+				
 				int startingRowGermlineOrSomaticOrAll = 0;  // 0 because header line has been stripped away
 				for (int i = startingRowGermlineOrSomaticOrAll; i < allVariantRows.size(); i++) {
 					String strRow = allVariantRows.get(i);
@@ -388,12 +392,27 @@ public class Clustering {
 
 					String[] germCols = strRow.split(Utils.TabStr);
 
+					//=IF(A3=A2,B3-B2+L2,B3+L2)
+							
+					String chromStr = (platform == SeqPlatform.Illumina) ? germCols[Script.Col_NAFTAFInput_Chrom] : Script.ChromPrefix + germCols[Script.Col_NAFTAFInput_Chrom].replace(Script.ChromPrefix, "");
+					Chrom chrom = Chrom.getChrom(chromStr);
+					int position = Integer.parseInt(germCols[Script.Col_NAFTAFInput_Position]);
+					
+					positionGenomeWide = (chrom == prevChrom) ? (positionGenomeWide + (position - prevPosition)) : (positionGenomeWide + position);
+				//	System.out.println("PP: " + positionGenomeWide);
+					prevPosition = position;
+					prevChrom = chrom;
+					
 					float vafNormal = adjustedVAFNormal[i]; //Clustering.extractVAFNormal(germCols, platform);
 					float vafTumor  = adjustedVAFTumor[i]; //Clustering.extractVAFTumor (germCols, platform);
 					clusterCoordinates[ clusterType.ordinal() ][0][indexForClusterType] = vafTumor;
 					clusterCoordinates[ clusterType.ordinal() ][1][indexForClusterType] = vafNormal;
-
-					String chromStr = (platform == SeqPlatform.Illumina) ? germCols[Script.Col_NAFTAFInput_Chrom] : Script.ChromPrefix + germCols[Script.Col_NAFTAFInput_Chrom].replace(Script.ChromPrefix, "");
+					
+					waterfallPlotTumor[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
+					waterfallPlotTumor[ clusterType.ordinal() ][1][indexForClusterType] = vafTumor;
+					
+					waterfallPlotNormal[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
+					waterfallPlotNormal[ clusterType.ordinal() ][1][indexForClusterType] = vafNormal;	
 
 					sb.setLength(0); // Clear the string builder
 					sb.append(chromStr)
@@ -460,33 +479,76 @@ public class Clustering {
 
 				// Now let's create the datasets needed to 
 
-				DefaultXYDataset xyDataset = new DefaultXYDataset();
-				for (ClusterType ct : ClusterType.values()) {
-					double[][] xyDataSeries = clusterCoordinates[ct.ordinal()];
-					xyDataset.addSeries(ct.name(), xyDataSeries);					
+				DefaultXYDataset xyDatasetVAFPlot = new DefaultXYDataset();
+				DefaultXYDataset xyDatasetWaterfallPlotTumor  = new DefaultXYDataset();
+				DefaultXYDataset xyDatasetWaterfallPlotNormal = new DefaultXYDataset();
+				
+				for (ClusterType ct : ClusterType.values()) {					
+					xyDatasetVAFPlot.addSeries(ct.name(), clusterCoordinates[ct.ordinal()]);
+					xyDatasetWaterfallPlotTumor.addSeries( ct.name(), waterfallPlotTumor[ct.ordinal()]);
+					xyDatasetWaterfallPlotNormal.addSeries(ct.name(), waterfallPlotNormal[ct.ordinal()]);
 				}
-				Clustering.plotVAFComparison(xyDataset, vafComparisonPlotDir + File.separator + samplenameRoot, samplenameRoot);
-
+				Clustering.plotVAFComparison(xyDatasetVAFPlot, vafComparisonPlotDir + File.separator + samplenameRoot + ".VAFComparison", samplenameRoot);
+				Clustering.plotVAFGenomeWide(xyDatasetWaterfallPlotTumor,  vafWaterfallPlotDir + File.separator + samplenameRoot + ".VAF_GenomeWide_Tumor",  samplenameRoot, true);				
+				Clustering.plotVAFGenomeWide(xyDatasetWaterfallPlotNormal, vafWaterfallPlotDir + File.separator + samplenameRoot + ".VAF_GenomeWide_Normal", samplenameRoot, false);
 			}
 		}		
 	}
+	
+	private static double[][][] getCoordinateArraysPerClusterType(int[] clusterTypeCounts) {
+		double[][][] clusterCoordinates = new double[clusterTypeCounts.length][2][];
+		
+		for (int clusterTypeIndex = 0; clusterTypeIndex < clusterCoordinates.length; clusterTypeIndex++) {
+			clusterCoordinates[clusterTypeIndex][0] = new double[ clusterTypeCounts[clusterTypeIndex] ];
+			clusterCoordinates[clusterTypeIndex][1] = new double[ clusterTypeCounts[clusterTypeIndex] ];
+		}
+		
+		return clusterCoordinates;
+	}
 
-	/** Plots the VAF (variant allele frequency) of the normal tissue comapred to the tumor tissue. */
-	public static void plotVAFComparison(XYDataset xyDataset, String outFilenameRoot, String sampleName) {
-		String title = "VAF Comparison: " + sampleName;
-		String xAxisLabel = "VAF Tumor";
-		String yAxisLabel = "VAF Normal";
+	/** Plots the VAF (variant allele frequency) of a tissue vs the genomic position. */
+	public static void plotVAFGenomeWide(XYDataset xyDataset, String outFilenameRoot, String sampleName, boolean isTumor) {
+		String xAxisLabel = "Position";
+		String yAxisLabel = "VAF";
+		String title = "VAF GenomeWide: " + sampleName + (isTumor ? " [Tumor]" : " [Normal]");
+		
 		JFreeChart theChart = 
 				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, true, false, false);
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
 		
 		XYItemRenderer itemRenderer = Clustering.getXYItemRendererHelper(5);		
-		itemRenderer.setSeriesPaint(ClusterType.Amp.ordinal(), ColorPastel.Dark_Red.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.LOH.ordinal(), ColorPastel.Yellow_Green.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.HETGermline.ordinal(), ColorPastel.Dark_Yellow.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.HETSomatic.ordinal(), ColorPastel.Gray_80.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.Noise.ordinal(), ColorPastel.CMYK_Cyan.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.Null.ordinal(), ColorPastel.Light_Magenta_Red.getColor());		
+		setSeriesPaintPerCluster(itemRenderer);
+		xyPlot.setRenderer(itemRenderer);		
+		
+		xyPlot.setBackgroundPaint(ColorPastel.Gray_15.getColor());
+		xyPlot.setDomainGridlinePaint(Color.white);
+		xyPlot.setRangeGridlinePaint(Color.white);		
+		
+		LegendTitle legendTitle = theChart.getLegend();
+		legendTitle.setID("Clusters");
+		legendTitle.setItemFont(new Font("Arial", Font.BOLD, 20));
+		
+		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 20);
+		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 20);
+		xyPlot.getRangeAxis().setLabelFont(rangeAxisLabelFont);		
+		xyPlot.getRangeAxis().setTickLabelFont(rangeAxisTickFont);
+		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
+		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);	
+		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, 2400, 800);
+	}
+	
+	/** Plots the VAF (variant allele frequency) of the normal tissue comapred to the tumor tissue. */
+	public static void plotVAFComparison(XYDataset xyDataset, String outFilenameRoot, String sampleName) {
+		String xAxisLabel = "VAF Tumor";
+		String yAxisLabel = "VAF Normal";
+		String title = "VAF Comparison: " + sampleName;
+		
+		JFreeChart theChart = 
+				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, true, false, false);
+		XYPlot xyPlot = (XYPlot) theChart.getPlot();
+		
+		XYItemRenderer itemRenderer = Clustering.getXYItemRendererHelper(5);		
+		setSeriesPaintPerCluster(itemRenderer);
 		xyPlot.setRenderer(itemRenderer);		
 		
 		xyPlot.setBackgroundPaint(ColorPastel.Gray_15.getColor());
@@ -507,9 +569,9 @@ public class Clustering {
 		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);		
 	
 		// Now write the plot		
-		int width = 800;
-		int height = 800;		
-		GraphUtils.saveChartAsPNG(outFilenameRoot + ".VAFComparison", theChart, width, height);
+		int width  = 800;
+		int height = 800;
+		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, width, height);
 	}
 
 	public static XYItemRenderer getXYItemRendererHelper(int size) {
@@ -523,6 +585,15 @@ public class Clustering {
 		//xyDotRend.setDotHeight(size);
 		//return xyDotRend;
 		return xyShapeRend;
+	}
+	
+	private static void setSeriesPaintPerCluster(XYItemRenderer itemRenderer) {
+		itemRenderer.setSeriesPaint(ClusterType.Amp.ordinal(), ColorPastel.Dark_Red.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.LOH.ordinal(), ColorPastel.Yellow_Green.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.HETGermline.ordinal(), ColorPastel.Dark_Yellow.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.HETSomatic.ordinal(), ColorPastel.Gray_80.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.Noise.ordinal(), ColorPastel.CMYK_Cyan.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.Null.ordinal(), ColorPastel.Light_Magenta_Red.getColor());	
 	}
 
 	// ========================================================================

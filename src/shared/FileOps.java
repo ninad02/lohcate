@@ -73,6 +73,9 @@ public class FileOps {
 		String line = null;
 		
 		try {
+			File theFile = new File(filename);
+			if (!theFile.exists()) return allLines;
+			
 			BufferedReader in = new BufferedReader(new FileReader(filename));
 			while ((line = in.readLine()) != null) {
 				allLines.add(line);				

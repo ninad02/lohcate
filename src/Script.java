@@ -97,7 +97,7 @@ public class Script {
 	private static final double GCContentThresholdHigh = 0.80;
 	
 	private static final int MaxWindowLength = 1000;
-	private static final int MaxSitesInWindowAllowed = 3;
+	private static final int MaxSitesInWindowAllowed = 4;
 	
 	// Column constants for the curated TSV files (files that have a cluster column)
 	private static final int ColCuratedTSV_Chrom    = 0;
@@ -120,7 +120,7 @@ public class Script {
 		
 		for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
 			String row = rows.get(rowIndex);
-			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0) {
+			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0 || row.indexOf("chrX") >= 0) {
 				rows.set(rowIndex, null);
 			} else {
 				// Do some light GC filtering
@@ -568,8 +568,12 @@ public class Script {
 					}
 					
 					// Print this region to file 
-					printSegmentedRegionsToFile_Helper(currentRegion, sb, delim, copyNumBase, regionsInSample.mSampleName, out);				
-					
+					int indexOfRegionStartInMap = snvMap.getIndexOfPositionInMap(chrom, currentRegion.getRangeStart());
+					if (indexOfRegionStartInMap < 0) {
+						String errorString = "ERROR: printSegmentedRegionsToFile(): Region start (" + currentRegion.getRangeStart() + "must exist in map!";
+						Utils.ensureTrue(false, errorString);
+					}
+										
 					// Now change the loop index to move to the map position just after the end of this region
 					int indexOfRegionEndInMap = snvMap.getIndexOfPositionInMap(chrom, currentRegion.getRangeEnd());
 					if (indexOfRegionEndInMap < 0) {
@@ -577,6 +581,9 @@ public class Script {
 						Utils.ensureTrue(false, errorString);						
 					}
 					indexInMap = indexOfRegionEndInMap;  // indexInMap will be incremented at loop end
+					
+					currentRegion.set(chrom, currentRegion.getRangeStart(), currentRegion.getRangeEnd(), true, indexOfRegionEndInMap - indexOfRegionStartInMap + 1);
+					printSegmentedRegionsToFile_Helper(currentRegion, sb, delim, copyNumBase, regionsInSample.mSampleName, out);				
 					
 					// Now move to the next cna-affected region
 					currentRegion = regionsInChromIter.hasNext() ? regionsInChromIter.next() : null;
@@ -588,7 +595,9 @@ public class Script {
 				}
 			}
 			
-			
+			if (dummyRangeValid) {
+				printSegmentedRegionsToFile_Helper(dummyRange, sb, delim, dummyRangeCopyNumberBase, regionsInSample.mSampleName, out);
+			}
 		}
 		
 		IOUtils.closeBufferedWriter(out);
@@ -607,7 +616,7 @@ public class Script {
 
 		
 		sb.append(sampleName)
-		  .append(delim).append(cnrr.getChromosome())
+		  .append(delim).append(cnrr.getChromosome().getCode())
 		  .append(delim).append(cnrr.getRangeStart())
 		  .append(delim).append(cnrr.getRangeEnd())
 		  .append(delim).append(cnrr.getNumSitesInterrogated())
@@ -1572,6 +1581,7 @@ public class Script {
 		String nafTafInptus     = "naf_taf_inputs";
 		String classifiedSites  = "sites_classified";
 		String vafPlots         = "vafPlots";
+		String vafWaterfallPlots = "vafWaterfallPlots";
 		String regions          = "regions";
 		String browserTracks    = "browser_tracks";
 		String geneEnrichment   = "gene_enrichment";
@@ -1621,6 +1631,7 @@ public class Script {
 									 allelicBiasFilename,
 									 rootFolderName + File.separator + classifiedSites, 
 									 rootFolderName + File.separator + vafPlots, 
+									 rootFolderName + File.separator + vafWaterfallPlots,
 					                 SeqPlatform.Illumina); //args[2] --> 0::Illumina, 1::SOLiD
 					                 
 		} else if (taskName.equals(taskRegions)) {
