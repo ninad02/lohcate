@@ -71,7 +71,7 @@ public class ScriptTest extends Script {
 
 			regionsFromSamples.get(3).add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 5, 9));
 
-			regionsFromSamples.get(4).add(new CopyNumberRegionRange(ClusterType.Amp, Chrom.c2, 6, 8));
+			regionsFromSamples.get(4).add(new CopyNumberRegionRange(ClusterType.GainSomatic, Chrom.c2, 6, 8));
 
 			
 			// Do random shuffling

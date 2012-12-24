@@ -102,25 +102,25 @@ public class Gene implements Comparable<Gene> {
 		  .append(delim).append(getCountVariantLocation(VariantLocation.Germline))
 		  .append(delim).append(getCountVariantLocation(VariantLocation.Somatic))
 		  
-		  .append(delim).append(getCountClusterType(ClusterType.Amp))
+		  .append(delim).append(getCountClusterType(ClusterType.GainSomatic))
 		  .append(delim).append(getCountClusterType(ClusterType.LOH))
 		  .append(delim).append(mCountLOHreferenceLost)
 		  .append(delim).append(getCountClusterType(ClusterType.HETGermline))
 		  .append(delim).append(getCountClusterType(ClusterType.HETSomatic))
 		  
-		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.Amp)))
+		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.GainSomatic)))
 		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.LOH)))
 		  .append(delim).append(Utils.log(mCountLOHreferenceLost))
 		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.HETGermline)))
 		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.HETSomatic)))
 		  
-		  .append(delim).append(getDensityClusterType(ClusterType.Amp))
+		  .append(delim).append(getDensityClusterType(ClusterType.GainSomatic))
 		  .append(delim).append(getDensityClusterType(ClusterType.LOH))
 		  .append(delim).append(mCountLOHreferenceLost / (float) getRangeLength())
 		  .append(delim).append(getDensityClusterType(ClusterType.HETGermline))
 		  .append(delim).append(getDensityClusterType(ClusterType.HETSomatic))
 		  
-		  .append(delim).append(getNumPatientsForClusterType(ClusterType.Amp))
+		  .append(delim).append(getNumPatientsForClusterType(ClusterType.GainSomatic))
 		  .append(delim).append(getNumPatientsForClusterType(ClusterType.LOH))
 		  .append(delim).append(getNumPatientsForClusterType(ClusterType.HETGermline))
 		  .append(delim).append(getNumPatientsForClusterType(ClusterType.HETSomatic));

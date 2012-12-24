@@ -514,7 +514,8 @@ public class Utils {
 		//Test_extractRsNumberFromLine();
 		//TestExtractNthColumn();
 		//TestExtractNthColumnRobust();
-		TestModularity();
+		//TestModularity();
+		System.out.println(calcFractionGC("CCTTGCGCAGGTG"));
 	}
 	
 	// ========================================================================

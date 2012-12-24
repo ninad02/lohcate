@@ -3,20 +3,21 @@ package lohcateEnums;
 import java.util.ArrayList;
 
 public enum ClusterType {
-	Amp,
+	GainGermline,	
+	GainSomatic,
 	LOH,	
+	cnLOH,
 	HETGermline,
 	
 	HETSomatic,
 	Noise,
 	Null;
+		
+	public static final ClusterType[] AmpLOHHetG = new ClusterType[] { GainSomatic, LOH, HETGermline };
+	public static final ClusterType[] AmpLOH = new ClusterType[]     { GainSomatic, LOH };
+	public static final ClusterType[] OnlyLOH = new ClusterType[]    { LOH };
 	
-	public static final ArrayList<String> namesLowercase = getClusterTypesLowercase();
-	public static final ClusterType[] AmpLOHHetG = new ClusterType[] { Amp, LOH, HETGermline };
-	public static final ClusterType[] AmpLOH = new ClusterType[]     { Amp, LOH };
-	public static final ClusterType[] OnlyLOH = new ClusterType[]         { LOH };
-	
-	public static int getNumAberrantClusterTypes() { return 2; }
+	//public static int getNumAberrantClusterTypes() { return 2; }
 	
 	public static int getNumClusterTypes() { return values().length; }
 	
@@ -25,22 +26,19 @@ public enum ClusterType {
 		return (code >= values().length) ? null : values()[code];
 	}
 	
-	/** Compare with lowercase to increase compatibility. */
-	public static ClusterType getClusterType(String clusterTypeName) {
-		clusterTypeName = clusterTypeName.toLowerCase();
-		for (int i = 0; i < namesLowercase.size(); i++) {
-			if (clusterTypeName.equals(namesLowercase.get(i))) {
-				return getClusterType(i);
-			}
-		}
-		return null;
+	public boolean isLOH() { 
+		return (this == LOH || this == cnLOH); 
 	}
 	
-	private static ArrayList<String> getClusterTypesLowercase() {
-		ArrayList<String> clusterTypeNamesLowerCase = new ArrayList<String>(values().length);
+	/** Compare with lowercase to increase compatibility. */
+	public static ClusterType getClusterType(String clusterTypeName) {
 		for (ClusterType ct : values()) {
-			clusterTypeNamesLowerCase.add(ct.name().toLowerCase());
+			if (ct.name().equalsIgnoreCase(clusterTypeName)) {
+				return ct;
+			}
 		}
-		return clusterTypeNamesLowerCase;
+
+		return null;
 	}
+		
 }

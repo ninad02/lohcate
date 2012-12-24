@@ -97,7 +97,7 @@ public class Script {
 	private static final double GCContentThresholdHigh = 0.80;
 	
 	private static final int MaxWindowLength = 1000;
-	private static final int MaxSitesInWindowAllowed = 4;
+	private static final int MaxSitesInWindowAllowed = 3;
 	
 	// Column constants for the curated TSV files (files that have a cluster column)
 	private static final int ColCuratedTSV_Chrom    = 0;
@@ -469,7 +469,7 @@ public class Script {
 		String delim = Utils.FileExtensionTSV.mDelimiter;
 		
 		
-		double copyNumBase = (clusterType == ClusterType.Amp) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);		
+		double copyNumBase = (clusterType == ClusterType.GainSomatic) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);		
 //		double log2RatioGisticCol = log2Ratio - 1.0;
 //		double log2CopyNumGistic = log2CopyNum - 1.0;
 		
@@ -512,7 +512,7 @@ public class Script {
 		CopyNumberRegionRange dummyRange = new CopyNumberRegionRange(ClusterType.HETGermline, Chrom.c0, 0);		
 		double dummyRangeCopyNumberBase = 2.0;
 		
-		double copyNumBase = (clusterType == ClusterType.Amp) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);		
+		double copyNumBase = (clusterType == ClusterType.GainSomatic) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);		
 //		double log2RatioGisticCol = log2Ratio - 1.0;
 //		double log2CopyNumGistic = log2CopyNum - 1.0;
 		
@@ -709,9 +709,12 @@ public class Script {
 			
 			final Chrom chrom  = Chrom.getChrom                       (Utils.extractNthColumnValue(line, ColCuratedTSV_Chrom,    Utils.TabStr));					
 			final int position = Integer.parseInt                     (Utils.extractNthColumnValue(line, ColCuratedTSV_Position, Utils.TabStr));
-			final ClusterType clusterType = ClusterType.getClusterType(Utils.extractNthColumnValue(line, ColCuratedTSV_Cluster,  Utils.TabStr));
+			ClusterType clusterType = ClusterType.getClusterType(Utils.extractNthColumnValue(line, ColCuratedTSV_Cluster,  Utils.TabStr));
 			final String rsColumnValue =                              (Utils.extractNthColumnValue(line, ColCuratedTSV_dbSNP,    Utils.TabStr));
 			final int rsId = (rsColumnValue.indexOf(NovelStr) >= 0 || rsColumnValue.indexOf(Utils.NAStr) >= 0) ? 0 : GenotypeUtils.getNumberFromRsId(rsColumnValue);
+			
+			// Convert cnLOH cluster type to LOH
+			clusterType = clusterType.isLOH() ? ClusterType.LOH : clusterType;
 			
 			// Register the site in the map
 			snvMap.registerSNV(chrom, position, rsId, Nuc.N, Nuc.N, true, true);
@@ -737,11 +740,10 @@ public class Script {
 					continue;  // We ignore duplicate positions
 				}
 				
-				// Now we know the position is after the current range end
-				boolean isLOHCluster = (clusterType == ClusterType.LOH);
+				// Now we know the position is after the current range end				
 				if ((currentRegion.mCopyNumberClusterType == clusterType) && 
 					(currentRegion.getChromosome() == chrom) &&
-					(!isLOHCluster || (isLOHCluster && (position - currentRegion.getRangeEnd() < REGION_SEGMENTATION_DIST_THRESHOLD))) ) {
+					(!clusterType.isLOH() || (clusterType.isLOH() && (position - currentRegion.getRangeEnd() < REGION_SEGMENTATION_DIST_THRESHOLD))) ) {
 					boolean result = currentRegion.extendRange(chrom, position);
 					if (!result) {
 						Utils.throwErrorAndExit("ERROR: Could not extend range! " + currentRegion.toString() + "\t" + chrom + "\t" + position + "\t" + inFile.getName());
@@ -1372,7 +1374,7 @@ public class Script {
 										  String recurrenceNameRoot) {
 		
 		//String filePrefix = outDir + File.separator;
-		String filePrefix = "http://ron.cs.columbia.edu/ninad/LOHcate/renal/browser_tracks/LOH/toUpload/";
+		String filePrefix = "http://ron.cs.columbia.edu/ninad/LOHcate/crc/browser_tracks/LOH/toUpload/";
 		
 		for (Chrom chrom : Chrom.values()) {
 			if (chrom.isInvalid()) continue;
@@ -1518,25 +1520,25 @@ public class Script {
 				VariantLocation.Germline.toLowerCase(), 
 				VariantLocation.Somatic.toLowerCase(),
 				
-				ClusterType.Amp.name(),
+				ClusterType.GainSomatic.name(),
 				ClusterType.LOH.name(), 
 				ClusterType.LOH.name() + "_refLost", 
 				ClusterType.HETGermline.name(),
 				ClusterType.HETSomatic.name(),
 				
-				ClusterType.Amp.name() + logStr,
+				ClusterType.GainSomatic.name() + logStr,
 				ClusterType.LOH.name() + logStr, 
 				ClusterType.LOH.name() + "_refLost" + logStr, 
 				ClusterType.HETGermline.name() + logStr,
 				ClusterType.HETSomatic.name() + logStr,
 				
-				ClusterType.Amp.name()              + densityStr,
+				ClusterType.GainSomatic.name()              + densityStr,
 				ClusterType.LOH.name()              + densityStr, 
 				ClusterType.LOH.name() + "_refLost" + densityStr, 
 				ClusterType.HETGermline.name()      + densityStr,
 				ClusterType.HETSomatic.name()       + densityStr,
 				
-				ClusterType.Amp.name()         + recurrenceStr, 
+				ClusterType.GainSomatic.name()         + recurrenceStr, 
 				ClusterType.LOH.name()         + recurrenceStr, 
 				ClusterType.HETGermline.name() + recurrenceStr,
 				ClusterType.HETSomatic.name()  + recurrenceStr
@@ -1582,6 +1584,7 @@ public class Script {
 		String classifiedSites  = "sites_classified";
 		String vafPlots         = "vafPlots";
 		String vafWaterfallPlots = "vafWaterfallPlots";
+		String copyNumPlots     = "copyNumPlots";
 		String regions          = "regions";
 		String browserTracks    = "browser_tracks";
 		String geneEnrichment   = "gene_enrichment";
@@ -1632,6 +1635,7 @@ public class Script {
 									 rootFolderName + File.separator + classifiedSites, 
 									 rootFolderName + File.separator + vafPlots, 
 									 rootFolderName + File.separator + vafWaterfallPlots,
+									 rootFolderName + File.separator + copyNumPlots,
 					                 SeqPlatform.Illumina); //args[2] --> 0::Illumina, 1::SOLiD
 					                 
 		} else if (taskName.equals(taskRegions)) {

@@ -27,7 +27,7 @@ public class DBSCAN2 {
 	protected int mClusterIndex;
 	
 	// ========================================================================
-	public int getClusterIDOfNoise() { return ClusterIDOfNoise; }
+	public static int getClusterIDOfNoise() { return ClusterIDOfNoise; }
 	
 	// ========================================================================
 	public DBSCAN2(ArrayList<Floint> points, float epsilon, int minPoints) {
