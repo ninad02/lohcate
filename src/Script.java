@@ -32,6 +32,7 @@ import shared.BucketCounter;
 import shared.IOUtils;
 import shared.PrimitiveWrapper;
 import shared.Utils;
+import shared.ArrayUtils.DynamicBucketCounter;
 import shared.Utils.FileExtensionAndDelimiter;
 
 /**
@@ -278,6 +279,7 @@ public class Script {
 					determineRecurrentRegions(regionsInSamplesPerClusterType.get(clusterIndex), clusterType);
 			regionsRecurrentPerClusterType.add(recurrentRegionsForOneClusterType);
 			recurrentRegionsForOneClusterType.print(out, fileExtDelim.mDelimiter);
+			plotRecurrence(recurrentRegionsForOneClusterType, outDir, clusterType);
 		}
 		
 		
@@ -310,6 +312,35 @@ public class Script {
 		}
 		
 		
+	}
+	
+	// ========================================================================
+	/** Plots a genome wide recurrence plot. */
+	public static void plotRecurrence(CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType, String outDir, ClusterType clusterType) {
+		
+		ArrayList<DynamicBucketCounter> dbcByChrom = new ArrayList<DynamicBucketCounter>();
+		for (Chrom chrom : Chrom.values()) {
+			dbcByChrom.add(new DynamicBucketCounter());
+		}
+		
+		float maxRecurrenceScore = -1.0f;
+		for (Chrom chrom : Chrom.values()) {
+			ArrayList<CopyNumberRegionRange> cnrrOnChrom = recurrentRegionsForOneClusterType.mRegionsByChrom.get(chrom.ordinal());
+			if (cnrrOnChrom.isEmpty()) continue;
+			
+			for (CopyNumberRegionRange cnrr : cnrrOnChrom) {
+				DynamicBucketCounter dbc = dbcByChrom.get(chrom.ordinal());
+				maxRecurrenceScore = Math.max(maxRecurrenceScore, cnrr.mRecurrenceScore);
+				
+				int range = cnrr.getRangeLength();
+				int rangeIncr = Math.max(range / 20, 1);
+				for (int startPos = cnrr.getRangeStart(); startPos <= cnrr.getRangeEnd(); startPos += rangeIncr) {
+					dbc.incrementCount(startPos, Math.round(cnrr.mRecurrenceScore));
+				}
+			}
+		}
+		
+		Clustering.plotRecurrenceGenomeWide(dbcByChrom, outDir, Math.round(maxRecurrenceScore), clusterType);
 	}
 	
 	// ========================================================================

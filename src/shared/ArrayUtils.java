@@ -464,10 +464,16 @@ public class ArrayUtils {
 			return (int) IntExtractorLSB.extractValue(mArray.get(indexOfKey));
 		}
 		
+		private int getKeyAtIndex(int indexOfKey) {
+			return (int) IntExtractorMSB.extractValue(mArray.get(indexOfKey));
+		}
+		
 		private int getIndexOfKey(int key) {
 			return binarySearchValue(key, mArray, IntExtractorMSB);
 		}
 		
+		public int getKeyLast() { return (int) IntExtractorMSB.extractValue(mArray.get(mArray.size() - 1)); }
+						
 		public int incrementCount(int key) { return incrementCount(key, 1); }
 		
 		public int incrementCount(int key, int numToIncrement) {
@@ -512,6 +518,19 @@ public class ArrayUtils {
 			
 			System.out.println("Key with max count: " + dbc.getKeyWithMaxCount());
 		}
+		
+		public DoubleArrayList[] toArrayListDouble() {
+			DoubleArrayList[] rV = new DoubleArrayList[2];
+			rV[0] = new DoubleArrayList();
+			rV[1] = new DoubleArrayList();
+			
+			for (int i = 0; i < mArray.size(); i++) {				
+				rV[0].add(getKeyAtIndex(i));
+				rV[1].add(getCountAtIndex(i));
+			}
+			return rV;
+		}
+		
 	}
 	
 	// ========================================================================
