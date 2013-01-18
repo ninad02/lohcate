@@ -1,4 +1,4 @@
-package shared;
+package nutils;
 
 import java.util.Collection;
 

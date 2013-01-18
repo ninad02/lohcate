@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import javax.imageio.ImageIO;
@@ -66,29 +65,6 @@ public class FileOps {
 			contents += inputLine + "\n";
 		in.close();
 		return contents;
-	}
-	
-	public static ArrayList<String> readAllLinesFromFile(String filename) {
-		ArrayList<String> allLines = new ArrayList<String>(100000);
-		String line = null;
-		
-		try {
-			File theFile = new File(filename);
-			if (!theFile.exists()) return allLines;
-			
-			BufferedReader in = new BufferedReader(new FileReader(filename));
-			while ((line = in.readLine()) != null) {
-				allLines.add(line);				
-			}
-						
-			in.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.exit(-1);
-		}
-		
-		allLines.trimToSize();
-		return allLines;
 	}
 	
 	public static String loadFromFile(String fileName) {

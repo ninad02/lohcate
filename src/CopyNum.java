@@ -194,7 +194,7 @@ public class CopyNum {
 					rtn.add(new Point(elem.x, r.x, elem.score)); //add non-zero left region
 				if (elem.y - r.y > 0)
 					rtn.add(new Point(r.y, elem.y, elem.score)); //add non-zero right region
-				rtn.add(new Point((int)Utils.max(elem.x, r.x), (int)Utils.min(elem.y, r.y), elem.z + 1, elem.score + r.score));
+				rtn.add(new Point((int)Math.max(elem.x, r.x), (int)Math.min(elem.y, r.y), elem.z + 1, elem.score + r.score));
 			}
 		}
 		return rtn;

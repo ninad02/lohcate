@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import nutils.ArrayUtils;
+
 
 import shared.*;
 import enrichmentanalysis.Gene;
@@ -49,7 +51,7 @@ public class Enrichment {
 				pathways_grab = getPathways(load[i].split(",")[2], roster_load); //grab pathways in which gene is implicated
 				for (String pathway : pathways_grab) {
 					//if (wlist.indexOf("," + pathway + ",")!=-1) {
-						ind = Utils.indexOf(pathways, pathway);
+						ind = ArrayUtils.linearSearch(pathways, pathway);
 						if (ind==-1) {
 							pathways.add(pathway);
 							path_genes.add(new ArrayList<String>());
@@ -118,7 +120,7 @@ public class Enrichment {
 			pathways_grab = getPathways(split[i].split(",")[2], roster_load); //grab pathways in which gene is implicated
 			for (String pathway : pathways_grab) {
 				//if (wlist.indexOf("," + pathway + ",")!=-1) {
-					ind = Utils.indexOf(pathways, pathway);
+					ind = ArrayUtils.linearSearch(pathways, pathway);
 					if (ind==-1) {
 						pathways.add(pathway);
 						path_genes.add(new ArrayList<String>());
@@ -323,17 +325,17 @@ public class Enrichment {
 			        temp.setRank(score); //set rank
 			        temp.setRank2(score_2);
 		        	HeatMap hmap = new HeatMap();
-		        	tmp_arr[0] = Utils.max(max_pos, min_neg) + Math.abs(max_neg); //upper bound
+		        	tmp_arr[0] = Math.max(max_pos, min_neg) + Math.abs(max_neg); //upper bound
 		        	hmap.setGradientPos(high, tmp_arr);
-		        	tmp_arr[0] = Utils.min(max_neg, min_pos) + Math.abs(max_neg);//lower bound
+		        	tmp_arr[0] = Math.min(max_neg, min_pos) + Math.abs(max_neg);//lower bound
 		    		hmap.setGradientNeg(low, tmp_arr);
 		    		hmap.setMidVal(median[median.length / 2]);
 		    		hmap.setZeroColor(mid);
 		    		
 		    		HeatMap hmap_2 = new HeatMap();
-		        	tmp_arr[0] = Utils.max(max_pos_2, min_neg_2) + Math.abs(max_neg_2); //upper bound
+		        	tmp_arr[0] = Math.max(max_pos_2, min_neg_2) + Math.abs(max_neg_2); //upper bound
 		        	hmap_2.setGradientPos(low, tmp_arr);
-		        	tmp_arr[0] = Utils.min(max_neg_2, min_pos_2) + Math.abs(max_neg_2); //lower bound
+		        	tmp_arr[0] = Math.min(max_neg_2, min_pos_2) + Math.abs(max_neg_2); //lower bound
 		    		hmap_2.setGradientNeg(high, tmp_arr);
 		    		hmap.setMidVal(median_2[median_2.length / 2]);
 		    		hmap_2.setZeroColor(mid);
@@ -409,7 +411,7 @@ public class Enrichment {
 			try {
 				go_grab = getGO(load[i].split(",")[2], go_load);
 				for (String grab : go_grab) {
-					ind = Utils.indexOf(lbls, grab);
+					ind = ArrayUtils.linearSearch(lbls, grab);
 					if (ind==-1) {
 						lbls.add(grab);
 						counts.add(1);
@@ -477,11 +479,11 @@ public class Enrichment {
 					String[] columns = load[row].split(Utils.TabStr);
 					
 					if (columns[4].equals(Script.MissingGeneNameValue)) { //avoid "." gene name
-						if (Utils.indexOf(blacklist, row)==-1 && Float.parseFloat(columns[baseColOfClusterTypes]) > temp_max) {
+						if (ArrayUtils.linearSearch(blacklist, row)==-1 && Float.parseFloat(columns[baseColOfClusterTypes]) > temp_max) {
 							temp_max = Float.parseFloat(columns[baseColOfClusterTypes]);
 							temp_max_ind = row;
 						}
-						if (Utils.indexOf(g1blacklist, row)==-1 && Float.parseFloat(columns[baseColOfClusterTypes]) > temp_max_g1
+						if (ArrayUtils.linearSearch(g1blacklist, row)==-1 && Float.parseFloat(columns[baseColOfClusterTypes]) > temp_max_g1
 								&& Float.parseFloat(columns[baseColOfClusterTypes]) <= 1) {//!columns[1].split("-")[0].equals(columns[1].split("-")[1])) { //handle genes with variant range > 0
 							temp_max_g1 = Float.parseFloat(columns[baseColOfClusterTypes]);
 							temp_max_ind_g1 = row;

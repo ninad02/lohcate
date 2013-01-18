@@ -1,4 +1,4 @@
-package shared;
+package nutils;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -6,8 +6,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Random;
 
-import com.carrotsearch.hppc.DoubleArrayList;
+import nutils.counter.DynamicBucketCounter;
+
+
 import com.carrotsearch.hppc.LongArrayList;
 
 public class ArrayUtils {
@@ -86,7 +90,7 @@ public class ArrayUtils {
 	public static<T> void reverseArray(T[] theArray) {
 		T tempVal;
 		int oppositeIndex;
-		for (int i = 0; i < (theArray.length >>> 2); i++) {
+		for (int i = 0; i < (theArray.length >>> 1); i++) {
 			oppositeIndex = theArray.length - i - 1;
 			tempVal = theArray[i];
 			theArray[i] = theArray[oppositeIndex];
@@ -178,22 +182,22 @@ public class ArrayUtils {
 		return rV;
 	}
 
-	/** Converts a collection of Integers to a primitive list. */
-	public static int[] getPrimitiveIntegerArray(Collection<Integer> theList) {
+	/** Converts a collection of Integers to a primitive list. */	
+	public static int[] getPrimitiveArrayInt(Collection<Integer> theList) {
 		int[] rV = new int[theList.size()];
 		int index = 0;
-		for (Iterator<Integer> iter = theList.iterator(); iter.hasNext(); ) {
-			rV[index++] = iter.next().intValue();
-		}
+		for (Integer num : theList) {
+			rV[index++] = num.intValue();
+		}		
 		return rV;
 	}
 
 	/** Converts a collection of Double to a primitive list. */
-	public static double[] getPrimitiveDoubleArray(Collection<Double> theList) {
+	public static double[] getPrimitiveArrayDouble(Collection<Double> theList) {
 		double[] rV = new double[theList.size()];
 		int index = 0;
-		for (Iterator<Double> iter = theList.iterator(); iter.hasNext(); ) {
-			rV[index++] = iter.next().doubleValue();
+		for (Double d : theList) {		
+			rV[index++] = d.doubleValue();
 		}
 		return rV;
 	}
@@ -358,180 +362,6 @@ public class ArrayUtils {
 	// ========================================================================
 	// ===== INNER CLASS =====
 	// ========================================================================
-	public static class BucketCounter {
-		private int[] mArray;		
-		private int mIndexStart;
-		private int mSumOfCounts;
-		private int mTotalSum;
-		
-		public BucketCounter(int arrayLength, int valueStart) {
-			mIndexStart = valueStart;
-			mArray = new int[arrayLength];
-			clear();
-		}
-		
-		public void clear() { 
-			Arrays.fill(mArray, 0); 
-			mSumOfCounts = 0; 	
-			mTotalSum = 0;
-		}
-		
-		public void increment(int bucket) { 
-			increment(bucket, 1);
-		}
-		
-		public void increment(int bucket, int numTimesToIncrement) {
-			mArray[bucket - mIndexStart] += numTimesToIncrement;
-			mSumOfCounts                 += numTimesToIncrement;
-			mTotalSum                    += (numTimesToIncrement * bucket);
-		}
-		
-		public int getLength() { return mArray.length; }
-		public int getCount(int bucket) { return mArray[bucket - mIndexStart]; }
-		public double getProportion(int bucket) { return (double) getCount(bucket) / (double) mSumOfCounts; }
-		public double calcMean() { return (double) mTotalSum / (double) mSumOfCounts; }
-		
-		/*
-		public ArrayUtils.BucketCounter downsampleCounts(double probabilityToRetainCount) {
-			int thisLength = getLength();
-			ArrayUtils.BucketCounter bcSubsampled = new ArrayUtils.BucketCounter(thisLength, mIndexStart);
-			
-			for (int b = 0; b < thisLength; b++) {
-				int trueBucketValue = b + mIndexStart;
-				int numSitesInBucket = getCount(trueBucketValue);
-				for (int j = 0; j < numSitesInBucket; j++) {
-					int downsampledNumReads = NumberUtils.numSuccessesInTrials(trueBucketValue, probabilityToRetainCount, 0);
-					bcSubsampled.increment(downsampledNumReads);
-				}
-			}	
-			return bcSubsampled;
-		}*/
-		
-		public boolean add(BucketCounter bc) {
-			if (this.mArray.length != bc.mArray.length) return false;
-			if (this.mIndexStart != bc.mIndexStart) return false;
-			
-			int bcLength = bc.getLength();
-			for (int b = 0; b < bcLength; b++) {
-				int trueOtherBucketValue = b + bc.mIndexStart;
-				int otherCount = bc.getCount(trueOtherBucketValue);
-				this.increment(trueOtherBucketValue, otherCount);
-			}
-			return true;
-		}
-		
-		public void print(PrintStream out) {			
-			print(out, true);
-		}
-		
-		public void print(PrintStream out, boolean printZeroCountElements) {
-			for (int i = 0; i < getLength(); i++) {
-				if (printZeroCountElements || (getCount(i) > 0)) {
-					out.println(i + "\t" + getCount(i) + "\t" + getProportion(i));
-				}
-			}
-		}
-	}
-
-	// ========================================================================
-	
-	
-	// ========================================================================
-	public static class DynamicBucketCounter {
-
-		LongArrayList mArray;
-		private int mSumOfCounts;
-		private int mTotalSum;
-		
-		public DynamicBucketCounter() {
-			mArray = new LongArrayList();
-			clear();
-		}
-		
-		public void clear() { 
-			mArray.clear();
-			mSumOfCounts = 0; 	
-			mTotalSum = 0;
-		}
-		
-		public int getCount(int key) {
-			int indexOfKey = getIndexOfKey(key);
-			if (indexOfKey < 0) return indexOfKey;
-			return getCountAtIndex(indexOfKey);			
-		}
-		
-		private int getCountAtIndex(int indexOfKey) {
-			return (int) IntExtractorLSB.extractValue(mArray.get(indexOfKey));
-		}
-		
-		private int getKeyAtIndex(int indexOfKey) {
-			return (int) IntExtractorMSB.extractValue(mArray.get(indexOfKey));
-		}
-		
-		private int getIndexOfKey(int key) {
-			return binarySearchValue(key, mArray, IntExtractorMSB);
-		}
-		
-		public int getKeyLast() { return (int) IntExtractorMSB.extractValue(mArray.get(mArray.size() - 1)); }
-						
-		public int incrementCount(int key) { return incrementCount(key, 1); }
-		
-		public int incrementCount(int key, int numToIncrement) {
-			int indexOfKey = getIndexOfKey(key);
-			if (indexOfKey < 0) {
-				mArray.insert(getInsertPoint(indexOfKey), getKeyValueAsLong(key, numToIncrement));
-				return numToIncrement;
-			} else {
-				int newCount = numToIncrement + getCountAtIndex(indexOfKey);
-				mArray.set(indexOfKey, getKeyValueAsLong(key, newCount));		
-				return newCount;
-			}
-		}
-		
-		private static long getKeyValueAsLong(int key, int value) {
-			return ( 0L | (((long) key) << Integer.SIZE) | value );
-		}
-		
-		
-		public int getKeyWithMaxCount() {
-			long keyValueMax = getKeyValueWithMaxCount();
-			return (int) IntExtractorMSB.extractValue(keyValueMax);
-		}
-		
-		public long getKeyValueWithMaxCount() {
-			return searchMaxValue(mArray, IntExtractorLSB);
-		}
-		
-		public static void TestDynamicBucketCounter() {
-			int numVals = 100;		
-			DynamicBucketCounter dbc = new DynamicBucketCounter();
-			
-			for (int i = 1; i <= numVals; i++) {				
-				for (int j = 0; j < i; j++) {
-					dbc.incrementCount(i);
-				}
-			}
-			
-			for (int i = 1; i <= numVals; i++) {
-				System.out.printf("%d\t%d\n", i, dbc.getCount(i));
-			}
-			
-			System.out.println("Key with max count: " + dbc.getKeyWithMaxCount());
-		}
-		
-		public DoubleArrayList[] toArrayListDouble() {
-			DoubleArrayList[] rV = new DoubleArrayList[2];
-			rV[0] = new DoubleArrayList();
-			rV[1] = new DoubleArrayList();
-			
-			for (int i = 0; i < mArray.size(); i++) {				
-				rV[0].add(getKeyAtIndex(i));
-				rV[1].add(getCountAtIndex(i));
-			}
-			return rV;
-		}
-		
-	}
 	
 	// ========================================================================
 	public static int getInsertPoint(int negativeArrayIndex) { return -(negativeArrayIndex + 1); }
@@ -664,7 +494,7 @@ public class ArrayUtils {
 				
 		return finalList;
 	}
-	
+
 	// ========================================================================
 	/** Given a String list of comma-separated numbers such that the head and tail
 	 *  of the list are surrounded by braces, this returns the string without the
@@ -681,21 +511,7 @@ public class ArrayUtils {
 	
 	
 	// ========================================================================
-	public interface ValueExtractor {
-		public long extractValue(long compactUnit);		
-	}
-	
-	public static ValueExtractor IntExtractorLSB = new ValueExtractor() { 
-		public long extractValue(long compactUnit) { return (compactUnit & 0xFFFFFFFFL); }
-	};
-		
-	public static ValueExtractor IntExtractorMSB = new ValueExtractor() { 
-		public long extractValue(long compactUnit) { return (compactUnit >>> Integer.SIZE); }
-	};
-	
-
-	// ========================================================================
-	public static long searchMaxValue(LongArrayList longArray, ValueExtractor extractor) {
+	public static long searchMaxValue(LongArrayList longArray, BitSetUtils.ValueExtractor extractor) {
 		long maxValue = Long.MIN_VALUE;
 		int maxValueIndex = -1;
 		
@@ -710,12 +526,15 @@ public class ArrayUtils {
 		
 		return longArray.get(maxValueIndex);
 	}
+
+	// ========================================================================
+	
 	
 	// ========================================================================
 	/** Given a sample index and integer array, this performs a binary search
 	 *  for the sample index on the integer array.  If the sample index is 
 	 *  found, an index >= 0 is returned, else (-(insertion point) - 1) is returned. */
-	public static int binarySearchValue(final long value, LongArrayList longArray, ValueExtractor extractor) {
+	public static int binarySearchValue(final long value, LongArrayList longArray, BitSetUtils.ValueExtractor extractor) {
 		int lowerIndex = 0;
 		int upperIndex = longArray.size() - 1;
 		int midIndex = 0;
@@ -756,5 +575,235 @@ public class ArrayUtils {
 		}
 		
 		return -(lowerIndex + 1);
+	}
+
+	// ========================================================================
+	/** Given a target collection, this adds elements from the source collection at the end
+	 *  of the target collection.  We create this function because it is ironically more 
+	 *  efficient than the addAll() method in some collections, which stupidly allocates
+	 *  memory to create an extra and needless temporary array in its implementation.
+	 * @param listToWhichToAdd
+	 * @param elementsToAdd
+	 */
+	// We create this function because it is ironically more efficient than the ArrayList.addAll() method,
+	// which stupidly allocates memory to create an extra and needless temporary array in its implementaion.
+	public static<T> void addAll(ArrayList<T> listToWhichToAdd, ArrayList<T> elementsToAdd) {
+		listToWhichToAdd.ensureCapacity( listToWhichToAdd.size() + elementsToAdd.size() );  // Ensure capacity so no memory reallocation later		
+		for (T element : elementsToAdd) {
+			listToWhichToAdd.add(element);
+		}
+	}
+
+	// ========================================================================
+	/** Given a two dimensional integer array, this fills all elements with the specified value. */
+	public static void arrayFill(int[][] theArray, int value) {
+		for (int[] subArray : theArray) {
+			Arrays.fill(subArray, value);
+		}
+	}
+
+	// ========================================================================
+	/** Given a three dimensional integer array, this fills all the elements with the specified value. */
+	public static void arrayFill(int[][][] theArray, int value) {
+		for (int[][] subArray : theArray) {
+			arrayFill(subArray, value);
+		}
+	}
+
+	// ========================================================================
+	/** Given a four dimensional integer array, thsi fills all the elements with the specified value. */
+	public static void arrayFill(int[][][][] theArray, int value) {
+		for (int[][][] subArray : theArray) {
+			arrayFill(subArray, value);
+		}
+	}
+
+	// ========================================================================
+	/** This returns a new int[] array with the specified length and initialized to the specified values. */
+	public static int[] newIntArray(int numElements, int fillValue) {
+		int[] newArray = new int[numElements];
+		Arrays.fill(newArray, fillValue);
+		return newArray;
+	}
+
+	// ========================================================================
+	/** This returns a new int[][] array with the specified dimensions and with all elements
+	 *  initialized to the specified value.
+	 */
+	public static int[][] newIntArray2D(int numElementsX, int numElementsY, int fillValue) {
+		int[][] newArray = new int[numElementsX][numElementsY];
+		arrayFill(newArray, fillValue);
+		return newArray;
+	}
+
+	// ========================================================================
+	/** Given an arraylist of arraylists of a certain type, this adds numNewArraysToAdd new ArrayLists of
+	 *  that type to the target list.
+	 * @param targetList
+	 * @param numNewArraysToAdd
+	 */
+	public static<T> ArrayList<ArrayList<T>> addNewEmptyArrayLists(ArrayList<ArrayList<T>> targetList, int numNewArraysToAdd) {
+		targetList = (targetList == null) ? new ArrayList<ArrayList<T>>() : targetList;
+		
+		for (int i = 0; i < numNewArraysToAdd; i++) {
+			targetList.add(new ArrayList<T>());
+		}
+		
+		return targetList;
+	}
+
+	// ========================================================================
+	// removes last n elements from the list
+	public static<T> ArrayList<T> removeLastNElements(ArrayList<T> theList, int numLastElementsToRemove) {
+		numLastElementsToRemove = Math.min(numLastElementsToRemove, theList.size());
+		int listSize = theList.size();
+		for (int i = 0; i < numLastElementsToRemove; i++) {
+			theList.remove(listSize - 1);
+			listSize--;
+		}
+		return theList;
+	}
+
+	// ========================================================================
+	// removes any elements set to null in the list
+	public static<T> ArrayList<T> removeNullElements(ArrayList<T> theList) {
+		
+		int indexNow = 0;
+		int indexAhead = indexNow + 1;
+		int numNullValues = 0;
+		
+		boolean remainingElementsNonNull = true;
+		int size = theList.size();
+		for ( ; (indexNow < size) && remainingElementsNonNull; indexNow++) {
+			if (theList.get(indexNow) == null) {
+				// Currently we have a null element.
+				numNullValues++;
+				
+				// Now we move indexAhead forward until we 
+				// reach a non-null value or the end of the list				
+				for (indexAhead = Math.max(indexNow + 1, indexAhead); 
+						(indexAhead < size) && (theList.get(indexAhead) == null); 
+						indexAhead++) {}				
+				
+				// At this point, indexAhead has either crossed its bounds
+				// or has found an element
+				if (indexAhead >= size) {    
+					// crossed bounds.  Means that there were no non-null elements past 
+					// the current index.  All we do now is remove the current and 
+					// remaining (null) elements from the list.
+					int numLastElementsToRemove = size - indexNow;  					
+					removeLastNElements(theList, numLastElementsToRemove);
+					numNullValues += numLastElementsToRemove - 1;
+					remainingElementsNonNull = false;
+				} else {  
+					// found a non-null element, so swap them
+					theList.set(indexNow, theList.get(indexAhead));
+					theList.set(indexAhead, null);
+				}
+				
+			} 
+		}
+				
+		return theList;		
+	}
+
+	// ========================================================================
+	private static void Test_removeNullElements() {
+		
+		ArrayList<Integer> list1 = new ArrayList<Integer>();
+		ArrayList<Integer> list2 = new ArrayList<Integer>();
+		ArrayList<Integer> listM = new ArrayList<Integer>();  // a master list
+		
+		ArrayList<Integer> list2IndicesToRemove = new ArrayList<Integer>();
+		
+		int numTrials = 10000;
+		int numElementsInArray = 100;
+		int numElementsToDelete = 30;
+		Random randomGen = new Random();
+		
+		for (int i = 0; i < numElementsInArray; i++) {			
+			listM.add(new Integer(i));
+		}
+		
+		for (int trial = 0; trial < numTrials; trial++) {
+			list1.clear();
+			list2.clear();
+			list1.addAll(listM);
+			list2.addAll(listM);
+			list2IndicesToRemove.clear();
+			
+			// Now select random elements to delete from list1 
+			for (int j = 0; j < numElementsToDelete; ) {
+				int indexToDelete = randomGen.nextInt(numElementsInArray);
+				if (list1.get(indexToDelete) != null) {
+					list1.set(indexToDelete, null);
+					list2IndicesToRemove.add(indexToDelete);
+					j++;						
+				}
+			}
+			
+			// Now we must delete from list2, though in reverse order
+			Collections.sort(list2IndicesToRemove);
+			Collections.reverse(list2IndicesToRemove);
+			for (Integer theIndex : list2IndicesToRemove) {
+				list2.remove(theIndex);
+			}
+			
+			// Now perform the deletion on the list 1
+			removeNullElements(list1);
+	
+			// Now compare
+			boolean areListsEqual = list1.equals(list2);
+			if (areListsEqual) {
+				System.out.println(list1);
+				System.out.println(list2);
+				System.out.println("");
+				//break;
+			}
+		}
+	}
+
+	// ========================================================================
+	/** This assumes that the list is sorted.  It tests whether the element already exists in
+	 *  the list and inserts the element only if it doesn't already exist in the list. 
+	 * @param targetList The list that is tested for the presence of the element in the list  
+	 * @param element The element to be added if it doesn't already exist in the list
+	 * @return true if the element already existed in the list, false otherwise
+	 */
+	public static<T> boolean checkInListAndInsertIfMissing(List <? extends Comparable<? super T>> list, T key) {
+		int resultIndex = Collections.binarySearch(list, key);
+		if (resultIndex < 0) {
+			int insertionIndex = getInsertPoint(resultIndex);
+			List<T> listCasted = (List<T>) list;
+			listCasted.add(insertionIndex, key);			
+			return false;
+		} else {
+			return true;
+		}		
+	}
+
+	// ========================================================================
+	/** This linearly searches the aray for the integer value.  
+	 * 
+	 * @param theArray The input array
+	 * @param targetValue The target value
+	 * @return The index of the target value in the input array, or -1 if not found.
+	 */
+	public static int linearSearch(ArrayList<Integer> theArray, final int targetValue) {
+		for (Integer i : theArray) {
+			if (targetValue == i) return i;
+		}
+		return -1;
+	}
+
+	/** This linearly searches the aray for the integer value.  
+	 * 
+	 * @param theArray The input array
+	 * @param elem The target object
+	 * @return The index of the target value in the input array, or -1 if not found.
+	 */
+	// ========================================================================
+	public static<E> int linearSearch(ArrayList<E> theArray, E elem) {
+		return theArray.indexOf(elem);
 	}
 }

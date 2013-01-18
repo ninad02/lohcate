@@ -2,12 +2,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import nutils.ArrayUtils;
+import nutils.counter.BucketCounter;
+
 import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
 import lohcateEnums.MutationType;
 import lohcateEnums.VariantLocation;
 
-import shared.BucketCounter;
 import shared.Utils;
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
@@ -52,13 +54,13 @@ public class Gene implements Comparable<Gene> {
 	
 	private void initializePatients() {
 		mPatients = new ArrayList<ArrayList<String>>();
-		Utils.addNewEmptyArrayLists(mPatients, ClusterType.values().length);
+		ArrayUtils.addNewEmptyArrayLists(mPatients, ClusterType.values().length);
 	}
 	
 	/** Returns true if the patient was already existing for the clustertype, false otherwise. */
 	public boolean addPatientIfNotAlreadyAdded(String patientName, ClusterType clusterType) {
 		ArrayList<String> patientList = mPatients.get(clusterType.ordinal());
-		return Utils.checkInListAndInsertIfMissing(patientList, patientName);
+		return ArrayUtils.checkInListAndInsertIfMissing(patientList, patientName);
 	}
 	
 	public int getNumPatientsForClusterType(ClusterType clusterType) {

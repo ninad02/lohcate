@@ -2,8 +2,10 @@ import java.io.BufferedReader;
 import java.util.ArrayList;
 import java.util.Collections;
 
-import shared.IOUtils;
-import shared.Utils;
+import nutils.ArrayUtils;
+import nutils.IOUtils;
+import nutils.StringUtils;
+
 
 import lohcateEnums.Chrom;
 
@@ -20,7 +22,7 @@ public class AllelicBiasTable {
 	
 	public AllelicBiasTable() {
 		mDummyPayload = new PositionAndPayload(0, 0, 0);
-		mPositionsAndVAFs = Utils.addNewEmptyArrayLists(null, Chrom.values().length);
+		mPositionsAndVAFs = ArrayUtils.addNewEmptyArrayLists(null, Chrom.values().length);
 	}
 
 	// ========================================================================
@@ -53,14 +55,14 @@ public class AllelicBiasTable {
 	public static AllelicBiasTable readFileAndConstructTable(String inFilename, int colNumSamples, int colAvgVAFNormal) {
 		BufferedReader in = IOUtils.getBufferedReader(inFilename);
 		String line;
-		String delim = Utils.FileExtensionTSV.mDelimiter;
+		String delim = StringUtils.FileExtensionTSV.mDelimiter;
 		
 		AllelicBiasTable allelicBiasTable = new AllelicBiasTable();
 		while ((line = IOUtils.getNextLineInBufferedReader(in)) != null) {
-			Chrom chrom    = Chrom.getChrom(Utils.extractNthColumnValue(line, 0, delim));
-			int position = Integer.parseInt(Utils.extractNthColumnValue(line, 1, delim));
-			int numSamplesRepresented = Integer.parseInt(Utils.extractNthColumnValue(line, colNumSamples,   delim));
-			float avgVAFNormal        = Float.parseFloat(Utils.extractNthColumnValue(line, colAvgVAFNormal, delim));
+			Chrom chrom    = Chrom.getChrom(StringUtils.extractNthColumnValue(line, 0, delim));
+			int position = Integer.parseInt(StringUtils.extractNthColumnValue(line, 1, delim));
+			int numSamplesRepresented = Integer.parseInt(StringUtils.extractNthColumnValue(line, colNumSamples,   delim));
+			float avgVAFNormal        = Float.parseFloat(StringUtils.extractNthColumnValue(line, colAvgVAFNormal, delim));
 			PositionAndPayload posAndPay = new PositionAndPayload(position, numSamplesRepresented, avgVAFNormal);
 			
 			allelicBiasTable.mPositionsAndVAFs.get(chrom.ordinal()).add(posAndPay);

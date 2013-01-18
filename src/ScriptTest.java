@@ -2,7 +2,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
 
-import shared.Utils;
+import nutils.CompareUtils;
+
 
 import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
@@ -123,7 +124,7 @@ public class ScriptTest extends Script {
 			} else {
 				boolean match = resultString.equals(resultStringPrev);
 				if (!match) {
-					Utils.throwErrorAndExit("ERROR: Doesn't match!\n" + resultString + "\n" + resultStringPrev);
+					CompareUtils.throwErrorAndExit("ERROR: Doesn't match!\n" + resultString + "\n" + resultStringPrev);
 				}
 			}
 		}

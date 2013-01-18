@@ -1,7 +1,10 @@
-package shared;
+package nutils.counter;
 
 import java.io.PrintStream;
 import java.util.Arrays;
+
+import nutils.ArrayUtils;
+import nutils.NumberUtils;
 
 public class BucketCounter {
 	private int[] mArray;		
@@ -42,6 +45,21 @@ public class BucketCounter {
 	public int getCount(int bucket) { return mArray[bucket - mIndexStart]; }
 	public double getProportion(int bucket) { return (double) getCount(bucket) / (double) mSumOfCounts; }
 	public double calcMean() { return (double) mTotalSum / (double) mSumOfCounts; }
+	
+	public BucketCounter downsampleCounts(double probabilityToRetainCount) {
+		int thisLength = getLength();
+		BucketCounter bcSubsampled = new BucketCounter(thisLength, mIndexStart);
+		
+		for (int b = 0; b < thisLength; b++) {
+			int trueBucketValue = b + mIndexStart;
+			int numSitesInBucket = getCount(trueBucketValue);
+			for (int j = 0; j < numSitesInBucket; j++) {
+				int downsampledNumReads = NumberUtils.numSuccessesInTrials(trueBucketValue, probabilityToRetainCount, 0);
+				bcSubsampled.increment(downsampledNumReads);
+			}
+		}	
+		return bcSubsampled;
+	}
 	
 	public boolean add(BucketCounter bc) {
 		if (this.mArray.length != bc.mArray.length) return false;

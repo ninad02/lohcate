@@ -8,6 +8,10 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Iterator;
 
+import nutils.ArrayUtils;
+import nutils.CompareUtils;
+import nutils.IOUtils;
+
 import lohcateEnums.Chrom;
 import lohcateEnums.Genotype;
 import lohcateEnums.Nuc;
@@ -15,10 +19,9 @@ import lohcateEnums.Nuc;
 import com.carrotsearch.hppc.IntArrayList;
 import com.carrotsearch.hppc.LongArrayList;
 
-import shared.ArrayUtils;
-import shared.IOUtils;
-import shared.NumberUtils;
 import shared.Utils;
+
+import nutils.NumberUtils;
 
 public class SNVMap {
 
@@ -90,7 +93,7 @@ public class SNVMap {
 	 *  if site alreay existed in list).
 	 */
 	public Boolean registerSNV(Chrom chrom, int position, int rsId, Nuc nuc1, Nuc nuc2, boolean strand, boolean uniqueOnly) {
-		Utils.ensureTrue(rsId >= 0, "ERROR: AffySNPMap.registerSNP(): rsId cannot be < 0!");
+		CompareUtils.ensureTrue(rsId >= 0, "ERROR: AffySNPMap.registerSNP(): rsId cannot be < 0!");
 		if (!strand) {
 			nuc1 = nuc1.getComplement();
 			nuc2 = nuc2.getComplement();
@@ -115,12 +118,12 @@ public class SNVMap {
 	public void registerSNPinIllumina(byte chromNum, int position, int rsId, Nuc nuc1, Nuc nuc2, boolean isIlluminaTop) {
 		// These are the rules.  
 		if (isIlluminaTop) {
-			Utils.ensureTrue(nuc1  == Nuc.A, "ERROR: SNVMap.registerSNP(): nuc1 is " + nuc1 + "instead of A");
-			Utils.ensureTrue((nuc2 == Nuc.C || nuc2 == Nuc.G), "ERROR: AffySNPMap.registerSNP(): nuc2 is " + nuc2 + "instead of C or G");
+			CompareUtils.ensureTrue(nuc1  == Nuc.A, "ERROR: SNVMap.registerSNP(): nuc1 is " + nuc1 + "instead of A");
+			CompareUtils.ensureTrue((nuc2 == Nuc.C || nuc2 == Nuc.G), "ERROR: AffySNPMap.registerSNP(): nuc2 is " + nuc2 + "instead of C or G");
 			// do the actual SNP registration
 		} else {
-			Utils.ensureTrue(nuc2  == Nuc.T, "ERROR: SNVMap.registerSNP(): nuc2 is " + nuc2 + "instead of T");
-			Utils.ensureTrue((nuc1 == Nuc.C || nuc1 == Nuc.G), "ERROR: AffySNPMap.registerSNP(): nuc1 is " + nuc1 + "instead of C or G");		
+			CompareUtils.ensureTrue(nuc2  == Nuc.T, "ERROR: SNVMap.registerSNP(): nuc2 is " + nuc2 + "instead of T");
+			CompareUtils.ensureTrue((nuc1 == Nuc.C || nuc1 == Nuc.G), "ERROR: AffySNPMap.registerSNP(): nuc1 is " + nuc1 + "instead of C or G");		
 			// do the actual SNP registration
 		}
 	}
@@ -547,19 +550,19 @@ public class SNVMap {
 			int extractedRsId = snvMap.getRsIdInMap(chromList.get(trial), positionList.get(trial));
 			if (extractedRsId != rsIDList.get(trial)) {
 				String errorString = "ERROR: Correct rs-id not pulled!\n" + rsIDList.get(trial) + "\t" + extractedRsId;
-				Utils.ensureTrue(false, errorString);
+				CompareUtils.ensureTrue(false, errorString);
 			}
 			
 			snvMap.getNucleotidesInMap(chromList.get(trial), positionList.get(trial), extractedNucs);
 			if (strandList.get(trial)) {
 				if (extractedNucs[0] != nuc1List.get(trial) || extractedNucs[1] != nuc2List.get(trial)) {
 					String errorString = "ERROR: Correct nuc alleles not pulled on positive strand!";
-					Utils.ensureTrue(false, errorString);
+					CompareUtils.ensureTrue(false, errorString);
 				}
 			} else {
 				if (extractedNucs[0] != nuc1List.get(trial).getComplement() || extractedNucs[1] != nuc2List.get(trial).getComplement()) {
 					String errorString = "ERROR: Correct nuc alleles not pulled on negative strand!";
-					Utils.ensureTrue(false, errorString);
+					CompareUtils.ensureTrue(false, errorString);
 				}
 			}
 		}
@@ -651,14 +654,14 @@ public class SNVMap {
 				if (extractedPosition != position) {
 					String errorString = "ERROR: Mismatched positions!\nTrial:\t" + trial + "\n" + position + "\t" + extractedPosition;
 					System.out.println("BinString = " + Long.toBinaryString(compactUnit));
-					Utils.ensureTrue(false, errorString);
+					CompareUtils.ensureTrue(false, errorString);
 				}
 				
-				Utils.ensureTrue(extractedRsID == rsID, "ERROR: Mismatched rsIDs!");
+				CompareUtils.ensureTrue(extractedRsID == rsID, "ERROR: Mismatched rsIDs!");
 				
 				if (!Arrays.equals(extractedNucs, assignedNucs)) {
 					String errorString = "ERROR: Mismatched Nucs!\n" + getStringForBytes(extractedNucs) + "\n" + getStringForBytes(assignedNucs);
-					Utils.ensureTrue(false, errorString);
+					CompareUtils.ensureTrue(false, errorString);
 				}
 			}
 			makeRsIDMostSignificant = !makeRsIDMostSignificant;

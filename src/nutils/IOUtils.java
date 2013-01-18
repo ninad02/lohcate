@@ -1,7 +1,8 @@
-package shared;
+package nutils;
 
 import java.io.*;
 import java.util.*;
+
 
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
@@ -36,7 +37,7 @@ public class IOUtils {
 			if (!dirPath.isDirectory()) {
 				boolean result = dirPath.mkdirs();
 				if (!result) {
-					Utils.throwErrorAndExit("ERROR: Could not create directory: " + dirPath.getAbsolutePath());
+					CompareUtils.throwErrorAndExit("ERROR: Could not create directory: " + dirPath.getAbsolutePath());
 				}
 			}
 		} catch (SecurityException e) {
@@ -423,6 +424,8 @@ public class IOUtils {
 	// ========================================================================
 	/** Given an infilename, this reads all the lines in the infilename and returns a list of strings. */
 	public static ArrayList<String> readAllLinesFromFile(String inFilename, boolean trimLines, boolean ignoreWhitespaceLines, StringBuilder headerString) {
+		if (!doesFileExist(inFilename)) return new ArrayList<String>();
+		
 		LinkedList<String> theList = new LinkedList<String>();
 		BufferedReader in = getBufferedReader(inFilename);
 		
@@ -444,6 +447,11 @@ public class IOUtils {
 		
 		closeBufferedReader(in);
 		return new ArrayList<String>(theList);
+	}
+	
+	// ========================================================================
+	public static boolean doesFileExist(String filename) {
+		return (new File(filename)).exists();		
 	}
 
 	// ========================================================================
@@ -689,6 +697,8 @@ public class IOUtils {
 		}
 		return null;
 	}
+
+	
 
 }
 

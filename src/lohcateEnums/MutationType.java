@@ -1,6 +1,7 @@
 package lohcateEnums;
 
 public enum MutationType {
+	None,
 	NonSynonymous_SNV    ("nonsynonymous_SNV"),
 	Synonymous_SNV       ("synonymous_SNV"),
 	
@@ -39,6 +40,7 @@ public enum MutationType {
 	
 	public String toUpperCase() { return mUpperCase; }
 	public String toLowerCase() { return mLowerCase; }
+	public String getPrintName() { return mPrintName; }
 	
 	public static MutationType getSNVType(String snvType) {
 		for (MutationType enumType : values()) {
@@ -49,7 +51,15 @@ public enum MutationType {
 				return enumType;
 			}
 		}
-		return null;
+		return None;
+	}
+	
+	public static MutationType getMutationType(int code) {
+		if (code >= 0 && code < values().length) {
+			return values()[code];
+		} else {
+			return null;
+		}
 	}
 	
 	/*

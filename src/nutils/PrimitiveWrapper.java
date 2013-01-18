@@ -1,7 +1,7 @@
 /**
  * 
  */
-package shared;
+package nutils;
 
 /**
  * @author ninad
