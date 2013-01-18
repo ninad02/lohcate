@@ -1,4 +1,4 @@
-package lohcateEnums;
+package genomeEnums;
 
 import java.util.ArrayList;
 

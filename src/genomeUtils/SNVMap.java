@@ -1,5 +1,8 @@
 package genomeUtils;
 
+import genomeEnums.Chrom;
+import genomeEnums.Genotype;
+import genomeEnums.Nuc;
 import genomeUtils.GenotypeUtils;
 
 import java.io.BufferedWriter;
@@ -12,9 +15,6 @@ import nutils.ArrayUtils;
 import nutils.CompareUtils;
 import nutils.IOUtils;
 
-import lohcateEnums.Chrom;
-import lohcateEnums.Genotype;
-import lohcateEnums.Nuc;
 
 import com.carrotsearch.hppc.IntArrayList;
 import com.carrotsearch.hppc.LongArrayList;

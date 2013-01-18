@@ -1,3 +1,6 @@
+import genomeEnums.Chrom;
+import genomeEnums.Nuc;
+import genomeEnums.VariantLocation;
 import genomeUtils.GenotypeUtils;
 import genomeUtils.RegionRange;
 import genomeUtils.RegionRange.RegionRangeOverlap;
@@ -30,13 +33,10 @@ import com.martiansoftware.jsap.FlaggedOption;
 import com.martiansoftware.jsap.JSAP;
 import com.martiansoftware.jsap.JSAPResult;
 
-import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
 import lohcateEnums.ColorPastel;
 import lohcateEnums.MutationType;
-import lohcateEnums.Nuc;
 import lohcateEnums.SeqPlatform;
-import lohcateEnums.VariantLocation;
 import shared.Utils;
 
 /**

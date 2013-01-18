@@ -1,4 +1,4 @@
-package lohcateEnums;
+package genomeEnums;
 
 public enum Nuc implements Comparable<Nuc> {
 	A(0, 'A'),

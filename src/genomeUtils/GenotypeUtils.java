@@ -1,6 +1,6 @@
 package genomeUtils;
 
-import lohcateEnums.Nuc;
+import genomeEnums.Nuc;
 import shared.Utils;
 
 public class GenotypeUtils {

@@ -1,3 +1,5 @@
+import genomeEnums.Chrom;
+
 import java.io.BufferedReader;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -7,7 +9,6 @@ import nutils.IOUtils;
 import nutils.StringUtils;
 
 
-import lohcateEnums.Chrom;
 
 import com.carrotsearch.hppc.LongArrayList;
 

@@ -1,3 +1,6 @@
+import genomeEnums.Chrom;
+import genomeEnums.Nuc;
+import genomeEnums.VariantLocation;
 import genomeUtils.GenotypeUtils;
 
 import java.awt.Color;
@@ -14,13 +17,10 @@ import java.util.Date;
 
 import javax.swing.text.html.HTMLDocument.HTMLReader.IsindexAction;
 
-import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
 import lohcateEnums.ColorPastel;
 import lohcateEnums.MutationType;
-import lohcateEnums.Nuc;
 import lohcateEnums.SeqPlatform;
-import lohcateEnums.VariantLocation;
 
 import nutils.ArgumentParserUtils;
 import nutils.ArrayUtils;

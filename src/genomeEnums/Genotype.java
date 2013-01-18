@@ -1,4 +1,4 @@
-package lohcateEnums;
+package genomeEnums;
 
 /** This is an enumerated type to represent the genotypes. */
 

@@ -3,11 +3,12 @@ package genomeUtils;
 /**
  * 
  */
+import genomeEnums.Genotype;
+import genomeEnums.Nuc;
+
 import java.util.ArrayList;
 
 import nutils.NumberUtils;
-import lohcateEnums.Genotype;
-import lohcateEnums.Nuc;
 
 public class InfoOneSiteOneSample {
 	

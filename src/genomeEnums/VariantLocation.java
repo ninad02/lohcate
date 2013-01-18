@@ -1,4 +1,4 @@
-package lohcateEnums;
+package genomeEnums;
 
 public enum VariantLocation {
 	Germline,

@@ -1,3 +1,6 @@
+import genomeEnums.Chrom;
+import genomeEnums.VariantLocation;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -5,10 +8,8 @@ import java.util.Comparator;
 import nutils.ArrayUtils;
 import nutils.counter.BucketCounter;
 
-import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
 import lohcateEnums.MutationType;
-import lohcateEnums.VariantLocation;
 
 import shared.Utils;
 /**

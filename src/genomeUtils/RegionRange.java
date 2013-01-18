@@ -1,8 +1,9 @@
 package genomeUtils;
 
+import genomeEnums.Chrom;
+
 import java.util.Comparator;
 
-import lohcateEnums.Chrom;
 
 public class RegionRange {
 	

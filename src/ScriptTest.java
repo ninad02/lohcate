@@ -1,3 +1,5 @@
+import genomeEnums.Chrom;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
@@ -5,7 +7,6 @@ import java.util.Random;
 import nutils.CompareUtils;
 
 
-import lohcateEnums.Chrom;
 import lohcateEnums.ClusterType;
 
 /**

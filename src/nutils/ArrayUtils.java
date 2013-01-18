@@ -9,9 +9,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
-import nutils.counter.DynamicBucketCounter;
-
-
 import com.carrotsearch.hppc.LongArrayList;
 
 public class ArrayUtils {
@@ -21,7 +18,7 @@ public class ArrayUtils {
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-		DynamicBucketCounter.TestDynamicBucketCounter();
+		
 	}
 
 	/** Copies arr2 into arr1. */
@@ -101,7 +98,7 @@ public class ArrayUtils {
 	public static void reverseArray(int[] theArray) {
 		int tempVal;
 		int oppositeIndex;
-		for (int i = 0; i < theArray.length / 2; i++) {
+		for (int i = 0; i < theArray.length >>> 1; i++) {
 			oppositeIndex = theArray.length - i - 1;
 			tempVal = theArray[i];
 			theArray[i] = theArray[oppositeIndex];
@@ -112,7 +109,7 @@ public class ArrayUtils {
 	public static void reverseArray(double[] theArray) {
 		double tempVal;
 		int oppositeIndex;
-		for (int i = 0; i < theArray.length / 2; i++) {
+		for (int i = 0; i < theArray.length >>> 1; i++) {
 			oppositeIndex = theArray.length - i - 1;
 			tempVal = theArray[i];
 			theArray[i] = theArray[oppositeIndex];
@@ -123,7 +120,7 @@ public class ArrayUtils {
 	public static void reverseArray(char[] theArray) {
 		char tempVal;
 		int oppositeIndex;
-		for (int i = 0; i < theArray.length / 2; i++) {
+		for (int i = 0; i < theArray.length >>> 1; i++) {
 			oppositeIndex = theArray.length - i - 1;
 			tempVal = theArray[i];
 			theArray[i] = theArray[oppositeIndex];
@@ -135,7 +132,7 @@ public class ArrayUtils {
 	public static void reverseArray(byte[] theArray) {
 		byte tempVal;
 		int oppositeIndex;
-		for (int i = 0; i < theArray.length / 2; i++) {
+		for (int i = 0; i < theArray.length >>> 1; i++) {
 			oppositeIndex = theArray.length - i - 1;
 			tempVal = theArray[i];
 			theArray[i] = theArray[oppositeIndex];
