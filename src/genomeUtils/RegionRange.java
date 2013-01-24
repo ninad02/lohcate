@@ -113,7 +113,7 @@ public class RegionRange {
 	
 	/** Given another region, this returns whether there is any overlap.  */
 	public boolean overlapRange(RegionRange rhs) {
-		return (mChrom.equals(rhs.mChrom) && ((rhs.mRangeStart >= mRangeStart) || (rhs.mRangeEnd <= mRangeEnd)));
+		return testAndCharacterizeOverlap(rhs).isOverlapType();		
 	}
 			
 	/** Given another region, this returns the type of overlap, if any.  
@@ -223,6 +223,7 @@ public class RegionRange {
 	 *
 	 */
 	public static enum RegionRangeOverlap {
+		// Overlap Types
 		Equals,                    
 		SubsumesTotal,           
 		SubsumesAlignedLeft,     
@@ -232,6 +233,8 @@ public class RegionRange {
 		ConsumedByAlignedRight,
 		BeforeWithOverlap,       
 		AfterWithOverlap,
+		
+		// Non-overlap types
 		BeforeWithoutOverlap,    
 		AfterWithoutOverlap,
 		BeforeViaDiffChromosome, 
@@ -244,6 +247,7 @@ public class RegionRange {
 			// to correspond to -1, 0, 1 from a right end alignment comparison
 		};
 		
+		public boolean isOverlapType() { return (ordinal() < BeforeWithoutOverlap.ordinal()); }
 		
 	}
 	

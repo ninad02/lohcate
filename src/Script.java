@@ -62,6 +62,9 @@ public class Script {
 	public static final char   MissingAllele = '.';
 	public static final float MaxVariantAlleleFrequency = 1.0f;
 	public static final String GenBrowserTrack = ".genBrowserTrack";
+	
+	public static final boolean EliminateExtremeGCSites = true;
+	public static final boolean EliminateHighDensitySNVs = true;
 
 	// Column constants for the curated TSV files (files that have a cluster column)
 	public static final int Col_NAFTAFInput_Chrom      = 0;
@@ -146,7 +149,9 @@ public class Script {
 					if (numSitesSpanned > MaxSitesInWindowAllowed) {
 						for (int rowToClean = windowRowStart; rowToClean < rowIndex; rowToClean++) {
 							//System.out.println("Removing:\t" + rows.get(rowToClean));
-							rows.set(rowToClean, null);
+							if (EliminateHighDensitySNVs) {
+								rows.set(rowToClean, null);
+							}
 							numSitesRemoved++;
 						}
 					}	
@@ -157,7 +162,7 @@ public class Script {
 				} 
 				
 				double fractionGCNormal = GenotypeUtils.calcFractionGC(gcString);
-				if ((fractionGCNormal < GCContentThresholdLow) || (fractionGCNormal >= GCContentThresholdHigh)) {
+				if (EliminateExtremeGCSites && (fractionGCNormal < GCContentThresholdLow) || (fractionGCNormal >= GCContentThresholdHigh)) {
 					rows.set(rowIndex, null);
 				}
 			}
@@ -815,44 +820,6 @@ public class Script {
 		return (clusterType != ClusterType.Noise && 
 				clusterType != ClusterType.Null  && 
 				clusterType != ClusterType.HETSomatic);
-	}
-	
-	// ========================================================================
-	/** Given an individual's copy number regions by chromosome, this partitions the
-	 *  regions into three such objects based on the clustering type (Dup, LOH, HET)
-	 */
-	//public static ArrayList<CopyNumberRegionsByChromosome>
-	
-	// ========================================================================
-	// INNER CLASS
-	// ========================================================================
-	public static class CopyNumberRegionRange extends RegionRange {
-		public ClusterType mCopyNumberClusterType;
-		public float mRecurrenceScore;
-		protected BucketCounter mClusterTypeCounts;
-		
-		public CopyNumberRegionRange(ClusterType copyNumberClusterType, Chrom chrom, int regionStart) {
-			super(chrom, regionStart);
-			mCopyNumberClusterType = copyNumberClusterType;
-			mRecurrenceScore = 1.0f;
-			mClusterTypeCounts = new BucketCounter(ClusterType.getNumClusterTypes(), 0);
-		}		
-		
-		public CopyNumberRegionRange(ClusterType copyNumberClusterType, Chrom chrom, int regionStart, int regionEnd) {
-			super(chrom, regionStart, regionEnd);
-			mCopyNumberClusterType = copyNumberClusterType;
-			mRecurrenceScore = 1.0f;
-			mClusterTypeCounts = new BucketCounter(ClusterType.getNumClusterTypes(), 0);
-		}
-		
-		public CopyNumberRegionRange(CopyNumberRegionRange rhs) {
-			super(rhs);
-			mCopyNumberClusterType = rhs.mCopyNumberClusterType;
-			mRecurrenceScore       = rhs.mRecurrenceScore;
-			mClusterTypeCounts     = rhs.mClusterTypeCounts.getCopy();
-		}
-		
-		public CopyNumberRegionRange getCopy() { return new CopyNumberRegionRange(this); }
 	}
 	
 	// ========================================================================

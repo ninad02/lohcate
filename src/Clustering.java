@@ -2,6 +2,7 @@ import genomeEnums.Chrom;
 import genomeEnums.Nuc;
 import genomeEnums.VariantLocation;
 import genomeUtils.GenotypeUtils;
+import genomeUtils.RegionSimulator;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -13,6 +14,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 
 import javax.swing.text.html.HTMLDocument.HTMLReader.IsindexAction;
@@ -661,7 +663,7 @@ public class Clustering {
 		xyPlot.getRangeAxis().setTickLabelFont(rangeAxisTickFont);
 		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
 		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);	
-		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, 4800, 800);
+		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, 2400, 800);
 	}
 	
 	/** Plots the VAF (variant allele frequency) of a tissue vs the genomic position. */
@@ -748,14 +750,22 @@ public class Clustering {
 	}
 	
 	private static void setSeriesPaintPerCluster(XYItemRenderer itemRenderer) {
-		itemRenderer.setSeriesPaint(ClusterType.GainGermline.ordinal(), ColorPastel.Violet.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.GainSomatic.ordinal(), ColorPastel.Dark_Red.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.LOH.ordinal(), ColorPastel.Pastel_Blue_Violet.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.cnLOH.ordinal(), ColorPastel.CMYK_Yellow.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.HETGermline.ordinal(), ColorPastel.Gray_50.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.HETSomatic.ordinal(), ColorPastel.Red_Orange.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.Noise.ordinal(), ColorPastel.Gray_60.getColor());
-		itemRenderer.setSeriesPaint(ClusterType.Null.ordinal(), ColorPastel.Gray_30.getColor());	
+		boolean allGray = false;
+		
+		if (allGray) {
+			for (ClusterType eventType : ClusterType.values()) {
+				itemRenderer.setSeriesPaint(eventType.ordinal(), ColorPastel.Gray_50.getColor());
+			}
+		} else {
+			itemRenderer.setSeriesPaint(ClusterType.GainGermline.ordinal(), ColorPastel.Violet.getColor());
+			itemRenderer.setSeriesPaint(ClusterType.GainSomatic.ordinal(), ColorPastel.Dark_Red.getColor());
+			itemRenderer.setSeriesPaint(ClusterType.LOH.ordinal(), ColorPastel.RGB_Blue.getColor());
+			itemRenderer.setSeriesPaint(ClusterType.cnLOH.ordinal(), ColorPastel.CMYK_Yellow.getColor());
+			itemRenderer.setSeriesPaint(ClusterType.HETGermline.ordinal(), ColorPastel.Gray_50.getColor());
+			itemRenderer.setSeriesPaint(ClusterType.HETSomatic.ordinal(), ColorPastel.Red_Orange.getColor());
+			itemRenderer.setSeriesPaint(ClusterType.Noise.ordinal(), ColorPastel.Gray_60.getColor());
+			itemRenderer.setSeriesPaint(ClusterType.Null.ordinal(), ColorPastel.Gray_30.getColor());				
+		}
 		itemRenderer.setSeriesPaint(ClusterType.Null.ordinal() + 1, ColorPastel.Black.getColor());
 	}
 
@@ -899,7 +909,7 @@ public class Clustering {
 						averageRatio = (float) (indexDistTumor + 1) / (float) (indexDistNormal + 1);
 						
 						//averageRatio = ((ratioSum / (float) numRowsWithSameGene) / coverageRatioTumorNormalGenomeWide);
-						//averageRatio = ((float) readCountSumTumor / (float) readCountSumNormal) / coverageRatioTumorNormalGenomeWide;
+						averageRatio = ((float) readCountSumTumor / (float) readCountSumNormal) / coverageRatioTumorNormalGenomeWide;
 					}
 	
 					for (int i = rowOfFirstInstanceOfGene; i <= row; i++) {					
@@ -1661,8 +1671,79 @@ public class Clustering {
 
 	// ========================================================================
 	// ========================================================================
+	public static class ClusteringInputOneSample implements RegionSimulator.SampleInformation<ClusteringInputOneSite> {
+		ArrayList<ClusteringInputOneSite> mInfoSites;
+		ClusteringInputOneSite mDummySite;
+		
+		public ClusteringInputOneSample(int numSitesEstimated) {
+			mInfoSites = new ArrayList<ClusteringInputOneSite>(numSitesEstimated);
+			constructorCommon();
+		}
+		
+		public ClusteringInputOneSample(ArrayList<String> rows) {
+			mInfoSites = new ArrayList<ClusteringInputOneSite>(rows.size());
+			constructorCommon();
+		}
+		
+		private void constructorCommon() {
+			mDummySite = new ClusteringInputOneSite();
+		}
+		
+		/** Returns the index of the first site (on the chromosome) in this sample.  If
+		 *  the chromosome does not exist, a negative index is returned in accordance to
+		 *  the definition from Collections.binarySearch()
+		 * @param chrom
+		 * @return
+		 */
+		public synchronized int getIndexChromStart(Chrom chrom) {
+			int resultIndex = getIndex(chrom, 1);
+			if (resultIndex >= 0) {
+				return resultIndex;
+			} else {				
+				int insertPoint = ArrayUtils.getInsertPoint(resultIndex);
+				ClusteringInputOneSite oneSiteInfo = mInfoSites.get(insertPoint);
+				return (oneSiteInfo.getChrom().equals(chrom) ? insertPoint : resultIndex);
+			}
+		}
+		
+		public synchronized int getIndexChromEnd(Chrom chrom) {
+			Chrom nextChrom = chrom.getNextChrom();
+			if (nextChrom == null) {
+				// There is no next chromosome
+				return mInfoSites.size() - 1;
+			} else {
+				// There is a position for a next chromosome
+				return getIndex(nextChrom, 0) - 1;
+			}
+		}
+		
+		public synchronized int getIndex(Chrom chrom, int position) {
+			mDummySite.setChrom(chrom);
+			mDummySite.setPosition(position);
+			return Collections.binarySearch(mInfoSites, mDummySite, ClusteringInputOneSite.ClusteringInputOneSiteComparator);			
+		}
+		
+		public synchronized ClusteringInputOneSite getSiteAtIndex(Chrom chrom, int index) {
+			return mInfoSites.get(index);
+		}
+	}
 	
-	public static class ClusteringInputOneSite {
+	// ========================================================================
+	// ========================================================================
+	
+	public static class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite>, RegionSimulator.SiteInformation {
+		
+		public static Comparator<ClusteringInputOneSite> ClusteringInputOneSiteComparator = new Comparator<ClusteringInputOneSite>() {
+			public int compare(ClusteringInputOneSite site1, ClusteringInputOneSite site2) {
+				int result = site1.getChrom().compareTo(site2.getChrom()); 
+				if (result == 0) {
+					result = Integer.compare(site1.getPosition(), site2.getPosition());
+				}
+				return result;
+			}
+		};
+		
+		// ========================================================================
 		private long mDataUnit_ChromProsRevVarAllelesMutType;
 		
 		private static final BitSetUtils.BitShiftAndMask bsmChrom = new BitShiftAndMask(5, 58);
@@ -1682,6 +1763,10 @@ public class Clustering {
 		public short mCovgVarNormal;
 		public short mCovgVarTumor;
 		public int mRsID; 
+		
+		public ClusteringInputOneSite() {
+			clear();
+		}			
 		
 		public ClusteringInputOneSite(String line, SeqPlatform platform) {
 			mFlankingNormal = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_FlankingStringNormal,  StringUtils.FileExtensionTSV.mDelimiter);
@@ -1750,12 +1835,42 @@ public class Clustering {
 			nucChar      = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_AlleleVarPop, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
 			Nuc aVarPop  = nucChar == Script.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
 			
-			mDataUnit_ChromProsRevVarAllelesMutType = bsmChrom.setValueInCompactUnit(chrom.ordinal(),      mDataUnit_ChromProsRevVarAllelesMutType);
-			mDataUnit_ChromProsRevVarAllelesMutType = bsmPos.setValueInCompactUnit(             position,  mDataUnit_ChromProsRevVarAllelesMutType);
+			setChrom(chrom);
+			setPosition(position);			
 			mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleRef.setValueInCompactUnit( aRef.getCode(),  mDataUnit_ChromProsRevVarAllelesMutType);
 			mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarN.setValueInCompactUnit(aVarN.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
 			mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarT.setValueInCompactUnit(aVarT.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
 			mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarPop.setValueInCompactUnit(aVarPop.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
+		}
+
+		// ====================================================================
+		public void setChrom(Chrom chrom) {
+			mDataUnit_ChromProsRevVarAllelesMutType = bsmChrom.setValueInCompactUnit(chrom.ordinal(), mDataUnit_ChromProsRevVarAllelesMutType);
+		}
+		
+		// ====================================================================
+		public void setPosition(int position) {
+			mDataUnit_ChromProsRevVarAllelesMutType = bsmPos.setValueInCompactUnit(position,  mDataUnit_ChromProsRevVarAllelesMutType);
+		}
+		
+		// ====================================================================
+		public void setCovgTotalNormal(short mCovgTotalNormal) {
+			this.mCovgTotalNormal = mCovgTotalNormal;
+		}
+
+		// ====================================================================
+		public void setCovgTotalTumor(short mCovgTotalTumor) {
+			this.mCovgTotalTumor = mCovgTotalTumor;
+		}
+
+		// ====================================================================
+		public void setCovgVarNormal(short mCovgVarNormal) {
+			this.mCovgVarNormal = mCovgVarNormal;
+		}
+
+		// ====================================================================
+		public void setCovgVarTumor(short mCovgVarTumor) {
+			this.mCovgVarTumor = mCovgVarTumor;
 		}
 		
 		// ====================================================================
@@ -1772,6 +1887,20 @@ public class Clustering {
 		
 		public MutationType getMutationType() {
 			return MutationType.getMutationType((int) bsmMutType.getValueInCompactUnit(mDataUnit_ChromProsRevVarAllelesMutType));
+		}
+
+		// ====================================================================
+		public void clear() {
+			mDataUnit_ChromProsRevVarAllelesMutType = 0;
+			mFlankingTumor = mFlankingNormal = mHugoSymbol = "";
+			mCovgTotalNormal = mCovgTotalTumor = mCovgVarNormal = mCovgVarTumor = 0;
+			mRsID = GenotypeUtils.RsID_Unknown;
+		}
+		
+		// ====================================================================
+		public int compareTo(ClusteringInputOneSite rhs) {
+			// The compact unit variable has chromosome and position ordered such that it's easy to sort
+			return Long.compare(mDataUnit_ChromProsRevVarAllelesMutType, rhs.mDataUnit_ChromProsRevVarAllelesMutType);
 		}
 		
 		// ====================================================================

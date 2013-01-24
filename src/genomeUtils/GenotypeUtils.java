@@ -1,5 +1,7 @@
 package genomeUtils;
 
+import nutils.NumberUtils;
+import genomeEnums.Chrom;
 import genomeEnums.Nuc;
 import shared.Utils;
 
@@ -8,6 +10,12 @@ public class GenotypeUtils {
 	public static final int RsID_Unknown = -1;
 	public static final int RsID_Novel   = -5;
 	public static final String RsPrefix = "rs";
+	
+	// =======================================================================
+	public static Chrom getRandomAutosomalChromosome() { 
+		int index = NumberUtils.getRandomInteger(Chrom.IndexAutosomalStart, Chrom.IndexAutosomalEnd);
+		return Chrom.getChrom((byte) index);
+	}
 	
 	// ========================================================================
 	/** Given an rsID string, this returns the integer from the rs ID. */

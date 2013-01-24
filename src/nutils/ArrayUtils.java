@@ -361,7 +361,9 @@ public class ArrayUtils {
 	// ========================================================================
 	
 	// ========================================================================
-	public static int getInsertPoint(int negativeArrayIndex) { return -(negativeArrayIndex + 1); }
+	public static int getInsertPoint(int negativeArrayIndex) { 
+		return ((negativeArrayIndex < 0) ? -(negativeArrayIndex + 1) : negativeArrayIndex); 
+	}
 	
 	// ========================================================================
 	/** Assumes that both lists are of the same size.  If not, it returns null. */ 

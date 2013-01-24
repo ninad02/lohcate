@@ -76,7 +76,9 @@ public enum Chrom {
 	}
 	
 	// ========================================================================
-	public static Chrom getChrom(byte chromNum) { return values()[chromNum]; }
+	public static Chrom getChrom(byte chromNum) { 
+		return ((chromNum < 0 || chromNum >= values().length) ? null : values()[chromNum]); 
+	}
 
 	// ========================================================================
 	public boolean isAutosomal() { 
@@ -110,5 +112,10 @@ public enum Chrom {
 	// ========================================================================
 	public boolean greaterThan(Chrom rhs) {
 		return (this.getCode() > rhs.getCode());
+	}
+	
+	// ========================================================================
+	public Chrom getNextChrom() {
+		return Chrom.getChrom((byte) (ordinal() + 1));
 	}
 }
