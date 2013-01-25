@@ -1724,8 +1724,14 @@ public class Clustering {
 		}
 		
 		public synchronized ClusteringInputOneSite getSiteAtIndex(Chrom chrom, int index) {
+			return getSiteAtIndex(index);
+		}
+		
+		public synchronized ClusteringInputOneSite getSiteAtIndex(int index) {
 			return mInfoSites.get(index);
 		}
+		
+		public synchronized int getNumSites() { return mInfoSites.size(); }
 	}
 	
 	// ========================================================================

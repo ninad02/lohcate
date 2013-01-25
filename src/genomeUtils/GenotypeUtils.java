@@ -1,7 +1,9 @@
 package genomeUtils;
 
+import nutils.CompareUtils;
 import nutils.NumberUtils;
 import genomeEnums.Chrom;
+import genomeEnums.Genotype;
 import genomeEnums.Nuc;
 import shared.Utils;
 
@@ -10,6 +12,60 @@ public class GenotypeUtils {
 	public static final int RsID_Unknown = -1;
 	public static final int RsID_Novel   = -5;
 	public static final String RsPrefix = "rs";
+
+	// ========================================================================
+	public static double adjustHaploidCopyNumber(double copyNumberPure, double fractionPurity) {
+		return adjustCopyNumberHelper(copyNumberPure, fractionPurity, GenomeConstants.DefaultHaploidCopyNumber);
+	}
+	
+	// ========================================================================
+	public static double adjustDiploidCopyNumber(double copyNumberPure, double fractionPurity) {
+		return adjustCopyNumberHelper(copyNumberPure, fractionPurity, GenomeConstants.DefaultDiploidCopyNumber);
+	}
+
+	// ========================================================================
+	protected static double adjustCopyNumberHelper(double copyNumberPure, double fractionPurity, double copyNumberStromal) {
+		return ((fractionPurity * copyNumberPure) + ((1 - fractionPurity) * copyNumberStromal));
+	}
+	
+	// ========================================================================
+	public static void defineGenotypeAlleles(Genotype genotypeCode, Nuc referenceAllele, Nuc otherAllele, Nuc[] allelePhase) {
+		switch(genotypeCode) {
+		case EnumHomozygous00: 
+			allelePhase[0] = allelePhase[1] = referenceAllele; 
+			break;
+		case EnumHeterozygous:
+			// Doesn't matter the order we put them in since genotype isn't supposed to be phased
+			allelePhase[0] = referenceAllele;
+			allelePhase[1] = otherAllele;
+			break;
+		case EnumHomozygous11: 
+			allelePhase[0] = allelePhase[1] = otherAllele; 
+			break;
+		case EnumInvalidGenotype: case EnumHomoDeletion:
+			allelePhase[0] = allelePhase[1] = Nuc.N;
+			break;
+		default: 
+			CompareUtils.ensureTrue(false, "ERROR: defineGenotypeAlleles(): Invalid Genotype!");
+			break;
+		}
+	}
+	
+	// ========================================================================
+	/** Given a pair of genotype alleles and a reference, this returns the variant allele. 
+	 * @return the variant allele, or null if both match the ref, or N if neither match the ref.
+	 */
+	public static Nuc deduceVariant(Nuc genoPhase0, Nuc genoPhase1, Nuc referenceAllele) {
+		if ((genoPhase0 == referenceAllele) && (genoPhase1 == referenceAllele)) {
+			return null;
+		} else if (genoPhase0 == referenceAllele) {
+			return genoPhase1;
+		} else if (genoPhase1 == referenceAllele) {
+			return genoPhase0;
+		} else {
+			return Nuc.N;
+		}
+	}
 	
 	// =======================================================================
 	public static Chrom getRandomAutosomalChromosome() { 
@@ -99,6 +155,22 @@ public class GenotypeUtils {
 		}
 	}
 
+	// ========================================================================
+	/** This method count the number of each nucleotide in the given string.
+	 *  @param seq The string to parse
+	 *  @param nc  The counter that will store the counts 
+	 *  @return Will return the invalid nucleotide in the string if there is one, else returns 'A'. */
+	/*
+	public static char countConstituentAlleles(CharSequence seq, NucCounter nc) {
+		nc.clear();
+	    for (int i = 0; i < seq.length(); i++) {
+	    	Nuc theNuc = Nuc.getNucUnsafe(seq.charAt(i));
+	    	if (theNuc == null) { return seq.charAt(i); }
+	    	nc.incrementCount(theNuc);
+	    }
+	    return 'A';
+	}*/
+	
 	public static void Test_extractRsNumberFromLine() {
 		String[] toTest = new String[] {
 				"rs-1",

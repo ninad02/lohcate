@@ -594,6 +594,14 @@ public class ArrayUtils {
 	}
 
 	// ========================================================================
+	/** Given a two dimensional double array, this fills all elements with the specified value. */
+	public static void arrayFill(double[][] theArray, double value) {
+		for (double[] subArray : theArray) {
+			Arrays.fill(subArray, value);
+		}
+	}	
+	
+	// ========================================================================
 	/** Given a two dimensional integer array, this fills all elements with the specified value. */
 	public static void arrayFill(int[][] theArray, int value) {
 		for (int[] subArray : theArray) {
@@ -635,6 +643,17 @@ public class ArrayUtils {
 		return newArray;
 	}
 
+	// ========================================================================
+	/** This returns a new double[][] array with the specified dimensions and with all elements
+	 *  initialized to the specified value.
+	 */
+	public static double[][] newDoubleArray2D(int numElementsX, int numElementsY, double fillValue) {
+		double[][] newArray = new double[numElementsX][numElementsY];
+		arrayFill(newArray, fillValue);
+		return newArray;
+	}
+
+	
 	// ========================================================================
 	/** Given an arraylist of arraylists of a certain type, this adds numNewArraysToAdd new ArrayLists of
 	 *  that type to the target list.

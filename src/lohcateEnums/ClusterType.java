@@ -16,6 +16,7 @@ public enum ClusterType {
 	public static final ClusterType[] AmpLOHHetG = new ClusterType[] { GainSomatic, LOH, HETGermline };
 	public static final ClusterType[] AmpLOH = new ClusterType[]     { GainSomatic, LOH };
 	public static final ClusterType[] OnlyLOH = new ClusterType[]    { LOH };
+	public static final ClusterType[] AmpLOHcnLOH = new ClusterType[] { GainSomatic, LOH, cnLOH };
 	
 	//public static int getNumAberrantClusterTypes() { return 2; }
 	

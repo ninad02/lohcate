@@ -21,7 +21,7 @@ public class RegionSimulator {
 		public int getIndexChromStart(Chrom chrom);
 		public int getIndexChromEnd(Chrom chrom);
 		public int getIndex(Chrom chrom, int position);
-		public E getSiteAtIndex(Chrom chrom, int position);
+		public E getSiteAtIndex(Chrom chrom, int index);
 	}
 
 	// ========================================================================
@@ -30,7 +30,7 @@ public class RegionSimulator {
 	
 	// ========================================================================
 	/** Generates a known region given the parameter values and adds it to the list of existing regions. */
-	public static synchronized<E extends RegionRange, T extends SiteInformation> 
+	public static<E extends RegionRange, T extends SiteInformation> 
 		E generateRegion(int approxLength, E newRegion, ArrayList<E> existingRegions, SampleInformation<T> oneSampleInfo) {
 		//ArrayList<CNRegion> regions = new ArrayList<CNRegion>();
 

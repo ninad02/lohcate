@@ -5,6 +5,7 @@ package genomeUtils;
  */
 import genomeEnums.Genotype;
 import genomeEnums.Nuc;
+import genomeEnums.TissueType;
 
 import java.util.ArrayList;
 
@@ -20,6 +21,15 @@ public class InfoOneSiteOneSample {
 		mNormal = new InfoOneSiteSampleTissue();
 		mTumor  = new InfoOneSiteSampleTissue();
 		clear();
+	}
+
+	// ========================================================================
+	public InfoOneSiteSampleTissue getTissueInfo(TissueType t) {
+		switch(t) {
+		case Normal: return mNormal; 
+		case Tumor:  return mTumor;		
+		}
+		return null;
 	}
 	
 	// ========================================================================
