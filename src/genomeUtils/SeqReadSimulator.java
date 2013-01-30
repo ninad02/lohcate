@@ -26,7 +26,6 @@ public class SeqReadSimulator {
 	// ========================================================================
 	public static interface SeqReadSimulationGoldStandard {
 		public void append(Nuc alleleAffected, Nuc alleleNotAffected, boolean doubleAmp);
-		public void clear();
 	}
 	
 	// ========================================================================
@@ -42,7 +41,7 @@ public class SeqReadSimulator {
 	
 	// ========================================================================
 	// ========================================================================
-	public static final int MinReadCountThreshold = 1;
+	public static final int MinReadCountThreshold = 50;
 	
 	RandomDataGenerator mRandomGen;
 

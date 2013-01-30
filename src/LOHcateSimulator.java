@@ -13,6 +13,7 @@ import genomeEnums.TissueType;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import lohcateEnums.ClusterType;
 
@@ -23,8 +24,9 @@ import nutils.ArrayUtils;
 import nutils.CompareUtils;
 import nutils.IOUtils;
 import nutils.NumberUtils;
+import nutils.StringUtils;
 
-public class LOHcateSimulator<E extends RegionSimulator.SiteInformation> {
+public class LOHcateSimulator {
 
 	// ========================================================================
 	
@@ -38,6 +40,31 @@ public class LOHcateSimulator<E extends RegionSimulator.SiteInformation> {
 		public double getPurity() { return 0.80; }
 		
 		public int getNumCNARegions() { return 5; }
+	}
+	
+	// ========================================================================
+	public static class LOHcateSimulatorGoldStandard implements SeqReadSimulator.SeqReadSimulationGoldStandard {
+		
+		ArrayList<ClusterType> mSomaticEvents;
+		
+		public LOHcateSimulatorGoldStandard(int numSites) {
+			mSomaticEvents = new ArrayList<ClusterType>(numSites);
+			setNumSites(numSites);
+		}
+		
+		public void append(Nuc alleleAffected, Nuc alleleNotAffected, boolean doubleAmp) {}
+		
+		public void setNumSites(int numSites) {
+			clear();
+			mSomaticEvents.ensureCapacity(numSites);
+			ArrayUtils.addToCollection(mSomaticEvents, ClusterType.Null, numSites, true);
+		}
+		
+		public void setEventAtSite(int siteIndex, ClusterType eventType) { mSomaticEvents.set(siteIndex, eventType); }
+		
+		public void clear() {
+			mSomaticEvents.clear();
+		}
 	}
 
 	// ========================================================================
@@ -60,8 +87,18 @@ public class LOHcateSimulator<E extends RegionSimulator.SiteInformation> {
 	}
 
 	// ========================================================================
-	public void generateSimulatedDataForSample(LOHcateSimulatorParams simParams, Clustering.ClusteringInputOneSample oneSampleData) {
+	public void generateSimulatedDataForSample(LOHcateSimulatorParams simParams, Clustering.ClusteringInputOneSample oneSampleData, LOHcateSimulatorGoldStandard goldStandard) {
+		
+		// First initialize the sample by simulating reads across the sample
+		simulateReadsInRegion(simParams, oneSampleData, null, goldStandard);
+		
+		// Get the regions
 		ArrayList<CopyNumberRegionRange> regionsSelected = deduceRegions(simParams, oneSampleData);
+		
+		// Go through the regions and generate the data
+		for (CopyNumberRegionRange regionSelected : regionsSelected) {
+			simulateReadsInRegion(simParams, oneSampleData, regionSelected, goldStandard);
+		}
 	}
 	
 	// ========================================================================
@@ -74,8 +111,9 @@ public class LOHcateSimulator<E extends RegionSimulator.SiteInformation> {
 		
 		// We create an array that tracks which chromosomes were used
 		boolean[] chromsUsed = new boolean[Chrom.values().length];
+		Arrays.fill(chromsUsed, false);
 		
-		int meanLengthCNARegion = 390000;
+		int meanLengthCNARegion = 20000000;
 		for (int regionIndex = 0; regionIndex < simParams.getNumCNARegions(); regionIndex++) {
 			int regionLength = (int) readSimulator.getRandomDataGenerator().nextExponential(meanLengthCNARegion);
 			//SequenceLogger.outputPrintln("Region Length: " + regionLength);
@@ -115,7 +153,7 @@ public class LOHcateSimulator<E extends RegionSimulator.SiteInformation> {
 		// Go through the regions and assign 
 		//Print out the regions
 		for (CopyNumberRegionRange region : cnRegions) {
-			System.out.println(region);
+			System.out.println(region + "\t" + region.mCopyNumberClusterType);
 		}
 		
 		// Generate the filename and the outstream		
@@ -135,39 +173,30 @@ public class LOHcateSimulator<E extends RegionSimulator.SiteInformation> {
 		//outStream.flush();
 		//outStream.close();
 	
-
-	
-	// ========================================================================
-	/** Based on the variant allele frequency, this determines the genotype. */
-	private Genotype deduceGenotype(double vaf) {
-		if (vaf <= Clustering.AlleleFrequencyStatsForSample.VAFNormalFrameLower) {
-			return Genotype.EnumHomozygous00;
-		} else if (vaf > Clustering.AlleleFrequencyStatsForSample.VAFNormalFrameUpper) {
-			return Genotype.EnumHomozygous11;
-		} else {
-			return Genotype.EnumHeterozygous;
-		}
-	}
-	
-	
 	// ========================================================================	
-	public void simulateReadsInRegion(LOHcateSimulatorParams simParams, Clustering.ClusteringInputOneSample infoSample, CopyNumberRegionRange cnRegion, SeqReadSimulator.SeqReadSimulationGoldStandard goldStandard) {
+	public void simulateReadsInRegion(LOHcateSimulatorParams simParams, Clustering.ClusteringInputOneSample infoSample, CopyNumberRegionRange cnRegion, LOHcateSimulatorGoldStandard goldStandard) {
 		
-		goldStandard.clear();
-			
 		Nuc[] genotype = new Nuc[2];
 		SeqReadSimulator seqSim = new SeqReadSimulator();
 		InfoOneSiteOneSample iosos = new InfoOneSiteOneSample();
 		SeqReadSimulator.SeqReadSimulationAdjustReads readAdjuster = SeqReadSimulator.ReadAdjusterNoAdjustment; 		
+		StringBuilder sb = new StringBuilder(2048);
 		
-		int indexStart = infoSample.getIndex(cnRegion.getChromosome(), cnRegion.getRangeStart());
-		if (indexStart < 0) {
-			CompareUtils.ensureTrue(false, "ERROR: Starting index must exist! Chrom:\t" + cnRegion.getChromosome() + "\tPos:\t" + cnRegion.getRangeStart());
-		}
-		
-		int indexEnd = infoSample.getIndex(cnRegion.getChromosome(), cnRegion.getRangeEnd());
-		if (indexEnd < 0) {
-			CompareUtils.ensureTrue(false, "ERROR: Starting index must exist! Chrom:\t" + cnRegion.getChromosome() + "\tPos:\t" + cnRegion.getRangeEnd());
+		// Set the indices to default values (to cover the entire sample, unless a region is specified
+		int indexStart = 0;
+		int indexEnd   = infoSample.getNumSites() - 1;
+				
+		// If a region is specified, this limits the simulation only to the specified region
+		if (cnRegion != null) {
+			indexStart = infoSample.getIndex(cnRegion.getChromosome(), cnRegion.getRangeStart());
+			if (indexStart < 0) {
+				CompareUtils.ensureTrue(false, "ERROR: Starting index must exist! Chrom:\t" + cnRegion.getChromosome() + "\tPos:\t" + cnRegion.getRangeStart());
+			}
+
+			indexEnd = infoSample.getIndex(cnRegion.getChromosome(), cnRegion.getRangeEnd());
+			if (indexEnd < 0) {
+				CompareUtils.ensureTrue(false, "ERROR: Starting index must exist! Chrom:\t" + cnRegion.getChromosome() + "\tPos:\t" + cnRegion.getRangeEnd());
+			}
 		}
 		
 		boolean allowHemizygousGenotype = true;
@@ -183,6 +212,7 @@ public class LOHcateSimulator<E extends RegionSimulator.SiteInformation> {
 			
 			Genotype genotypeEnum = deduceGenotype(infoOneSite.calcVAFNormal());
 			GenotypeUtils.defineGenotypeAlleles(genotypeEnum, referenceAllele, variantAlleleNormal, genotype);
+			ClusterType eventTypeToAssign = (genotypeEnum == Genotype.EnumHeterozygous ? ClusterType.HETGermline : ClusterType.Null);			
 			
 			//if (ParametersHATS.GlobalParams.shouldLog()) { SequenceLogger.debugPrint(infoOneSite.getPosition() + "\t" + refAllele); }
 //			if (ParametersHATS.GlobalParams.shouldLog()) {
@@ -192,20 +222,32 @@ public class LOHcateSimulator<E extends RegionSimulator.SiteInformation> {
 			double[][] copyNumber = ArrayUtils.newDoubleArray2D(TissueType.numValid(), Phase.numValid(), GenomeConstants.DefaultHaploidCopyNumber);
 			boolean isBiAllelicChangeNormal = false;
 			boolean isBiAllelicChangeTumor  = false;
+			Phase phaseToChange = NumberUtils.getRandomBit() ? Phase.p0 : Phase.p1;
+			Phase otherPhase = (phaseToChange == Phase.p0) ? Phase.p1 : Phase.p0;
 			
-			if (cnRegion.mCopyNumberClusterType == ClusterType.GainGermline) {
-				copyNumber[TissueType.Normal.mCode][Phase.p0.mCode] = ++(copyNumber[TissueType.Tumor.mCode][Phase.p0.mCode]);
-				
+			if (cnRegion == null) {
+				// Do nothing, we're just using as a placeholder.
+			
+			} else if (cnRegion.mCopyNumberClusterType == ClusterType.GainGermline) {
+				copyNumber[TissueType.Normal.mCode][phaseToChange.mCode] = ++(copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode]);
+				eventTypeToAssign = ClusterType.GainGermline;
+						
 			} else if (cnRegion.mCopyNumberClusterType == ClusterType.GainSomatic) {
-				
+				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getPurity());
+				eventTypeToAssign = ClusterType.GainSomatic;
 				
 			} else if (cnRegion.mCopyNumberClusterType == ClusterType.LOH) {				
-				copyNumber[TissueType.Tumor.mCode][Phase.p1.mCode] = GenotypeUtils.adjustHaploidCopyNumber(0, simParams.getPurity());
+				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(0, simParams.getPurity());
+				eventTypeToAssign = ClusterType.LOH;
 				
 			} else if (cnRegion.mCopyNumberClusterType == ClusterType.cnLOH) {
-				copyNumber[TissueType.Tumor.mCode][Phase.p0.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getPurity());
-				copyNumber[TissueType.Tumor.mCode][Phase.p1.mCode] = GenotypeUtils.adjustHaploidCopyNumber(0,                                        simParams.getPurity());
+				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getPurity());
+				copyNumber[TissueType.Tumor.mCode][otherPhase.mCode]    = GenotypeUtils.adjustHaploidCopyNumber(0,                                        simParams.getPurity());
+				eventTypeToAssign = ClusterType.cnLOH;
 			}
+			
+			// Finally do the gold standard assignment
+			goldStandard.setEventAtSite(row, eventTypeToAssign);
 			
 			seqSim.calculateReadsTissue(iosos.getTissueInfo(TissueType.Normal), simParams.getCoverageGenerated(TissueType.Normal), 
 					copyNumber[TissueType.Normal.mCode][Phase.p0.mCode], copyNumber[TissueType.Normal.mCode][Phase.p1.mCode], 
@@ -221,10 +263,25 @@ public class LOHcateSimulator<E extends RegionSimulator.SiteInformation> {
 			infoOneSite.setCovgVarTumor ( iosos.mTumor.mAlleleB.mNumReads);
 			infoOneSite.setCovgTotalNormal((short) iosos.mNormal.calcNumReadsTotal());
 			infoOneSite.setCovgTotalTumor ((short)  iosos.mTumor.calcNumReadsTotal());
+			
+			//System.out.println(infoOneSite.printToString(sb, true, StringUtils.FileExtensionTSV.mDelimiter) + "\t" + eventTypeToAssign);
+		}
+	}
+	
+	// ========================================================================
+	/** Based on the variant allele frequency, this determines the genotype. */
+	private Genotype deduceGenotype(double vaf) {
+		if (vaf <= Clustering.AlleleFrequencyStatsForSample.VAFNormalFrameLower) {
+			return Genotype.EnumHomozygous00;
+		} else if (vaf > Clustering.AlleleFrequencyStatsForSample.VAFNormalFrameUpper) {
+			return Genotype.EnumHomozygous11;
+		} else {
+			return Genotype.EnumHeterozygous;
 		}
 	}
 	
 	
+	// ========================================================================
 	/**
 	 * @param args
 	 */

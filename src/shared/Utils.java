@@ -59,16 +59,13 @@ public class Utils {
 		return target;
 	}
 	
-	/** Given an array of ClusterTypes, this returns the counts of the ClusterTypes, 
-	 *  according to ordering of the ClusterType enums. 
-	 */
-	public static int[] getClusterTypeCounts(ClusterType[] clusterTypeArray) {
-		int[] counts = new int[ClusterType.values().length];
+	public static<T extends Enum<T>> int[] getEnumTypeCounts(T[] enumTypeArray, int numEnumTypes) {		
+		int[] counts = new int[numEnumTypes];
 		Arrays.fill(counts, 0);
-		for (ClusterType ct : clusterTypeArray) {
-			counts[ct.ordinal()]++;
-		}
 		
+		for (T enumType : enumTypeArray) {
+			counts[enumType.ordinal()]++;
+		}		
 		return counts;
 	}
 	

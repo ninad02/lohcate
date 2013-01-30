@@ -18,7 +18,8 @@ public class ArrayUtils {
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-		
+		//Test_removeNullElements();
+		Test_removeNullElementsSimple();
 	}
 
 	/** Copies arr2 into arr1. */
@@ -308,11 +309,12 @@ public class ArrayUtils {
 
 	/** Given a collection, a dummy object, and a count, this adds "count" instances of 
 	 *  the dummy object to the collection (only a shallow adding, not a deep adding).
-	 *  
-	 *  This method is unsafe in that in can produce a run-time exception if the 
-	 *  collection is defined to hold a particular type and the object is not that type. 
 	 */
-	public static <T> void fillCollection(Collection<T> c, T o, int count) {
+	public static <T> void addToCollection(Collection<T> c, T o, int count, boolean clearCollection) {
+		if (clearCollection) {
+			c.clear();
+		}
+		
 		for (int i = 0; i < count; i++) {
 			c.add(o);
 		}
@@ -652,7 +654,6 @@ public class ArrayUtils {
 		arrayFill(newArray, fillValue);
 		return newArray;
 	}
-
 	
 	// ========================================================================
 	/** Given an arraylist of arraylists of a certain type, this adds numNewArraysToAdd new ArrayLists of
@@ -726,6 +727,19 @@ public class ArrayUtils {
 	}
 
 	// ========================================================================
+	private static void Test_removeNullElementsSimple() {
+		ArrayList<Integer> list1 = new ArrayList<Integer>();
+		for (int i = 0; i < 15; i++) { list1.add(i); }
+		list1.set(14, null);
+		list1.set(13, null);
+		list1.set(12, null);
+		list1.set(11, null);
+		
+		removeNullElements(list1);
+		System.out.println(list1);
+	}
+	
+	// ========================================================================
 	private static void Test_removeNullElements() {
 		
 		ArrayList<Integer> list1 = new ArrayList<Integer>();
@@ -773,10 +787,16 @@ public class ArrayUtils {
 			// Now compare
 			boolean areListsEqual = list1.equals(list2);
 			if (areListsEqual) {
+				//System.out.println(list1);
+				//System.out.println(list2);
+				//System.out.println("");
+				//break;
+			} else {
+				System.out.println("Lists Unequal:");
 				System.out.println(list1);
 				System.out.println(list2);
 				System.out.println("");
-				//break;
+
 			}
 		}
 	}
@@ -813,7 +833,22 @@ public class ArrayUtils {
 		}
 		return -1;
 	}
-
+	
+	// ========================================================================
+	/** Creates an arrayList of new objects given the desired array size and class factory. */
+	
+	
+	// ========================================================================
+	public static<T extends Enum<T>> int[] getEnumTypeCounts(T[] enumTypeArray, int numEnumTypes) {		
+		int[] counts = new int[numEnumTypes];
+		Arrays.fill(counts, 0);
+		
+		for (T enumType : enumTypeArray) {
+			counts[enumType.ordinal()]++;
+		}		
+		return counts;
+	}
+	
 	/** This linearly searches the aray for the integer value.  
 	 * 
 	 * @param theArray The input array

@@ -36,6 +36,7 @@ public enum Chrom {
 	public static final int IndexSexChromEnd    = 24;
 	public static final int NumAutosomes = 22;
 	public static final ArrayList<Chrom> Autosomes = createAutosomeArray();
+	public static final int MaxPositionOnLongestChrom = 0x0FFFFFFF;  // 28 bit mask
 
 	// ========================================================================
 	private static ArrayList<Chrom> createAutosomeArray() {

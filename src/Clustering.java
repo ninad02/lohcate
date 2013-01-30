@@ -28,10 +28,13 @@ import nutils.ArgumentParserUtils;
 import nutils.ArrayUtils;
 import nutils.BitSetUtils;
 import nutils.CompareUtils;
+import nutils.ContingencyTable;
 import nutils.GraphUtils;
 import nutils.IOUtils;
+import nutils.NullaryClassFactory;
 import nutils.PrimitiveWrapper;
 import nutils.BitSetUtils.BitShiftAndMask;
+import nutils.ContingencyTable.ContingencyTableValue;
 import nutils.StringUtils;
 import nutils.StringUtils.FileExtensionAndDelimiter;
 import nutils.counter.DynamicBucketCounter;
@@ -264,9 +267,146 @@ public class Clustering {
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
+		ClusteringInputOneSite.TestClusteringInputOneSite_Robust();
+	}
+	
+	// ========================================================================
+	private static void classifySitesHelper_MakeSubDirs(String outDir, String vafComparisonPlotDir, String vafWaterfallPlotDir, String copyNumberPlotDir) {
+		IOUtils.createDirectoryPath(outDir, false);
+		IOUtils.createDirectoryPath(vafComparisonPlotDir, false);
+		IOUtils.createDirectoryPath(vafWaterfallPlotDir, false);
+		IOUtils.createDirectoryPath(copyNumberPlotDir, false);
+	}
+	
+	// ========================================================================
+	private static ClusteringInputOneSample readLinesFromFiles(File file) {
+		String somaticFilename = file.getAbsolutePath().replace(VariantLocation.Germline.toLowerCase(), VariantLocation.Somatic.toLowerCase());
+		ArrayList<String> somaticSpecificVariantRows  = IOUtils.readAllLinesFromFile(somaticFilename);
+		ArrayList<String> germlineSpecificVariantRows = IOUtils.readAllLinesFromFile(file.getAbsolutePath());
+		System.out.println("\tRead All Lines...");
+		System.out.printf("\tNum Sites Total: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());				
+		
+		//String headerStringGermline = germlineSpecificVariantRows.get(0);
+		//String headerStringSomatic  = somaticSpecificVariantRows.get(0);
 
+		//upstream pipelines will randomly spit header lines into the 
+		// middle of a naf-taf-input file. we're just avoiding those
+		germlineSpecificVariantRows = Script.curateSNPCalls_removeHeaderLinesFromRows(germlineSpecificVariantRows);
+		somaticSpecificVariantRows  = Script.curateSNPCalls_removeHeaderLinesFromRows(somaticSpecificVariantRows);
+		System.out.printf("\tNum Sites Retained after Header and GC Removal: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
+		
+		// Create a combined set of rows
+		ArrayList<String> allVariantRowsStr = new ArrayList<String>(germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
+		allVariantRowsStr.addAll(germlineSpecificVariantRows);
+		int indexFirstSomaticRowInAllVariants = allVariantRowsStr.size();  // save the size with just the germline variants added
+		allVariantRowsStr.addAll(somaticSpecificVariantRows);
+
+		//Collections.sort(germlineSpecificVariantRows, LineComparatorTab);
+		//Collections.sort(somaticSpecificVariantRows,  LineComparatorTab);
+		Collections.sort(allVariantRowsStr,              Script.LineComparatorTab);
+		System.out.println("\tAll Sites Finished Sorting...");
+		
+		// Now parse into numeric values
+		ClusteringInputOneSample oneSampleData = new ClusteringInputOneSample(allVariantRowsStr);				
+		allVariantRowsStr.clear();
+		
+		return oneSampleData;
 	}
 
+	// ========================================================================
+	// ========================================================================
+	private static class ClusteringInputOneSampleMetaData {
+
+		float[]  mAdjustedVAFNormal;
+		float[]  mAdjustedVAFTumor;
+		double[] mImbalancePValuesTumor;
+		double[] mImbalancePValuesNormal;		
+		
+		PrimitiveWrapper.WFloat mCoverageRatioTumorToNormal;
+		DynamicBucketCounter mReadCountTalliesTumor;
+		DynamicBucketCounter mReadCountTalliesNormal;
+		
+		int[]   mNumSitesPerChrom;
+		float[] mAvgReadCountPerChromNormal;
+		float[] mCopyNumRatioPerChromNormal;
+		float[] mTumorCopyNumRatiosPerGene;
+		
+		double mFDRNormal = 0;
+		double mFDRTumor = 0;
+		
+		public ClusteringInputOneSampleMetaData(int numSites) {
+			mAdjustedVAFNormal       = new float[numSites];
+			mAdjustedVAFTumor        = new float[numSites];
+			mImbalancePValuesTumor  = new double[numSites];
+			mImbalancePValuesNormal = new double[numSites];
+			mTumorCopyNumRatiosPerGene = new float[numSites];
+			
+			mCoverageRatioTumorToNormal = new PrimitiveWrapper.WFloat(0);
+			mReadCountTalliesTumor  = new DynamicBucketCounter();
+			mReadCountTalliesNormal = new DynamicBucketCounter();
+			
+			mNumSitesPerChrom           = new   int[Chrom.values().length];
+			mAvgReadCountPerChromNormal = new float[Chrom.values().length];
+			mCopyNumRatioPerChromNormal = new float[Chrom.values().length];
+		}		
+	}
+	
+	// ========================================================================
+	// ========================================================================
+	/** Performs pre-processing (copy number calling, allelic imbalace p-values) on the input data
+	 *  and stores the results in the metadata
+	 */
+	private static void classifySitesHelper_preprocessMetaData(ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData, AllelicBiasTable allelicBiasTable, SeqPlatform platform) {
+		
+		// First, get the copy number ratios at a per-chromosome level				
+		float[] tumorNormalCopyNumRatiosPerChrom = calcAvgCoverageRatioPerChrom(oneSampleData.mInfoSites, metaData.mCopyNumRatioPerChromNormal, metaData.mNumSitesPerChrom, metaData.mAvgReadCountPerChromNormal, metaData.mCoverageRatioTumorToNormal, metaData.mReadCountTalliesTumor, metaData.mReadCountTalliesNormal);
+						
+		// Now get the copy number ratios at a segmented sub-chromosomal level (by gene)
+		calcRoughCopyNumberRatioPerSite(oneSampleData.mInfoSites, metaData.mTumorCopyNumRatiosPerGene, metaData.mCoverageRatioTumorToNormal.mFloat, metaData.mReadCountTalliesTumor, metaData.mReadCountTalliesNormal);				
+		
+		// Now get the clusters
+		calculateAdjustedVAFs(oneSampleData.mInfoSites, allelicBiasTable, metaData.mAdjustedVAFNormal, metaData.mAdjustedVAFTumor, metaData.mCopyNumRatioPerChromNormal, platform);
+
+		getPValuesImbalance(oneSampleData.mInfoSites, metaData.mImbalancePValuesTumor, metaData.mImbalancePValuesNormal, metaData.mAdjustedVAFNormal, metaData.mAdjustedVAFTumor);
+						
+		// Calculate the FDR for tumor and normal
+		metaData.mFDRTumor  = getFDR_BenjaminiHochberg(metaData.mImbalancePValuesTumor,  ParamsNum.FDRAlpha.getValue().doubleValue());
+		metaData.mFDRNormal = getFDR_BenjaminiHochberg(metaData.mImbalancePValuesNormal, ParamsNum.FDRAlpha.getValue().doubleValue());
+	}
+
+	// ========================================================================
+	private static Boolean classifySites_addToContingencyTables(ClusterType eventTest, ClusterType eventTruth, ArrayList<ContingencyTable> eventTables) {
+		boolean match = (eventTest == eventTruth);
+		
+		if (CompareUtils.isNull(eventTest) || CompareUtils.isNull(eventTruth)) {
+			return null;
+		}
+		
+		if (eventTest == ClusterType.Null) {
+			return Boolean.FALSE;
+		}
+		
+		for (ClusterType ct : ClusterType.values()) {
+			ContingencyTable table = eventTables.get(ct.ordinal());
+			
+			boolean matchTruthAndEvent = (eventTruth == ct);
+			boolean matchTestAndEvent  = (eventTest  == ct);
+			
+			if (matchTruthAndEvent && matchTestAndEvent) {
+				table.incrCount(ContingencyTableValue.TruePositive);
+			} else if (matchTruthAndEvent && !matchTestAndEvent) {
+				table.incrCount(ContingencyTableValue.FalseNegative);
+			} else if (!matchTruthAndEvent && matchTestAndEvent) {
+				table.incrCount(ContingencyTableValue.FalsePositive);
+			} else {
+				table.incrCount(ContingencyTableValue.TrueNegative);
+			}			
+		}
+		
+		return Boolean.TRUE;
+	}
+	
+	// ========================================================================
 	/**
 	 * Curate SNP calls by clustering data points into HET ball, DUP wedge, LOH sidelobes, &c., and by grabbing dbsnp population allele frequencies when possible
 	 * @param inDir naf-taf-inputs
@@ -283,19 +423,12 @@ public class Clustering {
 		System.out.println("Finished Reading Allelic Bias file...");
 		
 		// Create output directory
-		IOUtils.createDirectoryPath(outDir, false);
-		IOUtils.createDirectoryPath(vafComparisonPlotDir, false);
-		IOUtils.createDirectoryPath(vafWaterfallPlotDir, false);
-		IOUtils.createDirectoryPath(copyNumberPlotDir, false);
-		
+		classifySitesHelper_MakeSubDirs(outDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir);
 
 		String[] columnHeaders = new String[] { "chr", "pos", "VAF_Normal", "VAF_Tumor", "dbsnp", "gene", "mutation_type", "germ_som", "cluster" };
 		String headerStr = StringUtils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();		
 
-		ArrayList<DynamicBucketCounter> dbcByChromLOH = new ArrayList<DynamicBucketCounter>();
-		for (Chrom chrom : Chrom.values()) {
-			dbcByChromLOH.add(new DynamicBucketCounter());
-		}
+		ArrayList<DynamicBucketCounter> dbcByChromLOH = NullaryClassFactory.newList(ArrayList.class, DynamicBucketCounter.ClassFactory, Chrom.values().length); 
 		
 		int countAtPositionMax = -1; 
 		int fileIndex = 0;
@@ -305,217 +438,160 @@ public class Clustering {
 				// && wList(file.getName())) {
 				String samplenameRoot = file.getName().substring(0, indexOfSubstring);  				
 				System.out.println("Processing (" + ++fileIndex + "): " + file.getName());
-
-				String somaticFilename = file.getAbsolutePath().replace(VariantLocation.Germline.toLowerCase(), VariantLocation.Somatic.toLowerCase());
-				ArrayList<String> somaticSpecificVariantRows  = IOUtils.readAllLinesFromFile(somaticFilename);
-				ArrayList<String> germlineSpecificVariantRows = IOUtils.readAllLinesFromFile(file.getAbsolutePath());
-				System.out.println("\tRead All Lines...");
-				System.out.printf("\tNum Sites Total: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());				
+				ClusteringInputOneSample oneSampleData = readLinesFromFiles(file);
 				
-				//String headerStringGermline = germlineSpecificVariantRows.get(0);
-				//String headerStringSomatic  = somaticSpecificVariantRows.get(0);
-
-				//upstream pipelines will randomly spit header lines into the 
-				// middle of a naf-taf-input file. we're just avoiding those
-				germlineSpecificVariantRows = Script.curateSNPCalls_removeHeaderLinesFromRows(germlineSpecificVariantRows);
-				somaticSpecificVariantRows  = Script.curateSNPCalls_removeHeaderLinesFromRows(somaticSpecificVariantRows);
-				System.out.printf("\tNum Sites Retained after Header and GC Removal: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
-				
-				// Create a combined set of rows
-				ArrayList<String> allVariantRowsStr = new ArrayList<String>(germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
-				allVariantRowsStr.addAll(germlineSpecificVariantRows);
-				int indexFirstSomaticRowInAllVariants = allVariantRowsStr.size();  // save the size with just the germline variants added
-				allVariantRowsStr.addAll(somaticSpecificVariantRows);
-
-				//Collections.sort(germlineSpecificVariantRows, LineComparatorTab);
-				//Collections.sort(somaticSpecificVariantRows,  LineComparatorTab);
-				Collections.sort(allVariantRowsStr,              Script.LineComparatorTab);
-				System.out.println("\tAll Sites Finished Sorting...");
-				
-				// Now parse into numeric values
-				ArrayList<ClusteringInputOneSite> allVariantSites = new ArrayList<ClusteringInputOneSite>(allVariantRowsStr.size());
-				for (String line : allVariantRowsStr) {
-					ClusteringInputOneSite cios = new ClusteringInputOneSite(line, platform);
-					allVariantSites.add(cios);
-				}
-				allVariantRowsStr.clear();
-
 				String outFilename = samplenameRoot + fileExtDelim.mExtension;
 				String outFilenameFullPath = outDir + File.separator + outFilename; 
-
 				BufferedWriter out = IOUtils.getBufferedWriter(outFilenameFullPath);
 				IOUtils.writeToBufferedWriter(out, headerStr, true);
-
-				// First, get the copy number ratios at a per-chromosome level				
-				int[]   numSitesPerChrom           = new   int[Chrom.values().length];
-				float[] avgReadCountPerChromNormal = new float[Chrom.values().length];
-				float[] copyNumRatioPerChromNormal = new float[Chrom.values().length];
-				PrimitiveWrapper.WFloat coverageRatioTumorToNormal = new PrimitiveWrapper.WFloat(0);
-				DynamicBucketCounter readCountTalliesTumor  = new DynamicBucketCounter();
-				DynamicBucketCounter readCountTalliesNormal = new DynamicBucketCounter();
-				float[] tumorNormalCopyNumRatiosPerChrom = calcAvgCoverageRatioPerChrom(allVariantSites, copyNumRatioPerChromNormal, numSitesPerChrom, avgReadCountPerChromNormal, coverageRatioTumorToNormal, readCountTalliesTumor, readCountTalliesNormal);
+				
+				ArrayList<ContingencyTable> eventTables = NullaryClassFactory.newList(ArrayList.class, ContingencyTable.ClassFactory, ClusterType.values().length);
+				System.out.println("Num Event Tables: " + eventTables.size());
 								
-				// Now get the copy number ratios at a segmented sub-chromosomal level (by gene)
-				float[] tumorCopyNumRatiosPerGene = calcRoughCopyNumberRatioPerSite(allVariantSites, coverageRatioTumorToNormal.mFloat, readCountTalliesTumor, readCountTalliesNormal);				
-				
-				// Now get the clusters
-				float[] adjustedVAFNormal = new float[allVariantSites.size()];
-				float[] adjustedVAFTumor  = new float[allVariantSites.size()];
-				calculateAdjustedVAFs(allVariantSites, allelicBiasTable, adjustedVAFNormal, adjustedVAFTumor, copyNumRatioPerChromNormal, platform);
+				int numSimulationIter = 5;
+				for (int simulationIter = 0; simulationIter < numSimulationIter; simulationIter++) {
+					LOHcateSimulator simulator = new LOHcateSimulator();
+					LOHcateSimulator.LOHcateSimulatorGoldStandard goldStandard = new LOHcateSimulator.LOHcateSimulatorGoldStandard(oneSampleData.getNumSites());
+					simulator.generateSimulatedDataForSample(new LOHcateSimulator.LOHcateSimulatorParams(), oneSampleData, goldStandard);
 
-				double[] imbalancePValuesTumor  = new double[allVariantSites.size()];
-				double[] imbalancePValuesNormal = new double[allVariantSites.size()];				
-				getPValuesImbalance(allVariantSites, imbalancePValuesTumor, imbalancePValuesNormal, adjustedVAFNormal, adjustedVAFTumor);
-											
-				double fdrTumor  = getFDR_BenjaminiHochberg(imbalancePValuesTumor,  ParamsNum.FDRAlpha.getValue().doubleValue());
-				double fdrNormal = getFDR_BenjaminiHochberg(imbalancePValuesNormal, ParamsNum.FDRAlpha.getValue().doubleValue());
-				System.out.printf("FDR Alpha:\t%g\nFDR Tumor p-value: \t%g\nFDR Normal p-value:\t%g\n", ParamsNum.FDRAlpha.getValue().doubleValue(), fdrTumor, fdrNormal);
-								
-				ClusterType[] clusters = null;
-				System.out.println("\tInferred Copy Number and Allelic Imbalance Per Site...");
-				
-				if (UsePValuePlane) {
-					clusters = Clustering.getClusters_withPlane(allVariantSites, imbalancePValuesTumor, imbalancePValuesNormal, fdrTumor, fdrNormal, tumorCopyNumRatiosPerGene, copyNumRatioPerChromNormal, adjustedVAFNormal, adjustedVAFTumor, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
-				} else {
-					clusters = Clustering.getClusters_Old(allVariantSites, imbalancePValuesTumor, tumorCopyNumRatiosPerGene, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
-				}
+					// Declare meta-data and fill it
+					ClusteringInputOneSampleMetaData metaData = new ClusteringInputOneSampleMetaData(oneSampleData.mInfoSites.size());
+					classifySitesHelper_preprocessMetaData(oneSampleData, metaData, allelicBiasTable, platform);				
 
-				boolean toPrintWithCopyNum = true;
-				if (toPrintWithCopyNum) {
-					PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
-					for (int row = 0; row < allVariantSites.size(); row++) {
-						ClusteringInputOneSite oneSiteInfo = allVariantSites.get(row);
-						outStream.print(oneSiteInfo.printToString(sb, true, StringUtils.FileExtensionTSV.mDelimiter).toString());										
-						outStream.printf("\t%s", clusters[row].name());
-						outStream.printf("\t%g\t%g", tumorCopyNumRatiosPerGene[row], (tumorCopyNumRatiosPerGene[row] * Script.DefaultDiploidCopyNumber));  
-						outStream.printf("\t%g\t%g", adjustedVAFTumor[row], adjustedVAFNormal[row]);
-						outStream.printf("\t%g\t%g", imbalancePValuesTumor[row], imbalancePValuesNormal[row]);
-						outStream.println("");
-					}
-					IOUtils.closePrintStream(outStream);
-				}
+					System.out.printf("FDR Alpha:\t%g\nFDR Tumor p-value: \t%g\nFDR Normal p-value:\t%g\n", ParamsNum.FDRAlpha.getValue().doubleValue(), metaData.mFDRTumor, metaData.mFDRNormal);
+					System.out.println("\tInferred Copy Number and Allelic Imbalance Per Site...");					
 
-
-				System.out.println("\tGot clusters");
-
-				// Now initialize the data structure needed to plot
-				int[] clusterTypeCounts = Utils.getClusterTypeCounts(clusters);
-				double[][][] clusterCoordinates  = getCoordinateArraysPerClusterType(clusterTypeCounts);
-				double[][][] waterfallPlotTumor  = getCoordinateArraysPerClusterType(clusterTypeCounts);
-				double[][][] waterfallPlotNormal = getCoordinateArraysPerClusterType(clusterTypeCounts);
-				double[][][] copyNumPlot         = getCoordinateArraysPerClusterType(clusterTypeCounts);
-				
-				int[] clusterTypeIndex = new int[clusterTypeCounts.length];
-				Arrays.fill(clusterTypeIndex, -1);  
-
-				// Do the post-processing
-				Chrom prevChrom = Chrom.c0;
-				int prevPosition = 0;
-				long positionGenomeWide = 0;
-				
-				
-				DoubleArrayList chromBoundaryXValue = new DoubleArrayList();
-				DoubleArrayList chromBoundaryYValue = new DoubleArrayList();
-												
-				int startingRowGermlineOrSomaticOrAll = 0;  // 0 because header line has been stripped away
-				for (int i = startingRowGermlineOrSomaticOrAll; i < allVariantSites.size(); i++) {
-					ClusteringInputOneSite oneSiteInfo = allVariantSites.get(i);
-					ClusterType clusterType = clusters[i];
-					int indexForClusterType = ++(clusterTypeIndex[clusterType.ordinal()]);  // increase the index of the data structure of the cluster type
-
-					//=IF(A3=A2,B3-B2+L2,B3+L2)
-
-					Chrom chrom = oneSiteInfo.getChrom(); 							
-					int position = oneSiteInfo.getPosition(); 							
-		
-					if (chrom == prevChrom) {
-						positionGenomeWide += (position - prevPosition);
+					ClusterType[] clusters = null;
+					int indexFirstSomaticRowInAllVariants = 0;  // Set as invalid value for now
+					if (UsePValuePlane) {
+						clusters = Clustering.getClusters_withPlane(oneSampleData.mInfoSites, metaData.mImbalancePValuesTumor, metaData.mImbalancePValuesNormal, metaData.mFDRTumor, metaData.mFDRNormal, metaData.mTumorCopyNumRatiosPerGene, metaData.mCopyNumRatioPerChromNormal, metaData.mAdjustedVAFNormal, metaData.mAdjustedVAFTumor, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
 					} else {
-						positionGenomeWide += position;
-						for (double d = 0; d <= 5.0; d += 0.02) {
-							chromBoundaryXValue.add(positionGenomeWide);
-							chromBoundaryYValue.add(d);
+						clusters = Clustering.getClusters_Old(oneSampleData.mInfoSites, metaData.mImbalancePValuesTumor, metaData.mTumorCopyNumRatiosPerGene, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
+					}
+
+					boolean toPrintWithCopyNum = false;
+					if (toPrintWithCopyNum) {
+						PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
+						for (int row = 0; row < oneSampleData.mInfoSites.size(); row++) {
+							ClusteringInputOneSite oneSiteInfo = oneSampleData.mInfoSites.get(row);
+							outStream.print(oneSiteInfo.printToString(sb, true, StringUtils.FileExtensionTSV.mDelimiter).toString());										
+							outStream.printf("\t%s", clusters[row].name());
+							outStream.printf("\t%g\t%g", metaData.mTumorCopyNumRatiosPerGene[row], (metaData.mTumorCopyNumRatiosPerGene[row] * Script.DefaultDiploidCopyNumber));  
+							outStream.printf("\t%g\t%g", metaData.mAdjustedVAFTumor[row], metaData.mAdjustedVAFNormal[row]);
+							outStream.printf("\t%g\t%g", metaData.mImbalancePValuesTumor[row], metaData.mImbalancePValuesNormal[row]);
+							outStream.println("");
 						}
+						IOUtils.closePrintStream(outStream);
 					}
-					prevPosition = position;
-					prevChrom = chrom;
-					
-					// Add recurrence count
-					if (clusterType.isLOH()) {
-						int countAtPosition = dbcByChromLOH.get(chrom.ordinal()).incrementCount(position);
-						countAtPositionMax = Math.max(countAtPositionMax, countAtPosition);
-					}
-					
-					float vafNormal = adjustedVAFNormal[i]; //Clustering.extractVAFNormal(germCols, platform);
-					float vafTumor  = adjustedVAFTumor[i]; //Clustering.extractVAFTumor (germCols, platform);
-					clusterCoordinates[ clusterType.ordinal() ][0][indexForClusterType] = vafTumor;
-					clusterCoordinates[ clusterType.ordinal() ][1][indexForClusterType] = vafNormal;
-					
-					waterfallPlotTumor[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
-					waterfallPlotTumor[ clusterType.ordinal() ][1][indexForClusterType] = vafTumor;
-					
-					waterfallPlotNormal[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
-					waterfallPlotNormal[ clusterType.ordinal() ][1][indexForClusterType] = vafNormal;	
-					
-					copyNumPlot[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
-					copyNumPlot[ clusterType.ordinal() ][1][indexForClusterType] = (tumorCopyNumRatiosPerGene[i] * Script.DefaultDiploidCopyNumber);	
-					
 
-					sb.setLength(0); // Clear the string builder
-					sb.append(Script.ChromPrefix).append(chrom.ordinal())
-					.append(fileExtDelim.mDelimiter).append(position)
-					.append(fileExtDelim.mDelimiter).append(vafNormal)
-					.append(fileExtDelim.mDelimiter).append(vafTumor);
+					System.out.println("\tGot clusters");
 
-					String variantAnnotation = (oneSiteInfo.mRsID == GenotypeUtils.RsID_Novel) ? Script.NovelStr : GenotypeUtils.getRsIdFromNumber(oneSiteInfo.mRsID);
-					sb.append(fileExtDelim.mDelimiter).append(variantAnnotation);
+					// Now initialize the data structure needed to plot
+					int[] clusterTypeCounts = ArrayUtils.getEnumTypeCounts(clusters, ClusterType.values().length);
+					double[][][] clusterCoordinates  = getCoordinateArraysPerClusterType(clusterTypeCounts);
+					double[][][] waterfallPlotTumor  = getCoordinateArraysPerClusterType(clusterTypeCounts);
+					double[][][] waterfallPlotNormal = getCoordinateArraysPerClusterType(clusterTypeCounts);
+					double[][][] copyNumPlot         = getCoordinateArraysPerClusterType(clusterTypeCounts);
 
-					//System.out.println("Got variant annotations");
+					int[] clusterTypeIndex = new int[clusterTypeCounts.length];
+					Arrays.fill(clusterTypeIndex, -1);  
 
-					// Determine whether we are at a germline or somatic row
-					VariantLocation targetTissue = (oneSiteInfo.calcVAFNormal() <= 0.10) ? VariantLocation.Somatic : VariantLocation.Germline;   
+					// Do the post-processing
+					Chrom prevChrom = Chrom.c0;
+					int prevPosition = 0;
+					long positionGenomeWide = 0;
 
-					sb.append(fileExtDelim.mDelimiter).append(oneSiteInfo.mHugoSymbol)
-					  .append(fileExtDelim.mDelimiter).append(oneSiteInfo.getMutationType().getPrintName())
-					  .append(fileExtDelim.mDelimiter).append(targetTissue.toLowerCase())
-					  .append(fileExtDelim.mDelimiter).append(clusterType)
-						//.append(fileExtDelim.mDelimiter).append(copyNumRatios[i] * DefaultDiploidCopyNumber);
-						//.append(fileExtDelim.mDelimiter).append(imbalancePValues[i]);
-					  ;
+					DoubleArrayList chromBoundaryXValue = new DoubleArrayList();
+					DoubleArrayList chromBoundaryYValue = new DoubleArrayList();
 
-					IOUtils.writeToBufferedWriter(out, sb.toString(), true);
-					IOUtils.flushBufferedWriter(out);
-				}				
-				IOUtils.closeBufferedWriter(out);
+					int startingRowGermlineOrSomaticOrAll = 0;  // 0 because header line has been stripped away
+					for (int i = startingRowGermlineOrSomaticOrAll; i < oneSampleData.mInfoSites.size(); i++) {
+						ClusteringInputOneSite oneSiteInfo = oneSampleData.mInfoSites.get(i);
+						ClusterType clusterType = clusters[i];
+						int indexForClusterType = ++(clusterTypeIndex[clusterType.ordinal()]);  // increase the index of the data structure of the cluster type
 
-				// Now let's create the datasets needed to 
+						//=IF(A3=A2,B3-B2+L2,B3+L2)
+						classifySites_addToContingencyTables(clusterType, goldStandard.mSomaticEvents.get(i), eventTables);
 
-				DefaultXYDataset xyDatasetVAFPlot = new DefaultXYDataset();
-				DefaultXYDataset xyDatasetWaterfallPlotTumor  = new DefaultXYDataset();
-				DefaultXYDataset xyDatasetWaterfallPlotNormal = new DefaultXYDataset();							
-				DefaultXYDataset xyDatasetCopyNumber = new DefaultXYDataset();
-				
-				for (ClusterType ct : ClusterType.values()) {					
-					xyDatasetVAFPlot.addSeries(ct.name(), clusterCoordinates[ct.ordinal()]);
-					xyDatasetWaterfallPlotTumor.addSeries( ct.name(), waterfallPlotTumor[ct.ordinal()]);
-					xyDatasetWaterfallPlotNormal.addSeries(ct.name(), waterfallPlotNormal[ct.ordinal()]);
-					xyDatasetCopyNumber.addSeries(ct.name(), copyNumPlot[ct.ordinal()]);
+						Chrom chrom = oneSiteInfo.getChrom(); 							
+						int position = oneSiteInfo.getPosition(); 							
+
+						if (chrom == prevChrom) {
+							positionGenomeWide += (position - prevPosition);
+						} else {
+							positionGenomeWide += position;
+							for (double d = 0; d <= 5.0; d += 0.02) {
+								chromBoundaryXValue.add(positionGenomeWide);
+								chromBoundaryYValue.add(d);
+							}
+						}
+						prevPosition = position;
+						prevChrom = chrom;
+
+						// Add recurrence count
+						if (clusterType.isLOH()) {
+							int countAtPosition = dbcByChromLOH.get(chrom.ordinal()).incrementCount(position);
+							countAtPositionMax = Math.max(countAtPositionMax, countAtPosition);
+						}
+
+						float vafNormal = metaData.mAdjustedVAFNormal[i]; //Clustering.extractVAFNormal(germCols, platform);
+						float vafTumor  = metaData.mAdjustedVAFTumor[i]; //Clustering.extractVAFTumor (germCols, platform);
+						clusterCoordinates[ clusterType.ordinal() ][0][indexForClusterType] = vafTumor;
+						clusterCoordinates[ clusterType.ordinal() ][1][indexForClusterType] = vafNormal;
+
+						waterfallPlotTumor[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
+						waterfallPlotTumor[ clusterType.ordinal() ][1][indexForClusterType] = vafTumor;
+
+						waterfallPlotNormal[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
+						waterfallPlotNormal[ clusterType.ordinal() ][1][indexForClusterType] = vafNormal;	
+
+						copyNumPlot[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
+						copyNumPlot[ clusterType.ordinal() ][1][indexForClusterType] = (metaData.mTumorCopyNumRatiosPerGene[i] * Script.DefaultDiploidCopyNumber);	
+
+						IOUtils.writeToBufferedWriter(out, sb.toString(), true);
+						IOUtils.flushBufferedWriter(out);
+
+					}									
+
+					// Now let's create the datasets needed to
+					double[][] boundaryArrays = combineTwoDynamicArraysIntoOneStatic(chromBoundaryXValue, chromBoundaryYValue);
+					DefaultXYDataset xyDatasetVAFPlot             = classifySitesHelper_createAndFillXYData(clusterCoordinates, null);
+					DefaultXYDataset xyDatasetWaterfallPlotTumor  = classifySitesHelper_createAndFillXYData(waterfallPlotTumor,  boundaryArrays);
+					DefaultXYDataset xyDatasetWaterfallPlotNormal = classifySitesHelper_createAndFillXYData(waterfallPlotNormal, boundaryArrays);
+					DefaultXYDataset xyDatasetCopyNumber          = classifySitesHelper_createAndFillXYData(copyNumPlot, boundaryArrays);
+
+					Clustering.plotVAFComparison(xyDatasetVAFPlot,            vafComparisonPlotDir + File.separator + samplenameRoot + ".VAFComparison", samplenameRoot);
+					Clustering.plotVAFGenomeWide(xyDatasetWaterfallPlotTumor,  vafWaterfallPlotDir + File.separator + samplenameRoot + ".VAF_GenomeWide_Tumor",  samplenameRoot, true);				
+					Clustering.plotVAFGenomeWide(xyDatasetWaterfallPlotNormal, vafWaterfallPlotDir + File.separator + samplenameRoot + ".VAF_GenomeWide_Normal", samplenameRoot, false);
+					Clustering.plotCopyNumGenomeWide(xyDatasetCopyNumber,        copyNumberPlotDir + File.separator + samplenameRoot + ".CopyNumber_GenomeWide", samplenameRoot);				
 				}
-				double[][] boundaryArrays = combineTwoDynamicArraysIntoOneStatic(chromBoundaryXValue, chromBoundaryYValue);
-				xyDatasetWaterfallPlotTumor.addSeries("Boundary", boundaryArrays);
-				xyDatasetWaterfallPlotNormal.addSeries("Boundary", boundaryArrays);
-				xyDatasetCopyNumber.addSeries("Boundary", boundaryArrays);
+				IOUtils.closeBufferedWriter(out);
 				
-				Clustering.plotVAFComparison(xyDatasetVAFPlot,            vafComparisonPlotDir + File.separator + samplenameRoot + ".VAFComparison", samplenameRoot);
-				Clustering.plotVAFGenomeWide(xyDatasetWaterfallPlotTumor,  vafWaterfallPlotDir + File.separator + samplenameRoot + ".VAF_GenomeWide_Tumor",  samplenameRoot, true);				
-				Clustering.plotVAFGenomeWide(xyDatasetWaterfallPlotNormal, vafWaterfallPlotDir + File.separator + samplenameRoot + ".VAF_GenomeWide_Normal", samplenameRoot, false);
-				Clustering.plotCopyNumGenomeWide(xyDatasetCopyNumber,        copyNumberPlotDir + File.separator + samplenameRoot + ".CopyNumber_GenomeWide", samplenameRoot);				
+				for (ClusterType eventType : ClusterType.values()) {
+					ContingencyTable table = eventTables.get(eventType.ordinal());
+					System.out.printf("Event:\t%10s\tSensitivity:\t%g\tSpecificity:\t%g\n", eventType, table.getSensitivity(), table.getSpecificity());						
+				}	
 			}
 		}
 		
 		// Now plot the LOH recurrence across samples
 		plotRecurrenceGenomeWide(dbcByChromLOH, copyNumberPlotDir, countAtPositionMax, ClusterType.LOH);
 
+	}
+
+	// ========================================================================
+	private static DefaultXYDataset classifySitesHelper_createAndFillXYData(double[][][] coordinatesByEvent, double[][] boundaryArrays) {
+		DefaultXYDataset xyDataset = new DefaultXYDataset();
+		
+		for (ClusterType eventType : ClusterType.values()) {
+			xyDataset.addSeries(eventType.name(), coordinatesByEvent[eventType.ordinal()]);			
+		}
+		
+		if (boundaryArrays != null) {
+			xyDataset.addSeries("Boundary", boundaryArrays);
+		}
+		
+		return xyDataset;
 	}
 	
 	// ========================================================================
@@ -558,6 +634,7 @@ public class Clustering {
 		
 		DoubleArrayList chromBoundaryXValue = new DoubleArrayList();
 		DoubleArrayList chromBoundaryYValue = new DoubleArrayList();
+		PrimitiveWrapper.WInteger lastKey = new PrimitiveWrapper.WInteger(0);
 				
 		for (Chrom chrom : Chrom.values()) {
 			if (chrom.isAutosomal()) {
@@ -569,7 +646,8 @@ public class Clustering {
 				positionsGenomeWideAllSamples.addAll(positionAndCount[0]);
 				lohCountAllSamples.addAll           (positionAndCount[1]);
 				
-				lastPositionOnPrevChrom += dbcCountByEvent.get(chrom.ordinal()).getKeyLast();
+				boolean lastKeyExists = dbcCountByEvent.get(chrom.ordinal()).getKeyLast(lastKey);
+				lastPositionOnPrevChrom += (lastKeyExists) ? lastKey.mInt : 30000000;
 				
 				double increment = (maxValue) / 50.0;
 				for (double d = 0; d <= maxValue; d += increment) {
@@ -804,11 +882,11 @@ public class Clustering {
 							} else {
 								vafNormalExpected = 1.0f - ExpectedVAFNormalTrisomy;
 							}
-						} 
-
-						adjustmentFactor = vafNormalExpected / avgVAFNormal;
-						float absDiff = Math.abs(vafNormalExpected - avgVAFNormal);
-						offset = (vafNormal > vafNormalExpected) ? -absDiff : ((vafNormal == vafNormalExpected) ? 0 : absDiff);												
+						} else {
+							adjustmentFactor = vafNormalExpected / avgVAFNormal;
+							float absDiff = Math.abs(vafNormalExpected - avgVAFNormal);
+							offset = (vafNormal > vafNormalExpected) ? -absDiff : ((vafNormal == vafNormalExpected) ? 0 : absDiff);
+						}
 					}
 				}
 			}
@@ -850,8 +928,7 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	public static float[] calcRoughCopyNumberRatioPerSite(ArrayList<ClusteringInputOneSite> rows, float coverageRatioTumorNormalGenomeWide, DynamicBucketCounter readCountTalliesTumor, DynamicBucketCounter readCountTalliesNormal) {
-		float[] copyNumRatios    =   new float[rows.size()];
+	public static float[] calcRoughCopyNumberRatioPerSite(ArrayList<ClusteringInputOneSite> rows, float[] copyNumRatios, float coverageRatioTumorNormalGenomeWide, DynamicBucketCounter readCountTalliesTumor, DynamicBucketCounter readCountTalliesNormal) {		
 		boolean[] isSomaticSite = new boolean[rows.size()];
 		
 		String prevGene = "";
@@ -1683,10 +1760,18 @@ public class Clustering {
 		public ClusteringInputOneSample(ArrayList<String> rows) {
 			mInfoSites = new ArrayList<ClusteringInputOneSite>(rows.size());
 			constructorCommon();
+			parseLines(rows);
 		}
 		
 		private void constructorCommon() {
 			mDummySite = new ClusteringInputOneSite();
+		}
+		
+		private void parseLines(ArrayList<String> rows) {			
+			for (String line : rows) {
+				ClusteringInputOneSite cios = new ClusteringInputOneSite(line, SeqPlatform.Illumina);
+				mInfoSites.add(cios);
+			}
 		}
 		
 		/** Returns the index of the first site (on the chromosome) in this sample.  If
@@ -1701,6 +1786,8 @@ public class Clustering {
 				return resultIndex;
 			} else {				
 				int insertPoint = ArrayUtils.getInsertPoint(resultIndex);
+				if (insertPoint >= mInfoSites.size()) return resultIndex;
+				
 				ClusteringInputOneSite oneSiteInfo = mInfoSites.get(insertPoint);
 				return (oneSiteInfo.getChrom().equals(chrom) ? insertPoint : resultIndex);
 			}
@@ -1713,7 +1800,14 @@ public class Clustering {
 				return mInfoSites.size() - 1;
 			} else {
 				// There is a position for a next chromosome
-				return getIndex(nextChrom, 0) - 1;
+				int resultIndex = getIndexChromStart(nextChrom);
+				if (resultIndex < 0) {
+					// This means the next chromosome doesn't exist in the dataset.  
+					// Try the following chromosome via recursion
+					return getIndexChromEnd(nextChrom);  
+				} else {
+					return resultIndex - 1;
+				}
 			}
 		}
 		
@@ -1741,6 +1835,7 @@ public class Clustering {
 		
 		public static Comparator<ClusteringInputOneSite> ClusteringInputOneSiteComparator = new Comparator<ClusteringInputOneSite>() {
 			public int compare(ClusteringInputOneSite site1, ClusteringInputOneSite site2) {
+				//System.out.println(site1.getChrom() + "\t" + site1.getPosition() + "\t" + site2.getChrom() + "\t" + site2.getPosition());
 				int result = site1.getChrom().compareTo(site2.getChrom()); 
 				if (result == 0) {
 					result = Integer.compare(site1.getPosition(), site2.getPosition());
@@ -1855,7 +1950,7 @@ public class Clustering {
 		}
 		
 		// ====================================================================
-		public void setPosition(int position) {
+		public void setPosition(int position) {			
 			mDataUnit_ChromProsRevVarAllelesMutType = bsmPos.setValueInCompactUnit(position,  mDataUnit_ChromProsRevVarAllelesMutType);
 		}
 		
@@ -1940,6 +2035,23 @@ public class Clustering {
 			sb.append(delimiter).append(getMutationType().getPrintName());
 			sb.append(delimiter).append(mHugoSymbol);
 			return sb;
+		}
+		
+		// ====================================================================		
+		public static void TestClusteringInputOneSite_Robust() {
+			int numTrials = 10000000;
+			
+			ClusteringInputOneSite oneSiteInfo = new ClusteringInputOneSite();
+			for (int trial = 0; trial < numTrials; trial++) {
+				Chrom chrom = Chrom.getChrom((byte) NumberUtils.getRandomInteger(0, Chrom.values().length - 1));
+				int position = NumberUtils.getRandomInteger(0, (int) BitSetUtils.getMask(28));
+				oneSiteInfo.setChrom(chrom);
+				oneSiteInfo.setPosition(position);
+				
+				//System.out.println(trial);
+				CompareUtils.ensureTrue(oneSiteInfo.getChrom().equals(chrom), "Chrom not equal!");
+				CompareUtils.ensureTrue(position == oneSiteInfo.getPosition(), "Position not equal!");
+			}
 		}
 	}
 }

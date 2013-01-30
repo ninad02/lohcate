@@ -471,6 +471,7 @@ public class BitSetUtils {
 		}	
 		
 		public long setValueInCompactUnit(long value, long compactUnit) {
+			value = Math.max(value, 0);
 			value = Math.min(value, mMask);
 			return ((compactUnit & mClearShifted) | (value << mNumBitsToShift));			
 		}
@@ -496,7 +497,7 @@ public class BitSetUtils {
 	};
 
 	public static BitSetUtils.ValueExtractor IntExtractorMSB = new BitSetUtils.ValueExtractor() { 
-		public long extractValue(long compactUnit) { return (compactUnit >>> Integer.SIZE); }
+		public long extractValue(long compactUnit) { return ((compactUnit >>> Integer.SIZE) & 0xFFFFFFFFL); }
 	};
 	
 

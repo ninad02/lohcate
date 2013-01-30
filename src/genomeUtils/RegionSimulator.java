@@ -33,10 +33,14 @@ public class RegionSimulator {
 	public static<E extends RegionRange, T extends SiteInformation> 
 		E generateRegion(int approxLength, E newRegion, ArrayList<E> existingRegions, SampleInformation<T> oneSampleInfo) {
 		//ArrayList<CNRegion> regions = new ArrayList<CNRegion>();
-
+		
+		int numChromRetries = -1;
 		while (true) {
+			++numChromRetries;
+			
 			// First randomly select a chromosome
 			Chrom chrom = GenotypeUtils.getRandomAutosomalChromosome();		
+			System.out.println("Chrom Selected: " + chrom + "\tTry: " + numChromRetries);
 			int indexChromFirstPosition = oneSampleInfo.getIndexChromStart(chrom);
 			if (indexChromFirstPosition < 0) {
 				// Data for this particular chromosome does not exist in this sample, so 
@@ -46,6 +50,7 @@ public class RegionSimulator {
 
 			// Now, we are guaranteed to have a chromosome that exists in the sample
 			int indexChromLastPosition = oneSampleInfo.getIndexChromEnd(chrom);
+			System.out.println("Index Bounds:\t" + chrom + "\t" + indexChromFirstPosition + "\t" + indexChromLastPosition);
 			CompareUtils.ensureTrue(indexChromLastPosition >= indexChromFirstPosition, "ERROR: Index last position < Index first position in simulated region!");		
 			int chromPositionLast = oneSampleInfo.getSiteAtIndex(chrom, indexChromLastPosition).getPosition(); 
 
@@ -59,7 +64,10 @@ public class RegionSimulator {
 				//SequenceLogger.outputPrintln(positionAtIndex + "\tChromEnd:\t" + chromPositionLast + "\tDiff:\t" + lengthFromEnd);
 
 				// Now search for the position that will be the closest index
-				int resultIndex = oneSampleInfo.getIndex(chrom, randomPosition + (compareFactor * approxLength)); 				
+				int targetPosition = randomPosition + (compareFactor * approxLength);
+				//targetPosition = Math.min(Chrom.MaxPositionOnLongestChrom, Math.max(0, targetPosition));
+				
+				int resultIndex = oneSampleInfo.getIndex(chrom, targetPosition); 				
 				resultIndex = ArrayUtils.getInsertPoint(resultIndex);
 				
 				// We then make sure that resultIndex remains within the bounds of the chromosome

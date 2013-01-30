@@ -134,7 +134,7 @@ public class Script {
 		
 		for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
 			String row = rows.get(rowIndex);
-			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0 || row.indexOf("chrX") >= 0) {
+			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0 || row.indexOf("chrX") >= 0 || row.indexOf("chrY") >= 0 || row.indexOf("chrM") >= 0) {
 				rows.set(rowIndex, null);
 			} else {
 				// Do some light GC filtering

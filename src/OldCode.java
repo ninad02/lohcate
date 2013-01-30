@@ -1,3 +1,6 @@
+import genomeEnums.VariantLocation;
+import genomeUtils.GenotypeUtils;
+
 import java.util.ArrayList;
 
 import shared.FileOps;
@@ -523,6 +526,26 @@ public class OldCode {
 		}
 	}
 	*/
+	
+	/* Printing old clustering output:
+				sb.setLength(0); // Clear the string builder
+				sb.append(Script.ChromPrefix).append(chrom.ordinal())
+				.append(fileExtDelim.mDelimiter).append(position)
+				.append(fileExtDelim.mDelimiter).append(vafNormal)
+				.append(fileExtDelim.mDelimiter).append(vafTumor);
+				
+				String variantAnnotation = (oneSiteInfo.mRsID == GenotypeUtils.RsID_Novel) ? Script.NovelStr : GenotypeUtils.getRsIdFromNumber(oneSiteInfo.mRsID);
+				sb.append(fileExtDelim.mDelimiter).append(variantAnnotation);
+
+				// Determine whether we are at a germline or somatic row
+				VariantLocation targetTissue = (oneSiteInfo.calcVAFNormal() <= 0.10) ? VariantLocation.Somatic : VariantLocation.Germline;   
+
+				sb.append(fileExtDelim.mDelimiter).append(oneSiteInfo.mHugoSymbol)
+				.append(fileExtDelim.mDelimiter).append(oneSiteInfo.getMutationType().getPrintName())
+				.append(fileExtDelim.mDelimiter).append(targetTissue.toLowerCase())
+				.append(fileExtDelim.mDelimiter).append(clusterType)
+				;
+	 */
 	
 	/**
 	 * helper method for addScoreTracks()
