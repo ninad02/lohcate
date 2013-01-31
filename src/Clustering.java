@@ -335,10 +335,10 @@ public class Clustering {
 		double mFDRTumor = 0;
 		
 		public ClusteringInputOneSampleMetaData(int numSites) {
-			mAdjustedVAFNormal       = new float[numSites];
-			mAdjustedVAFTumor        = new float[numSites];
-			mImbalancePValuesTumor  = new double[numSites];
-			mImbalancePValuesNormal = new double[numSites];
+			mAdjustedVAFNormal         = new float[numSites];
+			mAdjustedVAFTumor          = new float[numSites];
+			mImbalancePValuesTumor    = new double[numSites];
+			mImbalancePValuesNormal   = new double[numSites];
 			mTumorCopyNumRatiosPerGene = new float[numSites];
 			
 			mCoverageRatioTumorToNormal = new PrimitiveWrapper.WFloat(0);
@@ -364,19 +364,19 @@ public class Clustering {
 		// Now get the copy number ratios at a segmented sub-chromosomal level (by gene)
 		calcRoughCopyNumberRatioPerSite(oneSampleData.mInfoSites, metaData.mTumorCopyNumRatiosPerGene, metaData.mCoverageRatioTumorToNormal.mFloat, metaData.mReadCountTalliesTumor, metaData.mReadCountTalliesNormal);				
 		
-		// Now get the clusters
+		// Now adjust the VAF values basead on biases
 		calculateAdjustedVAFs(oneSampleData.mInfoSites, allelicBiasTable, metaData.mAdjustedVAFNormal, metaData.mAdjustedVAFTumor, metaData.mCopyNumRatioPerChromNormal, platform);
 
 		getPValuesImbalance(oneSampleData.mInfoSites, metaData.mImbalancePValuesTumor, metaData.mImbalancePValuesNormal, metaData.mAdjustedVAFNormal, metaData.mAdjustedVAFTumor);
 						
 		// Calculate the FDR for tumor and normal
-		metaData.mFDRTumor  = getFDR_BenjaminiHochberg(metaData.mImbalancePValuesTumor,  ParamsNum.FDRAlpha.getValue().doubleValue());
-		metaData.mFDRNormal = getFDR_BenjaminiHochberg(metaData.mImbalancePValuesNormal, ParamsNum.FDRAlpha.getValue().doubleValue());
+		boolean pointsIndependent = true;
+		metaData.mFDRTumor  = getFDR_BenjaminiHochberg(metaData.mImbalancePValuesTumor,  ParamsNum.FDRAlpha.getValue().doubleValue(), pointsIndependent);
+		metaData.mFDRNormal = getFDR_BenjaminiHochberg(metaData.mImbalancePValuesNormal, ParamsNum.FDRAlpha.getValue().doubleValue(), pointsIndependent);
 	}
 
 	// ========================================================================
-	private static Boolean classifySites_addToContingencyTables(ClusterType eventTest, ClusterType eventTruth, ArrayList<ContingencyTable> eventTables) {
-		boolean match = (eventTest == eventTruth);
+	private static Boolean classifySites_addToContingencyTables(ClusterType eventTest, ClusterType eventTruth, ArrayList<ContingencyTable> eventTables) {		
 		
 		if (CompareUtils.isNull(eventTest) || CompareUtils.isNull(eventTruth)) {
 			return null;
@@ -448,7 +448,7 @@ public class Clustering {
 				ArrayList<ContingencyTable> eventTables = NullaryClassFactory.newList(ArrayList.class, ContingencyTable.ClassFactory, ClusterType.values().length);
 				System.out.println("Num Event Tables: " + eventTables.size());
 								
-				int numSimulationIter = 5;
+				int numSimulationIter = 10;
 				for (int simulationIter = 0; simulationIter < numSimulationIter; simulationIter++) {
 					LOHcateSimulator simulator = new LOHcateSimulator();
 					LOHcateSimulator.LOHcateSimulatorGoldStandard goldStandard = new LOHcateSimulator.LOHcateSimulatorGoldStandard(oneSampleData.getNumSites());
@@ -469,7 +469,7 @@ public class Clustering {
 						clusters = Clustering.getClusters_Old(oneSampleData.mInfoSites, metaData.mImbalancePValuesTumor, metaData.mTumorCopyNumRatiosPerGene, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
 					}
 
-					boolean toPrintWithCopyNum = false;
+					boolean toPrintWithCopyNum = true;
 					if (toPrintWithCopyNum) {
 						PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
 						for (int row = 0; row < oneSampleData.mInfoSites.size(); row++) {
@@ -548,7 +548,7 @@ public class Clustering {
 						copyNumPlot[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
 						copyNumPlot[ clusterType.ordinal() ][1][indexForClusterType] = (metaData.mTumorCopyNumRatiosPerGene[i] * Script.DefaultDiploidCopyNumber);	
 
-						IOUtils.writeToBufferedWriter(out, sb.toString(), true);
+						//IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 						IOUtils.flushBufferedWriter(out);
 
 					}									
@@ -607,13 +607,17 @@ public class Clustering {
 	 *  NOTE: Since this is mathematics, k starts at 1, not 0
 	 *  
 	 */
-	public static double getFDR_BenjaminiHochberg(double[] pValues, double fdrAlpha) {
+	public static double getFDR_BenjaminiHochberg(double[] pValues, double fdrAlpha, boolean pointsIndependent) {
 		double[] pValuesClone = pValues.clone();
 		Arrays.sort(pValuesClone);
 		
-		double eulerMascheroniConstant = 0.577215664901532;
-		double e_m = 1.0 / (2 * pValuesClone.length);
-		double c_m = Math.log(pValuesClone.length) + eulerMascheroniConstant + e_m;
+		double c_m = 1.0;  // Default under condition of independence
+		
+		if (!pointsIndependent) {
+			double eulerMascheroniConstant = 0.577215664901532;
+			double e_m = 1.0 / (2 * pValuesClone.length);
+			c_m = Math.log(pValuesClone.length) + eulerMascheroniConstant + e_m;
+		}
 		
 		for (int k = pValuesClone.length - 1; k >= 0; k--) {
 			double threshold = ((double) (k + 1) / ((double) pValuesClone.length * c_m)) * fdrAlpha;
@@ -667,6 +671,7 @@ public class Clustering {
 		return new double[][] { list1.toArray(), list2.toArray() };
 	}
 	
+	// ========================================================================
 	private static double[][][] getCoordinateArraysPerClusterType(int[] clusterTypeCounts) {
 		double[][][] clusterCoordinates = new double[clusterTypeCounts.length][2][];
 		
@@ -678,6 +683,7 @@ public class Clustering {
 		return clusterCoordinates;
 	}
 
+	// ========================================================================
 	public static void plotEventSampleRecurrence(XYDataset xyDataset, String outFilenameRoot) {
 		String xAxisLabel = "Position";
 		String yAxisLabel = "# Samples with Event";
@@ -711,6 +717,7 @@ public class Clustering {
 		
 	}
 	
+	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of a tissue vs the genomic position. */
 	public static void plotCopyNumGenomeWide(XYDataset xyDataset, String outFilenameRoot, String sampleName) {
 		String xAxisLabel = "Position";
@@ -744,6 +751,7 @@ public class Clustering {
 		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, 2400, 800);
 	}
 	
+	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of a tissue vs the genomic position. */
 	public static void plotVAFGenomeWide(XYDataset xyDataset, String outFilenameRoot, String sampleName, boolean isTumor) {
 		String xAxisLabel = "Position";
@@ -777,6 +785,7 @@ public class Clustering {
 		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, 2400, 800);
 	}
 	
+	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of the normal tissue comapred to the tumor tissue. */
 	public static void plotVAFComparison(XYDataset xyDataset, String outFilenameRoot, String sampleName) {
 		String xAxisLabel = "VAF Tumor";
@@ -814,6 +823,7 @@ public class Clustering {
 		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, width, height);
 	}
 
+	// ========================================================================
 	public static XYItemRenderer getXYItemRendererHelper(int size) {
 		XYShapeRenderer xyShapeRend = new XYShapeRenderer();				
 		
@@ -827,6 +837,7 @@ public class Clustering {
 		return xyShapeRend;
 	}
 	
+	// ========================================================================
 	private static void setSeriesPaintPerCluster(XYItemRenderer itemRenderer) {
 		boolean allGray = false;
 		
@@ -1084,10 +1095,13 @@ public class Clustering {
 		int totalNumSites        = ArrayUtils.arraySum(numSitesPerChrom);
 		float avgCoverageNormal = (float) totalReadCountNormal / (float) totalNumSites;
 		float avgCoverageTumor  = (float) totalReadCountTumor  / (float) totalNumSites;
-		//coverageRatioTumorToNormal.mFloat = avgCoverageTumor / avgCoverageNormal;
-		coverageRatioTumorToNormal.mFloat = (float) readCountTalliesTumor.getKeyWithMaxCount() / (float) readCountTalliesNormal.getKeyWithMaxCount(); 
-		System.out.println("Tumor Normal Genome-wide ratio: " + coverageRatioTumorToNormal.mFloat);
-				
+		
+		// Re-assign to highest count
+		avgCoverageNormal = (float) readCountTalliesNormal.getKeyWithMaxCount();
+		avgCoverageTumor  = (float) readCountTalliesTumor.getKeyWithMaxCount();
+		
+		coverageRatioTumorToNormal.mFloat = avgCoverageTumor / avgCoverageNormal;		 
+		System.out.println("Tumor Normal Genome-wide ratio: " + coverageRatioTumorToNormal.mFloat);				
 		System.out.printf("Average Read Count Normal: %g\n", avgCoverageNormal);
 		
 		for (Chrom chrom : Chrom.values()) {
@@ -1108,6 +1122,7 @@ public class Clustering {
 		return tumorNormalRatioPerChrom;
 	}
 
+	// ========================================================================
 	/**
 	 * A helper method for curateSNPCalls()
 	 * @param load line-split FileOps.loadFromFile of naf-taf-input

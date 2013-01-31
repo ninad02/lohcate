@@ -264,7 +264,7 @@ public class LOHcateSimulator {
 			infoOneSite.setCovgTotalNormal((short) iosos.mNormal.calcNumReadsTotal());
 			infoOneSite.setCovgTotalTumor ((short)  iosos.mTumor.calcNumReadsTotal());
 			
-			//System.out.println(infoOneSite.printToString(sb, true, StringUtils.FileExtensionTSV.mDelimiter) + "\t" + eventTypeToAssign);
+			// System.out.println(infoOneSite.printToString(sb, true, StringUtils.FileExtensionTSV.mDelimiter) + "\t" + eventTypeToAssign);
 		}
 	}
 	
