@@ -11,6 +11,74 @@ import com.martiansoftware.jsap.Switch;
 public class ArgumentParserUtils {
 
 	// ========================================================================
+	public static abstract class InputParameter<T> {
+		protected char   mFlagShort;
+		protected String mFlagLong;
+		protected String mUsageName;
+		
+		protected T      mDefaultValue;
+		protected T      mActualValue;
+		
+		public InputParameter(T defaultValue, char flagShort, String flagLong, String usageName) {
+			mFlagShort = flagShort;
+			mFlagLong  = flagLong;
+			mUsageName = usageName;
+			mActualValue = mDefaultValue = defaultValue;
+		}
+		
+		public char getShortFlag() { return mFlagShort; }
+		public String getLongFlag() { return mFlagLong; }
+		public String getUsageName() { return mUsageName; }
+		
+		public T getValue()        { return mActualValue; } 
+		public T getDefaultValue() { return mDefaultValue; }
+		
+		public void setValue(T newValue) { mActualValue = newValue; } 
+		
+		public String getNameAndValueAsString(String delimiter) { 
+			return (mFlagLong + delimiter + getValue());
+		}
+		
+		public abstract void parseValue(String newValueStr);
+	}
+
+	// ========================================================================
+	public static class InputParameterInteger extends InputParameter<Integer> {
+		
+		public InputParameterInteger(Integer defaultValue, char flagShort, String flagLong, String usageName) {
+			super(defaultValue, flagShort, flagLong, usageName);
+		}
+		
+		public void parseValue(String newValueStr) {
+			mActualValue = Integer.parseInt(newValueStr);
+		}
+	}
+	
+	// ========================================================================
+	public static class InputParameterDouble extends InputParameter<Double> {
+		
+		public InputParameterDouble(Double defaultValue, char flagShort, String flagLong, String usageName) {
+			super(defaultValue, flagShort, flagLong, usageName);
+		}
+		
+		public void parseValue(String newValueStr) {
+			mActualValue = Double.parseDouble(newValueStr);
+		}
+	}
+	
+	// ========================================================================
+	public static class InputParameterBoolean extends InputParameter<Boolean> {
+		
+		public InputParameterBoolean(Boolean defaultValue, char flagShort, String flagLong, String usageName) {
+			super(defaultValue, flagShort, flagLong, usageName);
+		}
+		
+		public void parseValue(String newValueStr) {
+			mActualValue = Boolean.parseBoolean(newValueStr);
+		}
+	}
+	
+	// ========================================================================
 	public static void registerJSAPParameters(JSAP jsap, Collection<Parameter> params) {
 		for (Parameter p : params) { registerJSAPParameter(jsap, p); }
 	}

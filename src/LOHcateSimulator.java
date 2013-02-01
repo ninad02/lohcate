@@ -20,6 +20,12 @@ import lohcateEnums.ClusterType;
 import org.apache.commons.math3.random.JDKRandomGenerator;
 import org.apache.commons.math3.random.RandomDataGenerator;
 
+import com.martiansoftware.jsap.JSAP;
+
+import nutils.ArgumentParserUtils;
+import nutils.ArgumentParserUtils.InputParameter;
+import nutils.ArgumentParserUtils.InputParameterDouble;
+import nutils.ArgumentParserUtils.InputParameterInteger;
 import nutils.ArrayUtils;
 import nutils.CompareUtils;
 import nutils.IOUtils;
@@ -29,19 +35,99 @@ import nutils.StringUtils;
 public class LOHcateSimulator {
 
 	// ========================================================================
-	
+	// INNER CLASS
+	// ========================================================================
 	public static class LOHcateSimulatorParams implements SeqReadSimulator.SeqReadSimulationParams {
-		public double getCoverageGenerated(TissueType t) { return 100; }
-		public double getCopyNumberTotal()               { return 2.5; }			
+
+		// ====================================================================
+		// MEMBER VARIABLES
+		// ====================================================================
+		
+		protected InputParameterDouble[] mCoverageGenerated = new InputParameterDouble[] {
+			new InputParameterDouble(100.0, JSAP.NO_SHORTFLAG, "CoverageGeneratedTumor", JSAP.NO_DEFAULT),
+			new InputParameterDouble(100.0, JSAP.NO_SHORTFLAG, "CoverageGeneratedNormal", JSAP.NO_DEFAULT)
+		};				
+				
+		protected InputParameterDouble[] mCoverageExpected = new InputParameterDouble[] {
+				new InputParameterDouble(100.0, JSAP.NO_SHORTFLAG, "CoverageGeneratedTumor", JSAP.NO_DEFAULT),
+				new InputParameterDouble(100.0, JSAP.NO_SHORTFLAG, "CoverageGeneratedNormal", JSAP.NO_DEFAULT)
+		};	
+		
+		protected InputParameterDouble mTumorPurity = new InputParameterDouble(0.50, JSAP.NO_SHORTFLAG, "TumorPurity", JSAP.NO_DEFAULT);		
+		protected InputParameterInteger mNumCNARegions = new InputParameterInteger(5, JSAP.NO_SHORTFLAG, "NumCNARegions", JSAP.NO_DEFAULT);
+		
+		public ArrayList<InputParameter<?>> mParams;
+		
+		// ====================================================================
+		public LOHcateSimulatorParams() {			
+			mParams = new ArrayList<InputParameter<?>>();
+			for (TissueType t : TissueType.values()) {
+				mParams.add(mCoverageGenerated[t.ordinal()]);
+				mParams.add(mCoverageExpected[t.ordinal()]);
+			}
+			mParams.add(mTumorPurity);
+			mParams.add(mNumCNARegions);
+			
+		}
+		
+		// ====================================================================
+		public LOHcateSimulatorParams(String paramFilename) {
+			this();  // call other constructor
+			parseParamFileAndSet(paramFilename);
+		}
+		
+		// ====================================================================
+		protected void parseParamFileAndSet(String paramFilename) {
+			String[][] params = IOUtils.readAllLinesFromFileAsMatrix(paramFilename);
+			for (String[] paramAndArgs : params) {
+				String paramName = paramAndArgs[0];
+				String argValue  = paramAndArgs[1];
+				
+				for (InputParameter<?> ip : mParams) {
+					if (ip.getLongFlag().equals(paramName)) {
+						ip.parseValue(argValue);
+					}
+				}
+			}
+		}
+		
+		// ========================================================================
+		public void printValues(PrintStream out) {
+			out.println("------------------------------------------------");
+			out.println("------------ Simulation Parameters -------------");
+
+			for (InputParameter<?> ip : mParams) {
+				String line = ip.getNameAndValueAsString(StringUtils.FileExtensionTSV.mDelimiter);
+				out.println(line);
+			}			
+			
+			out.println("------------------------------------------------");
+			out.flush();
+		}
+		
+		// ====================================================================
+		// GETTERS
+		public double getCoverageGenerated(TissueType t) { return mCoverageGenerated[t.ordinal()].getValue(); }
+		
+		public double getPurity() { return mTumorPurity.getValue(); }
+		
+		public int getNumCNARegions() { return mNumCNARegions.getValue(); } 
+
+		// ====================================================================		
 		public double getNumFractionOfReadForGCAlleles() { return 1.0; }
 		
-		public boolean isCopyNumberChangeBiAllelic()     { return false; }	
+		public double getCopyNumberTotal()               { return 2.5; }	
+		public boolean isCopyNumberChangeBiAllelic()     { return false; }
 		public boolean allowHemizygousOrHomozygousDeletionGenotypes() { return true; }
-		public double getPurity() { return 0.80; }
-		
-		public int getNumCNARegions() { return 5; }
 	}
 	
+	// ========================================================================
+	// ======================= END INNER CLASS ================================
+	// ========================================================================
+
+	
+	// ========================================================================
+	// INNER CLASS
 	// ========================================================================
 	public static class LOHcateSimulatorGoldStandard implements SeqReadSimulator.SeqReadSimulationGoldStandard {
 		
