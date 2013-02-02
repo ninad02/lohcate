@@ -26,6 +26,7 @@ import lohcateEnums.SeqPlatform;
 
 import nutils.ArgumentParserUtils;
 import nutils.ArrayUtils;
+import nutils.ArrayUtils.DoubleParallelArray;
 import nutils.BitSetUtils;
 import nutils.CompareUtils;
 import nutils.ContingencyTable;
@@ -435,7 +436,6 @@ public class Clustering {
 		for (File file : files) {			
 			int indexOfSubstring = file.getName().indexOf(Script.GermlineSuffix);
 			if (indexOfSubstring >= 0) {
-				// && wList(file.getName())) {
 				String samplenameRoot = file.getName().substring(0, indexOfSubstring);  				
 				System.out.println("Processing (" + ++fileIndex + "): " + file.getName());
 				ClusteringInputOneSample oneSampleData = readLinesFromFiles(file);
@@ -488,13 +488,10 @@ public class Clustering {
 
 					// Now initialize the data structure needed to plot
 					int[] clusterTypeCounts = ArrayUtils.getEnumTypeCounts(clusters, ClusterType.values().length);
-					double[][][] clusterCoordinates  = getCoordinateArraysPerClusterType(clusterTypeCounts);
-					double[][][] waterfallPlotTumor  = getCoordinateArraysPerClusterType(clusterTypeCounts);
-					double[][][] waterfallPlotNormal = getCoordinateArraysPerClusterType(clusterTypeCounts);
-					double[][][] copyNumPlot         = getCoordinateArraysPerClusterType(clusterTypeCounts);
-
-					int[] clusterTypeIndex = new int[clusterTypeCounts.length];
-					Arrays.fill(clusterTypeIndex, -1);  
+					DoubleParallelArray[] clusterCoordinates  = getCoordinateArraysPerClusterType(clusterTypeCounts);
+					DoubleParallelArray[] waterfallPlotTumor  = getCoordinateArraysPerClusterType(clusterTypeCounts);
+					DoubleParallelArray[] waterfallPlotNormal = getCoordinateArraysPerClusterType(clusterTypeCounts);
+					DoubleParallelArray[] copyNumPlot         = getCoordinateArraysPerClusterType(clusterTypeCounts);
 
 					// Do the post-processing
 					Chrom prevChrom = Chrom.c0;
@@ -505,14 +502,13 @@ public class Clustering {
 					DoubleArrayList chromBoundaryYValue = new DoubleArrayList();
 
 					int startingRowGermlineOrSomaticOrAll = 0;  // 0 because header line has been stripped away
-					for (int i = startingRowGermlineOrSomaticOrAll; i < oneSampleData.mInfoSites.size(); i++) {
-						ClusteringInputOneSite oneSiteInfo = oneSampleData.mInfoSites.get(i);
-						ClusterType clusterType = clusters[i];
-						int indexForClusterType = ++(clusterTypeIndex[clusterType.ordinal()]);  // increase the index of the data structure of the cluster type
+					for (int row = startingRowGermlineOrSomaticOrAll; row < oneSampleData.mInfoSites.size(); row++) {
+						ClusteringInputOneSite oneSiteInfo = oneSampleData.mInfoSites.get(row);
+						ClusterType clusterType = clusters[row];
+
+						classifySites_addToContingencyTables(clusterType, goldStandard.mSomaticEvents.get(row), eventTables);
 
 						//=IF(A3=A2,B3-B2+L2,B3+L2)
-						classifySites_addToContingencyTables(clusterType, goldStandard.mSomaticEvents.get(i), eventTables);
-
 						Chrom chrom = oneSiteInfo.getChrom(); 							
 						int position = oneSiteInfo.getPosition(); 							
 
@@ -534,23 +530,15 @@ public class Clustering {
 							countAtPositionMax = Math.max(countAtPositionMax, countAtPosition);
 						}
 
-						float vafNormal = metaData.mAdjustedVAFNormal[i]; //Clustering.extractVAFNormal(germCols, platform);
-						float vafTumor  = metaData.mAdjustedVAFTumor[i]; //Clustering.extractVAFTumor (germCols, platform);
-						clusterCoordinates[ clusterType.ordinal() ][0][indexForClusterType] = vafTumor;
-						clusterCoordinates[ clusterType.ordinal() ][1][indexForClusterType] = vafNormal;
-
-						waterfallPlotTumor[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
-						waterfallPlotTumor[ clusterType.ordinal() ][1][indexForClusterType] = vafTumor;
-
-						waterfallPlotNormal[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
-						waterfallPlotNormal[ clusterType.ordinal() ][1][indexForClusterType] = vafNormal;	
-
-						copyNumPlot[ clusterType.ordinal() ][0][indexForClusterType] = positionGenomeWide;
-						copyNumPlot[ clusterType.ordinal() ][1][indexForClusterType] = (metaData.mTumorCopyNumRatiosPerGene[i] * Script.DefaultDiploidCopyNumber);	
+						float vafNormal = metaData.mAdjustedVAFNormal[row];
+						float vafTumor  = metaData.mAdjustedVAFTumor[row]; 
+						clusterCoordinates [clusterType.ordinal()].add( vafTumor, vafNormal );
+						waterfallPlotTumor [clusterType.ordinal()].add( positionGenomeWide, vafTumor);
+						waterfallPlotNormal[clusterType.ordinal()].add( positionGenomeWide, vafNormal);
+						copyNumPlot        [clusterType.ordinal()].add( positionGenomeWide, (metaData.mTumorCopyNumRatiosPerGene[row] * Script.DefaultDiploidCopyNumber));
 
 						//IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 						IOUtils.flushBufferedWriter(out);
-
 					}									
 
 					// Now let's create the datasets needed to
@@ -580,11 +568,11 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	private static DefaultXYDataset classifySitesHelper_createAndFillXYData(double[][][] coordinatesByEvent, double[][] boundaryArrays) {
+	private static DefaultXYDataset classifySitesHelper_createAndFillXYData(DoubleParallelArray[] coordinatesByEvent, double[][] boundaryArrays) {
 		DefaultXYDataset xyDataset = new DefaultXYDataset();
 		
 		for (ClusterType eventType : ClusterType.values()) {
-			xyDataset.addSeries(eventType.name(), coordinatesByEvent[eventType.ordinal()]);			
+			xyDataset.addSeries(eventType.name(), coordinatesByEvent[eventType.ordinal()].mArray);			
 		}
 		
 		if (boundaryArrays != null) {
@@ -672,12 +660,12 @@ public class Clustering {
 	}
 	
 	// ========================================================================
-	private static double[][][] getCoordinateArraysPerClusterType(int[] clusterTypeCounts) {
-		double[][][] clusterCoordinates = new double[clusterTypeCounts.length][2][];
+	private static DoubleParallelArray[] getCoordinateArraysPerClusterType(int[] clusterTypeCounts) {
+		
+		DoubleParallelArray[] clusterCoordinates = new DoubleParallelArray[clusterTypeCounts.length];
 		
 		for (int clusterTypeIndex = 0; clusterTypeIndex < clusterCoordinates.length; clusterTypeIndex++) {
-			clusterCoordinates[clusterTypeIndex][0] = new double[ clusterTypeCounts[clusterTypeIndex] ];
-			clusterCoordinates[clusterTypeIndex][1] = new double[ clusterTypeCounts[clusterTypeIndex] ];
+			clusterCoordinates[clusterTypeIndex] = new DoubleParallelArray(clusterTypeCounts[clusterTypeIndex]);
 		}
 		
 		return clusterCoordinates;

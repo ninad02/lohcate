@@ -324,37 +324,59 @@ public class ArrayUtils {
 	// ===== INNER CLASS =====
 	// ========================================================================
 	public static abstract class NumArray {
-		public int mArrayLength;
+		public int mArraySize;
 		
-		public NumArray() { reset(); }		
-		public void reset() { mArrayLength = 0; }
+		public NumArray() { 
+			reset(); 
+		}		
+		
+		public void reset() { mArraySize = 0; }
+		public int size() { return mArraySize; }
 	}
 
+	// ========================================================================
 	public static class IntArray extends NumArray {
 		public int[] mArray;
 					
-		public IntArray(int arrayLength) { 
+		public IntArray(int numElements) { 
 			super();
-			mArray = new int[arrayLength];
+			mArray = new int[numElements];
 		}
 		
 		public int add(int num) { 
-			mArray[mArrayLength] = num; 
-			return ++mArrayLength; 
+			mArray[mArraySize] = num; 
+			return ++mArraySize; 
 		}
 	}
 
+	// ========================================================================
 	public static class DoubleArray extends NumArray {
 		public double[] mArray;
 		
-		public DoubleArray(int arrayLength) { 
+		public DoubleArray(int numElements) { 
 			super();
-			mArray = new double[arrayLength];
+			mArray = new double[numElements];
 		}
 		
 		public int add(double num) { 
-			mArray[mArrayLength] = num; 
-			return ++mArrayLength; 
+			mArray[mArraySize] = num; 
+			return ++mArraySize; 
+		}
+	}
+	
+	// ========================================================================
+	public static class DoubleParallelArray extends NumArray {
+		public double[][] mArray;		
+		
+		public DoubleParallelArray(int numElements) { 
+			super();
+			mArray = new double[2][numElements];
+		}
+		
+		public int add(double numX, double numY) {
+			mArray[0][mArraySize] = numX;
+			mArray[1][mArraySize] = numY;
+			return  ++mArraySize; 
 		}
 	}
 	
