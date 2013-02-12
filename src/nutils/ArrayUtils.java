@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
+import com.carrotsearch.hppc.DoubleArrayList;
 import com.carrotsearch.hppc.LongArrayList;
 
 public class ArrayUtils {
@@ -365,12 +366,13 @@ public class ArrayUtils {
 	}
 	
 	// ========================================================================
-	public static class DoubleParallelArray extends NumArray {
+	public static class ParallelArrayDouble extends NumArray {
 		public double[][] mArray;		
 		
-		public DoubleParallelArray(int numElements) { 
+		public ParallelArrayDouble(int numElements) { 
 			super();
 			mArray = new double[2][numElements];
+			ArrayUtils.arrayFill(mArray, 0);
 		}
 		
 		public int add(double numX, double numY) {
@@ -880,5 +882,10 @@ public class ArrayUtils {
 	// ========================================================================
 	public static<E> int linearSearch(ArrayList<E> theArray, E elem) {
 		return theArray.indexOf(elem);
+	}
+
+	// ========================================================================
+	public static double[][] combineTwoDynamicArraysIntoOneStatic(DoubleArrayList list1, DoubleArrayList list2) {
+		return new double[][] { list1.toArray(), list2.toArray() };
 	}
 }

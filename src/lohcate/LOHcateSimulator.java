@@ -1,3 +1,4 @@
+package lohcate;
 import genomeUtils.GenomeConstants;
 import genomeUtils.GenotypeUtils;
 import genomeUtils.InfoOneSiteOneSample;
@@ -15,6 +16,9 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import lohcate.clustering.AlleleFrequencyStatsForSample;
+import lohcate.clustering.ClusteringInputOneSample;
+import lohcate.clustering.ClusteringInputOneSite;
 import lohcateEnums.ClusterType;
 
 import org.apache.commons.math3.random.JDKRandomGenerator;
@@ -44,17 +48,19 @@ public class LOHcateSimulator {
 		// ====================================================================
 		
 		protected InputParameterDouble[] mCoverageGenerated = new InputParameterDouble[] {
-			new InputParameterDouble(100.0, JSAP.NO_SHORTFLAG, "CoverageGeneratedTumor", JSAP.NO_DEFAULT),
-			new InputParameterDouble(100.0, JSAP.NO_SHORTFLAG, "CoverageGeneratedNormal", JSAP.NO_DEFAULT)
+			new InputParameterDouble(100.0, "CoverageGeneratedTumor", JSAP.NO_SHORTFLAG, "CoverageGeneratedTumor", JSAP.NO_DEFAULT),
+			new InputParameterDouble(100.0, "CoverageGeneratedNormal", JSAP.NO_SHORTFLAG, "CoverageGeneratedNormal", JSAP.NO_DEFAULT)
 		};				
 				
 		protected InputParameterDouble[] mCoverageExpected = new InputParameterDouble[] {
-				new InputParameterDouble(100.0, JSAP.NO_SHORTFLAG, "CoverageGeneratedTumor", JSAP.NO_DEFAULT),
-				new InputParameterDouble(100.0, JSAP.NO_SHORTFLAG, "CoverageGeneratedNormal", JSAP.NO_DEFAULT)
+				new InputParameterDouble(100.0, "CoverageExpectedTumor",  JSAP.NO_SHORTFLAG, "CoverageExpectedTumor", JSAP.NO_DEFAULT),
+				new InputParameterDouble(100.0, "CoverageExpectedNormal", JSAP.NO_SHORTFLAG, "CoverageExpectedNormal", JSAP.NO_DEFAULT)
 		};	
 		
-		protected InputParameterDouble mTumorPurity = new InputParameterDouble(0.50, JSAP.NO_SHORTFLAG, "TumorPurity", JSAP.NO_DEFAULT);		
-		protected InputParameterInteger mNumCNARegions = new InputParameterInteger(5, JSAP.NO_SHORTFLAG, "NumCNARegions", JSAP.NO_DEFAULT);
+		protected InputParameterDouble mTumorPurity = new InputParameterDouble(0.50, "TumorPurity", JSAP.NO_SHORTFLAG, "TumorPurity", JSAP.NO_DEFAULT);		
+		protected InputParameterInteger mNumCNARegions = new InputParameterInteger(5, "NumCNARegions", JSAP.NO_SHORTFLAG, "NumCNARegions", JSAP.NO_DEFAULT);
+		
+		protected InputParameterInteger mNumIterations = new InputParameterInteger(10, "NumIterations", JSAP.NO_SHORTFLAG, "NumIterations", JSAP.NO_DEFAULT);
 		
 		public ArrayList<InputParameter<?>> mParams;
 		
@@ -113,6 +119,8 @@ public class LOHcateSimulator {
 		
 		public int getNumCNARegions() { return mNumCNARegions.getValue(); } 
 
+		public int getNumIterations() { return mNumIterations.getValue(); }
+		
 		// ====================================================================		
 		public double getNumFractionOfReadForGCAlleles() { return 1.0; }
 		
@@ -151,6 +159,8 @@ public class LOHcateSimulator {
 		public void clear() {
 			mSomaticEvents.clear();
 		}
+		
+		public ClusterType getEvent(int index) { return mSomaticEvents.get(index); }
 	}
 
 	// ========================================================================
@@ -173,7 +183,7 @@ public class LOHcateSimulator {
 	}
 
 	// ========================================================================
-	public void generateSimulatedDataForSample(LOHcateSimulatorParams simParams, Clustering.ClusteringInputOneSample oneSampleData, LOHcateSimulatorGoldStandard goldStandard) {
+	public void generateSimulatedDataForSample(LOHcateSimulatorParams simParams, ClusteringInputOneSample oneSampleData, LOHcateSimulatorGoldStandard goldStandard) {
 		
 		// First initialize the sample by simulating reads across the sample
 		simulateReadsInRegion(simParams, oneSampleData, null, goldStandard);
@@ -188,7 +198,7 @@ public class LOHcateSimulator {
 	}
 	
 	// ========================================================================
-	private ArrayList<CopyNumberRegionRange> deduceRegions(LOHcateSimulatorParams simParams, Clustering.ClusteringInputOneSample oneSampleData) {
+	private ArrayList<CopyNumberRegionRange> deduceRegions(LOHcateSimulatorParams simParams, ClusteringInputOneSample oneSampleData) {
 
 		boolean specifyRandomSeed = true;
 		SeqReadSimulator readSimulator = specifyRandomSeed ? new SeqReadSimulator(Integer.SIZE) : new SeqReadSimulator();
@@ -260,7 +270,7 @@ public class LOHcateSimulator {
 		//outStream.close();
 	
 	// ========================================================================	
-	public void simulateReadsInRegion(LOHcateSimulatorParams simParams, Clustering.ClusteringInputOneSample infoSample, CopyNumberRegionRange cnRegion, LOHcateSimulatorGoldStandard goldStandard) {
+	public void simulateReadsInRegion(LOHcateSimulatorParams simParams, ClusteringInputOneSample infoSample, CopyNumberRegionRange cnRegion, LOHcateSimulatorGoldStandard goldStandard) {
 		
 		Nuc[] genotype = new Nuc[2];
 		SeqReadSimulator seqSim = new SeqReadSimulator();
@@ -290,7 +300,7 @@ public class LOHcateSimulator {
 		// Now go through the relevant region
 		for (int row = indexStart; row <= indexEnd; row++) {
 			iosos.clear();
-			Clustering.ClusteringInputOneSite infoOneSite = infoSample.getSiteAtIndex(row);
+			ClusteringInputOneSite infoOneSite = infoSample.getSiteAtIndex(row);
 		
 			Nuc referenceAllele     = infoOneSite.getReferenceAllele();
 			Nuc variantAlleleNormal = infoOneSite.getVariantAlleleNormal();
@@ -320,6 +330,7 @@ public class LOHcateSimulator {
 						
 			} else if (cnRegion.mCopyNumberClusterType == ClusterType.GainSomatic) {
 				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getPurity());
+				System.out.println("COPYNUMBER:\t" + (copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] + copyNumber[TissueType.Tumor.mCode][otherPhase.mCode]));
 				eventTypeToAssign = ClusterType.GainSomatic;
 				
 			} else if (cnRegion.mCopyNumberClusterType == ClusterType.LOH) {				
@@ -357,9 +368,9 @@ public class LOHcateSimulator {
 	// ========================================================================
 	/** Based on the variant allele frequency, this determines the genotype. */
 	private Genotype deduceGenotype(double vaf) {
-		if (vaf <= Clustering.AlleleFrequencyStatsForSample.VAFNormalFrameLower) {
+		if (vaf <= AlleleFrequencyStatsForSample.VAFNormalFrameLower) {
 			return Genotype.EnumHomozygous00;
-		} else if (vaf > Clustering.AlleleFrequencyStatsForSample.VAFNormalFrameUpper) {
+		} else if (vaf > AlleleFrequencyStatsForSample.VAFNormalFrameUpper) {
 			return Genotype.EnumHomozygous11;
 		} else {
 			return Genotype.EnumHeterozygous;

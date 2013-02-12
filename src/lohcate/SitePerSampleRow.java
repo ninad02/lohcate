@@ -1,3 +1,4 @@
+package lohcate;
 //refName	coordinate	refBase	varBase	variantBase-N	variantBase-T	refEnv-N	refEnv-T	Q20_TotCov_N	Q20_TotCov_T	Q20_VarCov_N	Q20_VarCov_T	Q20_VariantRatio_N	Q20_VariantRatio_T	dbsnp	MutationType	Hugo_Symbol
 //chr1	881627	G	A	A	A	AGGTCAGGGGTGT	AGGTCAGGGGTGT	75	72	75	71	1	0.986111	rs2272757,bycluster;byfrequency;by1000genomes,G|0.539;A|0.461,.	synonymous_SNV	NOC2L
 

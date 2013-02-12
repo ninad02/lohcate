@@ -1,3 +1,4 @@
+package lohcate;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.IOException;

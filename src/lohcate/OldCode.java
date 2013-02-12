@@ -1,7 +1,12 @@
+package lohcate;
 import genomeEnums.VariantLocation;
 import genomeUtils.GenotypeUtils;
 
 import java.util.ArrayList;
+
+import lohcate.clustering.ClusteringInputOneSite;
+import lohcateEnums.SeqPlatform;
+import nutils.NumberUtils;
 
 import shared.FileOps;
 import shared.Utils;
@@ -546,6 +551,237 @@ public class OldCode {
 				.append(fileExtDelim.mDelimiter).append(clusterType)
 				;
 	 */
+	
+	
+	// ========================================================================
+	/*
+	 * A helper method for curateSNPCalls()
+	 * @param load line-split FileOps.loadFromFile of naf-taf-input
+	 * @param som_start start index of .somatic.txt naf-taf-input data in 'load' parameter
+	 * This assumes header has been stripped out
+	 * 
+	 *  //Vv.vV well/poorly tuned parameters for different data sets
+			//data set --> (NAF_STRIP_EXPANDER, (HET_BALL_EPS, HET_BALL_MINPTS), (DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS))
+			//target-aml --> (1, (0.035, 100), (0.015, 100))
+			//target-all --> (1, (0.035, 100), (0.01, 100))
+			//pvera --> (1.25, (0.035, 100), (0.015, 100))
+			//hepato --> (1.25, (0.035, 100), (0.015, 100))
+			//renal-we --> (1, (0.05, 500), (0.02, 350))
+	 *
+	public static ClusterType[] getClusters_Old(ArrayList<ClusteringInputOneSite> rows, double[] imbalancePValues, float[] copyNumRatios, String outFilenameFullPath, int startingRowGermlineOrSomaticOrAll, SeqPlatform platform) {
+
+		// Get the allele frequency statistics, and adjust the frames based on the resulting standard deviation
+		AlleleFrequencyStatsForSample afStatsSample = new AlleleFrequencyStatsForSample();
+		afStatsSample.tabulateAndPerformStatistics(rows, platform);
+		float vafNormalFrameAdjustedLower = afStatsSample.mCountMean - (Clustering.NAF_STRIP_EXPANDER * afStatsSample.mStdDev);
+		float vafNormalFrameAdjustedUpper = afStatsSample.mCountMean + (Clustering.NAF_STRIP_EXPANDER * afStatsSample.mStdDev);
+
+		//apply DBScan to points within NAF frame		
+		//double scalingFactor = DefaultDiploidCopyNumber;		
+		ArrayList<Floint> points = Clustering.getValidPointsListForClustering(rows, imbalancePValues, ScalingFactor, platform, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper);
+
+		System.out.println("Begin clustering algorithm: " + (new Date()).toString());
+
+		//DBScanFaster dbscanner = new DBScanFaster(points, HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+		DBScanFaster dbscanner = new DBScanFaster(points, Clustering.HET_BALL_EPS, Clustering.HET_BALL_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
+
+		dbscanner.cluster();
+		int clusterIDofHetBall = dbscanner.getCentralClusterID();
+		Boolean[] pointsWithinRadius = dbscanner.getPointsWithinMinRadiusOfCluster(clusterIDofHetBall);
+		int[] clusterAssignments = dbscanner.getClustAssignments();  // save and cache	
+
+		int[] clusterTypeIDsFromAlgorithm = new int[ClusterType.values().length];		
+		clusterTypeIDsFromAlgorithm[ClusterType.GainSomatic.ordinal()]  = -1;
+		clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()] = -2;
+		clusterTypeIDsFromAlgorithm[ClusterType.HETGermline.ordinal()] = clusterIDofHetBall;
+		clusterTypeIDsFromAlgorithm[ClusterType.Noise.ordinal()] = DBScanFaster.getClusterIDOfNoise();
+
+
+		//		PrintStream outStream = IOUtils.getPrintStream(outFilenameFullPath + ".withCopyNum.txt");
+		//		for (int r = 0; r < rows.size(); r++) {
+		//			outStream.print(rows.get(r));
+		//			outStream.println("\t" + copyNumRatios[r] + "\t" + (copyNumRatios[r] * scalingFactor + "\t" + clusterAssign));
+		//		}
+		//		IOUtils.closePrintStream(outStream);
+
+		// Now, re-run DBScan, but with changed parameters		
+		//dbscanner.changeParams(HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS);		
+		//dbscanner.cluster();
+		//int clusterIDofHetBallWithWedge = dbscanner.getCentralClusterID();
+		//int[] clusterAssignmentsWithWedge = dbscanner.getClustAssignments();
+
+		// We now do a third pass, this time allowing only those points that are not part of the het cluster
+		// We then perform a lower neighbor threshold on these points so that they can be declared as LOH
+		ArrayList<Floint> nonHetPoints = new ArrayList<Floint>(points.size());
+		boolean[] isNonHetPoint = new boolean[points.size()];		
+
+		double threshold = 0.05;
+		for (int i = 0; i < clusterAssignments.length; i++) {
+			isNonHetPoint[i] = (clusterAssignments[i] != clusterIDofHetBall); 
+			if (isNonHetPoint[i]) {
+				nonHetPoints.add(points.get(i));
+			}
+		}
+		DBScanFaster dbscannerNonHet = new DBScanFaster(nonHetPoints, Clustering.NON_HET_BALL_EPS, Clustering.NON_HET_BALL_MINPTS, 0, 0, 1, 1);
+		dbscannerNonHet.cluster();
+		int[] clusterAssignmentsNonHet = dbscannerNonHet.getClustAssignments();
+
+		System.out.println("End clustering algorithm: " + (new Date()).toString());
+
+		int nonHetIndex = -1;
+		for (int i = 0; i < clusterAssignments.length; i++) {
+
+			/*
+				if (isNonHetPoint[i]) {
+					++nonHetIndex;
+					if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+						// There is a collision of numeric cluster assignments.  This is due to the
+						// fact that we run DBScan on different input lists, thus leading to respective
+						// clusterIDs being assigned to each cluster for each run.  We need to ensure
+						// that we are performing no collisions.  If the hetball cluster is the first
+						// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+						// cluster ID.  Yes, this is kind of a hack.						
+						clusterAssignmentsNonHet[nonHetIndex] = 
+							(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+					}
+					clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];  // assign for lower thresholds
+					//clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];  // assign for lower thresholds
+
+				} else {	
+					/*
+					if (pointsWithinRadius[i] == null) {
+						Utils.throwErrorAndExit("ERROR: Cannot possibly be a non-het point!");
+					} else if (pointsWithinRadius[i] == Boolean.FALSE) {					
+						if (pointOnDiagonal(points.get(i), ClusterDiagonalLeeway)) {
+							clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
+						} else {
+							clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
+						}
+					}
+				}
+			 */
+
+			/*
+				if (isNonHetPoint[i]) {
+					++nonHetIndex;
+					if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+						// There is a collision of numeric cluster assignments.  This is due to the
+						// fact that we run DBScan on different input lists, thus leading to respective
+						// clusterIDs being assigned to each cluster for each run.  We need to ensure
+						// that we are performing no collisions.  If the hetball cluster is the first
+						// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+						// cluster ID.  Yes, this is kind of a hack.						
+						clusterAssignmentsNonHet[nonHetIndex] = 
+							(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+					}
+					clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];  // assign for lower thresholds
+				} else {								
+					if (pointsWithinRadius[i] == null) {
+						Utils.throwErrorAndExit("ERROR: Cannot possibly be a non-het point!");
+					} else if (pointsWithinRadius[i] == Boolean.FALSE) {					
+						if (pointOnDiagonal(points.get(i), ClusterDiagonalLeeway)) {
+							clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
+						} else {
+							clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
+						}
+					}
+				}
+			 */
+
+			/*
+			if (isNonHetPoint[i]) { ++nonHetIndex; }  // make sure we're always at the correct index
+
+			if (clusterAssignments[i] == DBSCAN2.ClusterIDOfNoise) {
+				if (isNonHetPoint[i]) {					
+					if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+						// There is a collision of numeric cluster assignments.  This is due to the
+						// fact that we run DBScan on different input lists, thus leading to respective
+						// clusterIDs being assigned to each cluster for each run.  We need to ensure
+						// that we are performing no collisions.  If the hetball cluster is the first
+						// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+						// cluster ID.  Yes, this is kind of a hack.						
+						clusterAssignmentsNonHet[nonHetIndex] = 
+								(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+					}
+					clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];  // assign for lower thresholds
+				} else {
+					clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Dup.ordinal()];   // only change if we're in a het ball region
+				}
+			}
+			*/
+			
+			/*
+			if (isNonHetPoint[i]) { ++nonHetIndex; }  // make sure we're always at the correct index
+
+			if (clusterAssignments[i] == DBSCAN2.ClusterIDOfNoise) {
+				if (isNonHetPoint[i]) {					
+					if (clusterAssignmentsNonHet[nonHetIndex] == clusterIDofHetBall) {
+						// There is a collision of numeric cluster assignments.  This is due to the
+						// fact that we run DBScan on different input lists, thus leading to respective
+						// clusterIDs being assigned to each cluster for each run.  We need to ensure
+						// that we are performing no collisions.  If the hetball cluster is the first
+						// cluster, then we take the next cluster ID, else, we subract 1 from the hetball 
+						// cluster ID.  Yes, this is kind of a hack.						
+						clusterAssignmentsNonHet[nonHetIndex] = 
+								(clusterIDofHetBall == DBSCAN2.ClusterIDOfNoise + 1) ? clusterIDofHetBall + 1 : clusterIDofHetBall - 1; 
+					}
+					if (pointOnDiagonal(points.get(i), ClusterDiagonalLeeway)) {
+						clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.Null.ordinal()];
+					} else {
+						clusterAssignments[i] = clusterAssignmentsNonHet[nonHetIndex];   
+					}
+				} else {
+					clusterAssignments[i] = clusterTypeIDsFromAlgorithm[ClusterType.GainSomatic.ordinal()];   // only change if we're in a het ball region
+				}
+			}
+
+		}
+
+		// Now assign the cluster types
+
+		return Clustering.assignClusters(rows, platform, vafNormalFrameAdjustedLower, vafNormalFrameAdjustedUpper, clusterAssignments, clusterTypeIDsFromAlgorithm);
+	}
+	
+	*
+	*
+	// ========================================================================
+	// Convenience function 
+	private static ArrayList<Floint> 
+		getValidPointsListForClustering(ArrayList<ClusteringInputOneSite> rows, double[] verticalFactor, double scalingFactor, SeqPlatform platform, float vafBoundLower, float vafBoundUpper) {
+		
+		ArrayList<Floint> points = new ArrayList<Floint>(rows.size());
+
+		for (int row = 0; row < rows.size(); row++) {
+			ClusteringInputOneSite oneSiteInfo = rows.get(row);			
+			float vafNormal = oneSiteInfo.calcVAFNormal();
+			if (NumberUtils.inRangeLowerExclusive(vafNormal, vafBoundLower, vafBoundUpper)) {	
+				Floint thePoint = new Floint(oneSiteInfo.calcVAFTumor(), vafNormal, (float) (verticalFactor[row] * scalingFactor));
+				points.add(thePoint);			
+			}
+		}
+
+		return points;
+	}
+	
+	*
+	*/
+
+	
+	//Vv.vV implements our old window-based clustering method. ugly, isn't it?
+	/*public static int assignCluster(float N, float T) {
+		if ((.35 < N && N < .65) && ((.2 < T && T < .375))) //left-of-center duplication
+			return 0;
+		else if ((.35 < N && N < .65) && ((.625 < T && T < .75))) //right-of-center duplication
+			return 0;
+		else if ((.35 < N && N < .65) && T < .2) //left-of-center loss of heterozygosity
+			return 1;
+		else if ((.35 < N && N < .65) && T > .75) //right-of-center loss of heterozygosity
+			return 2;
+		else if ((.35 < N && N < .65) && (.2 < T && T < .75)) //central, spherical cluster (heterozygotes)
+			return 3;
+		else
+			return cluster_names.length;
+	}*/
 	
 	/**
 	 * helper method for addScoreTracks()

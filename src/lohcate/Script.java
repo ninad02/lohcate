@@ -1,3 +1,4 @@
+package lohcate;
 import genomeEnums.Chrom;
 import genomeEnums.Nuc;
 import genomeEnums.VariantLocation;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.ListIterator;
 
 import nutils.ArgumentParserUtils;
@@ -33,6 +35,9 @@ import com.martiansoftware.jsap.FlaggedOption;
 import com.martiansoftware.jsap.JSAP;
 import com.martiansoftware.jsap.JSAPResult;
 
+import lohcate.clustering.Clustering;
+import lohcate.clustering.ClusteringParams;
+import lohcate.clustering.ClusteringPlotting;
 import lohcateEnums.ClusterType;
 import lohcateEnums.ColorPastel;
 import lohcateEnums.MutationType;
@@ -126,7 +131,7 @@ public class Script {
 	
 	public static final GenomicCoordinateComparatorInTextFileLine LineComparatorTab = new GenomicCoordinateComparatorInTextFileLine();
 	
-	static ArrayList<String> curateSNPCalls_removeHeaderLinesFromRows(ArrayList<String> rows) {
+	public static ArrayList<String> curateSNPCalls_removeHeaderLinesFromRows(ArrayList<String> rows) {
 		int windowPositionStart = 0;
 		int windowRowStart = 0;
 		Chrom chromPrev = Chrom.c0;
@@ -333,10 +338,7 @@ public class Script {
 	/** Plots a genome wide recurrence plot. */
 	public static void plotRecurrence(CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType, String outDir, ClusterType clusterType) {
 		
-		ArrayList<DynamicBucketCounter> dbcByChrom = new ArrayList<DynamicBucketCounter>();
-		for (Chrom chrom : Chrom.values()) {
-			dbcByChrom.add(new DynamicBucketCounter());
-		}
+		EnumMap<Chrom, DynamicBucketCounter> dbcByChrom = DynamicBucketCounter.ClassFactory.newEnumMap(Chrom.class);
 		
 		float maxRecurrenceScore = -1.0f;
 		for (Chrom chrom : Chrom.values()) {
@@ -344,8 +346,7 @@ public class Script {
 			if (cnrrOnChrom.isEmpty()) continue;
 			
 			for (CopyNumberRegionRange cnrr : cnrrOnChrom) {
-				DynamicBucketCounter dbc = dbcByChrom.get(chrom.ordinal());
-				maxRecurrenceScore = Math.max(maxRecurrenceScore, cnrr.mRecurrenceScore);
+				DynamicBucketCounter dbc = dbcByChrom.get(chrom);				
 				
 				int range = cnrr.getRangeLength();
 				int rangeIncr = Math.max(range / 20, 1);
@@ -355,7 +356,7 @@ public class Script {
 			}
 		}
 		
-		Clustering.plotRecurrenceGenomeWide(dbcByChrom, outDir, Math.round(maxRecurrenceScore), clusterType);
+		ClusteringPlotting.plotRecurrenceGenomeWide(dbcByChrom, outDir, clusterType);
 	}
 	
 	// ========================================================================
@@ -1618,21 +1619,24 @@ public class Script {
 		
 		long sys_time_init = System.currentTimeMillis();	
 		
+		
 		if (taskName.equals(taskClustering)) {
 			String allelicBiasFile = "AllelicBiasFile";
 			FlaggedOption allelicBias = new FlaggedOption(allelicBiasFile).setStringParser(JSAP.STRING_PARSER).setRequired(false)
 					.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("allelicBias").setUsageName(allelicBiasFile);
 			allelicBias.setHelp("Specify a file that has allelic biases");
 			ArgumentParserUtils.registerJSAPParameter(jsapTask, allelicBias);
-			Clustering.registerClusteringParameters(jsapTask);
+			
+			ClusteringParams clusteringParams = ClusteringParams.GlobalClusteringParams;
+			clusteringParams.registerClusteringParameters(jsapTask);
 			
 			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
 			String rootFolderName      = jsapResult.getString(rootFolderPath);
 			String allelicBiasFilename = jsapResult.getString(allelicBiasFile);
-			Clustering.configureParameters(jsapResult);
+			clusteringParams.configureParameters(jsapResult);
 			
 			if (allelicBiasFilename == null) {
-				Clustering.ParamsBool.IgnoreAllelicBias.setValue(true);
+				clusteringParams.setIgnoreAllelicBias(true);
 			}
 			
 			//SeqPlatform platform = SeqPlatform.getPlatform(Integer.parseInt(args[2]));

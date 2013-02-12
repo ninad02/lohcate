@@ -2,25 +2,26 @@ package nutils;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumMap;
 
-public class NullaryClassFactory<E> {
+public class NullaryClassFactory<V> {
 	
-	Class<E> mClass;
+	Class<V> mClass;
 	
 	// ========================================================================
-	public NullaryClassFactory(Class<E> theClass) {
+	public NullaryClassFactory(Class<V> theClass) {
 		mClass = theClass;
 	}
 	
 	// ========================================================================
-	public E newInstanceRaw() throws InstantiationException, IllegalAccessException { 		
+	public V newInstanceRaw() throws InstantiationException, IllegalAccessException { 		
 		return mClass.newInstance();
 	}
 
 	// ========================================================================
 	/** The same as newInstanceRaw(), but the exceptions are caught internally. */
-	public E newInstance() {
-		E newObject = null;
+	public V newInstance() {
+		V newObject = null;
 		
 		try {
 			newObject = newInstanceRaw();
@@ -38,23 +39,34 @@ public class NullaryClassFactory<E> {
 	}
 
 	// ========================================================================
-	public static<V, T extends Collection<V>> T newList(Class<T> listClass, NullaryClassFactory<V> elementFactory, int numElements) {
+	public <Key extends Enum<Key>> EnumMap<Key, V> newEnumMap(Class<Key> keyClass) {		
+		EnumMap<Key, V> enumMap = new EnumMap<Key, V>(keyClass);
+		
+		Key[] keys = keyClass.getEnumConstants();
+		for (Key theKey : keys) {
+			enumMap.put(theKey, newInstance());
+		}
+		
+		return enumMap;
+	}
+	
+	// ========================================================================
+	public <T extends Collection<V>> T newList(Class<T> listClass, int numElements) {
 		NullaryClassFactory<T> classFactory = new NullaryClassFactory<T>(listClass);
 		T newCollection = classFactory.newInstance();
 				
-		for (int i = 0; i < numElements; i++) {
-			V newObject = elementFactory.newInstance();
-			newCollection.add(newObject);
+		for (int i = 0; i < numElements; i++) {			
+			newCollection.add(newInstance());
 		}
 		
 		return newCollection;
 	}
 	
 	// ========================================================================
-	public ArrayList<E> newArrayList(int numElements) {
-		ArrayList<E> newList = new ArrayList<E>(numElements);
+	public ArrayList<V> newArrayList(int numElements) {
+		ArrayList<V> newList = new ArrayList<V>(numElements);
 		for (int i = 0; i < numElements; i++) {
-			E newObject = newInstance();
+			V newObject = newInstance();
 			newList.add(newObject);
 		}
 		return newList;

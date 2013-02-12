@@ -1,3 +1,4 @@
+package lohcate;
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
  * D Wheeler & SG Reddy
@@ -10,7 +11,8 @@
  */
 public class Point {
 	public int x, y, z;
-	public float score;
+	public float score;	
+	
 	public Point(int x, int y) {
 		this(x, y, 0);
 	}

@@ -1,3 +1,4 @@
+package lohcate;
 import genomeEnums.Chrom;
 import genomeUtils.RegionRange;
 import lohcateEnums.ClusterType;

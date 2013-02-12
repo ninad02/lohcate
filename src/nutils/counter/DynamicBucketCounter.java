@@ -16,6 +16,7 @@ public class DynamicBucketCounter {
 	LongArrayList mArray;
 	private int mSumOfCounts;
 	private int mTotalSum;
+	private int mIndexOfMaxCount;
 	
 	public DynamicBucketCounter() {
 		mArray = new LongArrayList();
@@ -27,6 +28,7 @@ public class DynamicBucketCounter {
 		mArray.clear();
 		mSumOfCounts = 0; 	
 		mTotalSum = 0;
+		mIndexOfMaxCount = -1;
 	}
 	
 	// ========================================================================
@@ -34,6 +36,11 @@ public class DynamicBucketCounter {
 		int indexOfKey = getIndexOfKey(key);
 		if (indexOfKey < 0) return indexOfKey;
 		return getCountAtIndex(indexOfKey);			
+	}
+	
+	// ========================================================================
+	public int getCountMax() {
+		return (mIndexOfMaxCount < 0) ? 0 : getCountAtIndex(mIndexOfMaxCount);
 	}
 	
 	// ========================================================================
@@ -63,14 +70,26 @@ public class DynamicBucketCounter {
 	
 	// ========================================================================
 	public int incrementCount(int key, int numToIncrement) {
+		mSumOfCounts += numToIncrement;
+		
 		int indexOfKey = getIndexOfKey(key);
 		if (indexOfKey < 0) {
-			mArray.insert(ArrayUtils.getInsertPoint(indexOfKey), getKeyValueAsLong(key, numToIncrement));
+			int insertPoint = ArrayUtils.getInsertPoint(indexOfKey); 			
+			mArray.insert(insertPoint, getKeyValueAsLong(key, numToIncrement));
+			determineIndexOfMaxCountWithIncrementedIndex(insertPoint, numToIncrement);
 			return numToIncrement;
 		} else {
 			int newCount = numToIncrement + getCountAtIndex(indexOfKey);
 			mArray.set(indexOfKey, getKeyValueAsLong(key, newCount));		
+			determineIndexOfMaxCountWithIncrementedIndex(indexOfKey, newCount);
 			return newCount;
+		}
+	}
+
+	// ========================================================================
+	private void determineIndexOfMaxCountWithIncrementedIndex(int index, int count) {
+		if ((mIndexOfMaxCount < 0) || (count > getCountAtIndex(mIndexOfMaxCount))) {
+			mIndexOfMaxCount = index;
 		}
 	}
 	

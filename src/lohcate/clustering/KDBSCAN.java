@@ -1,3 +1,4 @@
+package lohcate.clustering;
 import java.util.ArrayList;
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes

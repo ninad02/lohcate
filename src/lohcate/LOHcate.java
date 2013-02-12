@@ -1,3 +1,4 @@
+package lohcate;
 /** 
  * For now, this is just a wrapper class that serves as an entry point to LOHcate.
  * 

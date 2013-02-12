@@ -1,12 +1,15 @@
+package lohcate;
 import genomeEnums.Chrom;
 import genomeEnums.VariantLocation;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumMap;
 
 import nutils.ArrayUtils;
 import nutils.counter.BucketCounter;
+import nutils.counter.BucketCounterEnum;
 
 import lohcateEnums.ClusterType;
 import lohcateEnums.MutationType;
@@ -24,11 +27,11 @@ public class Gene implements Comparable<Gene> {
 	
 	public String mLabel;
 	public Chrom mChrom;
-	public ArrayList<ArrayList<String>> mPatients;
+	public EnumMap<ClusterType, ArrayList<String>> mPatients;  	
 	
-	public BucketCounter mMutationTypeCounts;	
-	public BucketCounter mClusterTypeCounts;	
-	public BucketCounter mVariantLocationCounts;
+	public BucketCounterEnum<MutationType> mMutationTypeCounts;	
+	public BucketCounterEnum<ClusterType> mClusterTypeCounts;	
+	public BucketCounterEnum<VariantLocation> mVariantLocationCounts;
 	public int mCountLOHreferenceLost;
 	public int mMinBasePairPosition, mMaxBasePairPosition;
 	
@@ -37,9 +40,9 @@ public class Gene implements Comparable<Gene> {
 		mChrom = chrom;
 		initializePatients();
 				
-		mMutationTypeCounts    = new BucketCounter(MutationType.values().length,    0);  // stores hit counts for synonymous, nonsynonymous
-		mClusterTypeCounts     = new BucketCounter(ClusterType.values().length,     0);				
-		mVariantLocationCounts = new BucketCounter(VariantLocation.values().length, 0);  // stores hit counts for germline, somatic
+		mMutationTypeCounts    = new BucketCounterEnum<MutationType>(MutationType.class);  // stores hit counts for synonymous, nonsynonymous
+		mClusterTypeCounts     = new BucketCounterEnum<ClusterType>(ClusterType.class);				
+		mVariantLocationCounts = new BucketCounterEnum<VariantLocation>(VariantLocation.class);  // stores hit counts for germline, somatic
 		clearCounts();
 				
 		mMinBasePairPosition = Integer.MAX_VALUE;
@@ -54,34 +57,36 @@ public class Gene implements Comparable<Gene> {
 	}
 	
 	private void initializePatients() {
-		mPatients = new ArrayList<ArrayList<String>>();
-		ArrayUtils.addNewEmptyArrayLists(mPatients, ClusterType.values().length);
+		mPatients = new EnumMap<ClusterType, ArrayList<String>>(ClusterType.class);
+		for (ClusterType ct : ClusterType.values()) {
+			mPatients.put(ct, new ArrayList<String>());
+		}
 	}
 	
 	/** Returns true if the patient was already existing for the clustertype, false otherwise. */
-	public boolean addPatientIfNotAlreadyAdded(String patientName, ClusterType clusterType) {
-		ArrayList<String> patientList = mPatients.get(clusterType.ordinal());
+	public boolean addPatientIfNotAlreadyAdded(String patientName, ClusterType clusterType) {		
+		ArrayList<String> patientList = getPatientsForClusterType(clusterType);		
 		return ArrayUtils.checkInListAndInsertIfMissing(patientList, patientName);
 	}
 	
 	public int getNumPatientsForClusterType(ClusterType clusterType) {
-		ArrayList<String> patientList = mPatients.get(clusterType.ordinal());
+		ArrayList<String> patientList = getPatientsForClusterType(clusterType);
 		return patientList.size();
 	}
 	
 	public ArrayList<String> getPatientsForClusterType(ClusterType ct) {
-		return mPatients.get(ct.ordinal());
+		return mPatients.get(ct);
 	}
 	
-	public void incrementCountForClusterType(ClusterType clusterType)    { mClusterTypeCounts.increment(clusterType.ordinal()); }	
-	public void incrementCountForMutationType(MutationType mutationType) { mMutationTypeCounts.increment(mutationType.ordinal()); } 			
-	public void incrementCountForVariantLocation(VariantLocation varLoc) { mVariantLocationCounts.increment(varLoc.ordinal()); }
+	public void incrementCountForClusterType(ClusterType clusterType)    { mClusterTypeCounts.increment(clusterType); }	
+	public void incrementCountForMutationType(MutationType mutationType) { mMutationTypeCounts.increment(mutationType); } 			
+	public void incrementCountForVariantLocation(VariantLocation varLoc) { mVariantLocationCounts.increment(varLoc); }
 	
-	public int getCountVariantLocation(VariantLocation varLoc) { return mVariantLocationCounts.getCount(varLoc.ordinal()); }
-	public int getCountMutationType(MutationType mutationType) { return mMutationTypeCounts.getCount(mutationType.ordinal()); }
-	public int getCountClusterType(ClusterType clusterType)    { return mClusterTypeCounts.getCount(clusterType.ordinal()); }	
+	public int getCountVariantLocation(VariantLocation varLoc) { return mVariantLocationCounts.getCount(varLoc); }
+	public int getCountMutationType(MutationType mutationType) { return mMutationTypeCounts.getCount(mutationType); }
+	public int getCountClusterType(ClusterType clusterType)    { return mClusterTypeCounts.getCount(clusterType); }	
 	
-	public float getRecurrence(int ind, int total) { return (float) mPatients.get(ind).size() / (float) total; }
+	public float getRecurrence(ClusterType ct, int total) { return (float) mPatients.get(ct).size() / (float) total; }
 	
 	public int getRangeLength() { return (mMaxBasePairPosition - mMinBasePairPosition + 1); }
 	

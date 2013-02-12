@@ -1,3 +1,4 @@
+package lohcate;
 
 public class LOHcateParameters {
 

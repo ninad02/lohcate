@@ -15,20 +15,23 @@ public class ArgumentParserUtils {
 		protected char   mFlagShort;
 		protected String mFlagLong;
 		protected String mUsageName;
+		protected String mName;
 		
 		protected T      mDefaultValue;
 		protected T      mActualValue;
 		
-		public InputParameter(T defaultValue, char flagShort, String flagLong, String usageName) {
+		public InputParameter(T defaultValue, String name, char flagShort, String flagLong, String usageName) {
 			mFlagShort = flagShort;
 			mFlagLong  = flagLong;
 			mUsageName = usageName;
+			mName      = name;
 			mActualValue = mDefaultValue = defaultValue;
 		}
 		
 		public char getShortFlag() { return mFlagShort; }
 		public String getLongFlag() { return mFlagLong; }
 		public String getUsageName() { return mUsageName; }
+		public String getName() { return mName; }
 		
 		public T getValue()        { return mActualValue; } 
 		public T getDefaultValue() { return mDefaultValue; }
@@ -43,10 +46,18 @@ public class ArgumentParserUtils {
 	}
 
 	// ========================================================================
-	public static class InputParameterInteger extends InputParameter<Integer> {
+	public static abstract class InputParameterNumber<T extends Number> extends InputParameter<T> {
 		
-		public InputParameterInteger(Integer defaultValue, char flagShort, String flagLong, String usageName) {
-			super(defaultValue, flagShort, flagLong, usageName);
+		public InputParameterNumber(T defaultValue, String name, char flagShort, String flagLong, String usageName) {
+			super(defaultValue, name, flagShort, flagLong, usageName);
+		}
+	}
+	
+	// ========================================================================
+	public static class InputParameterInteger extends InputParameterNumber<Integer> {
+		
+		public InputParameterInteger(Integer defaultValue, String name, char flagShort, String flagLong, String usageName) {
+			super(defaultValue, name, flagShort, flagLong, usageName);
 		}
 		
 		public void parseValue(String newValueStr) {
@@ -55,10 +66,10 @@ public class ArgumentParserUtils {
 	}
 	
 	// ========================================================================
-	public static class InputParameterDouble extends InputParameter<Double> {
+	public static class InputParameterDouble extends InputParameterNumber<Double> {
 		
-		public InputParameterDouble(Double defaultValue, char flagShort, String flagLong, String usageName) {
-			super(defaultValue, flagShort, flagLong, usageName);
+		public InputParameterDouble(Double defaultValue, String name, char flagShort, String flagLong, String usageName) {
+			super(defaultValue, name, flagShort, flagLong, usageName);
 		}
 		
 		public void parseValue(String newValueStr) {
@@ -69,8 +80,8 @@ public class ArgumentParserUtils {
 	// ========================================================================
 	public static class InputParameterBoolean extends InputParameter<Boolean> {
 		
-		public InputParameterBoolean(Boolean defaultValue, char flagShort, String flagLong, String usageName) {
-			super(defaultValue, flagShort, flagLong, usageName);
+		public InputParameterBoolean(Boolean defaultValue, String name, char flagShort, String flagLong, String usageName) {
+			super(defaultValue, name, flagShort, flagLong, usageName);
 		}
 		
 		public void parseValue(String newValueStr) {
@@ -96,6 +107,12 @@ public class ArgumentParserUtils {
 			e.printStackTrace(); 
 			System.exit(-1); 
 		}	
+	}
+
+	// ========================================================================
+	/** Creates a switch and registers it with the JSAP object.  Returns the switch. */
+	public static<T> Switch createSwitch(InputParameter<T> param, JSAP jsap) {
+		return createSwitch(param.getName(), param.getShortFlag(), param.getLongFlag(), param.getUsageName(), jsap);
 	}
 	
 	// ========================================================================

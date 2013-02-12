@@ -1,6 +1,7 @@
 package nutils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 
 import org.apache.commons.math3.distribution.BinomialDistribution;
@@ -104,6 +105,62 @@ public class NumberUtils {
 	// ========================================================================
 	public static final double InvalidLogProbabilityThreshold = 0.01;
 	public boolean isInvalidLogProbability(double logProb) { return logProb > InvalidLogProbabilityThreshold; } 
+
+	// ========================================================================
+	public static final int getIndexOfPoissonWithHighestProbability(int k, PoissonDistribution[] dists) {
+		double maxProb = -Double.MAX_VALUE;
+		int    maxProbIndex = -1;
+				
+		for (int i = 0; i < dists.length; i++) {
+			double prob = dists[i].probability(k);
+			if (prob > maxProb) {
+				maxProb = prob;
+				maxProbIndex = i;
+			}
+		}
+		
+		return maxProbIndex;
+	}
+
+	// ========================================================================
+	public static final int roundToNearest5(int num) {
+		return (int) (Math.round(num / 5.0) * 5);
+	}
+
+	// ========================================================================
+	/** Calculates the FDR via the Benjamini-Hochberg correction and returns the p-value
+	 *  threshold.
+	 *  
+	 *  BH correction works as follows.  Sort the p-values from least to greatest.  Then,
+	 *  starting from greatest p-value (end of array), move to least p-value (beginning 
+	 *  of array) such that you reach a p-value that meets the condition:
+	 *  
+	 *  p-value[k] <= (k / array-length) * alpha
+	 *  
+	 *  NOTE: Since this is mathematics, k starts at 1, not 0
+	 *  
+	 */
+	public static double getFDR_BenjaminiHochberg(double[] pValues, double fdrAlpha, boolean pointsIndependent) {
+		double[] pValuesClone = pValues.clone();
+		Arrays.sort(pValuesClone);
+		
+		double c_m = 1.0;  // Default under condition of independence
+		
+		if (!pointsIndependent) {
+			double eulerMascheroniConstant = 0.577215664901532;
+			double e_m = 1.0 / (2 * pValuesClone.length);
+			c_m = Math.log(pValuesClone.length) + eulerMascheroniConstant + e_m;
+		}
+		
+		for (int k = pValuesClone.length - 1; k >= 0; k--) {
+			double threshold = ((double) (k + 1) / ((double) pValuesClone.length * c_m)) * fdrAlpha;
+			if (pValuesClone[k] <= threshold) {
+				return pValuesClone[k];
+			}
+		}
+		
+		return 0;
+	}
 
 	/** Returns whether the value is in the range, with an exclusive lower bound and inclusive upper bound. */
 	public static boolean inRangeLowerExclusive(float value, float boundLower, float boundUpper) {
