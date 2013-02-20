@@ -23,7 +23,7 @@ public class ClusteringParams {
 	
 	protected InputParameterDouble mAmplificationThreshold   = new InputParameterDouble(2.3,  "AmplificationThreshold",   JSAP.NO_SHORTFLAG, "ampThresh", "Copy_Number_Threshold_for_Amplification");
 	protected InputParameterDouble mDeletionThreshold        = new InputParameterDouble(1.7,  "DeletionThreshold",        JSAP.NO_SHORTFLAG, "delThresh", "Copy_Number_Threshold_for_Deletion");
-	protected InputParameterDouble mGermlineTrisomyThreshold = new InputParameterDouble(1.48, "GermlineTrisomyThreshold", JSAP.NO_SHORTFLAG, "germlineAneuploidyGainThreshold", "Copy_Number_Threshold_for_Germline_Chromosomal_Gain");
+	protected InputParameterDouble mGermlineTrisomyThreshold = new InputParameterDouble(1.4, "GermlineTrisomyThreshold", JSAP.NO_SHORTFLAG, "germlineAneuploidyGainThreshold", "Copy_Number_Threshold_for_Germline_Chromosomal_Gain");
 	protected InputParameterDouble mFDRAlpha                 = new InputParameterDouble(0.01, "mFDRAlpha",                JSAP.NO_SHORTFLAG, "FDR_Alpha", "FDR_Alpha_Value_for_Allelic_Fraction_Imbalance");
 
 	protected InputParameterBoolean mIgnoreAllelicBias     = new InputParameterBoolean(false, "IgnoreAllelicBias",     JSAP.NO_SHORTFLAG, "ignoreAllelicBias", "Specifies whether allelic bias is to be ignored and not corrected");

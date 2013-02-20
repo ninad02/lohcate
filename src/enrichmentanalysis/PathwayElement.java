@@ -31,7 +31,7 @@ public class PathwayElement {
 		setLoc(source, gene_name);
 	}
 	public PathwayElement(String name) {
-		this.name = Utils.gClean(name);
+		this.name = name.toUpperCase();
 	}
 	/**
 	 * Grab coordinates of pathway element location(s) from HTML image-map annotations. 

@@ -20,19 +20,10 @@ import lohcateEnums.ClusterType;
  */
 public class Utils {
 	
-	public static final String CommaStr = ",";
-	public static final String TabStr        = "\t";
-	public static final String TabPatternStr = "\\t";
 	public static final String rsPrefix = "rs";
 	public static final String rsNegative = "rs-1";
-	public static final String SemicolonStr = ";";
 	public static final String NAStr  = "N/A";
-	public static final String RangeDash = "-";
-	public static final String SpaceString = " ";
-	public static final String ColonString = ":";
-	public static final String DoubleQuoteStr = "\"";
-	public static final String DotStr = ".";
-	public static final int NumAutosomes = 22;
+	public static final String RangeDash = "-";	
 	
 	public static double log(float param) {
 		return (param == 0) ? param : Math.log(param);
@@ -40,12 +31,6 @@ public class Utils {
 	
 	public static float normalize(float val, float min, float max, float new_min, float new_max) {
 		return new_max - ( (new_max - new_min) * ((max - val) / (max - min)) );
-	}
-	
-	public static String rmLeadingSpaces(String param) {
-		while(param.charAt(0)==' ')
-			param = param.substring(1, param.length());
-		return param;
 	}
 	
 	public static String gClean(String param) {
@@ -57,16 +42,6 @@ public class Utils {
 				target += param.charAt(i);
 		}
 		return target;
-	}
-	
-	public static<T extends Enum<T>> int[] getEnumTypeCounts(T[] enumTypeArray, int numEnumTypes) {		
-		int[] counts = new int[numEnumTypes];
-		Arrays.fill(counts, 0);
-		
-		for (T enumType : enumTypeArray) {
-			counts[enumType.ordinal()]++;
-		}		
-		return counts;
 	}
 	
 	public static void TestModularity() {

@@ -13,6 +13,7 @@ import java.util.EnumMap;
 import lohcateEnums.ClusterType;
 import lohcateEnums.ColorPastel;
 import nutils.ArrayUtils;
+import nutils.EnumMapSafe;
 import nutils.GraphUtils;
 import nutils.PrimitiveWrapper;
 import nutils.PrimitiveWrapper.WInteger;
@@ -72,7 +73,7 @@ public class ClusteringPlotting {
 
 	// ========================================================================
 	/** Plots the event recurrence genome-wide. */
-	public static void plotRecurrenceGenomeWide(EnumMap<Chrom, DynamicBucketCounter> dbcCountByEvent, String outDir, ClusterType clusterType) {
+	public static void plotRecurrenceGenomeWide(EnumMapSafe<Chrom, DynamicBucketCounter> dbcCountByEvent, String outDir, ClusterType clusterType) {
 		DoubleArrayList positionsGenomeWideAllSamples = new DoubleArrayList();
 		DoubleArrayList lohCountAllSamples            = new DoubleArrayList();
 		double lastPositionOnPrevChrom = 0;
@@ -95,6 +96,7 @@ public class ClusteringPlotting {
 				lastPositionOnPrevChrom += (lastKeyExists) ? lastKey.mInt : 30000000;
 				
 				int maxValue = dbcCountByEvent.get(chrom).getCountMax();
+				maxValue = Math.max(maxValue, 1);
 				
 				double increment = (maxValue) / 50.0;
 				for (double d = 0; d <= maxValue; d += increment) {
@@ -238,9 +240,9 @@ public class ClusteringPlotting {
 			itemRenderer.setSeriesPaint(ClusterType.GainSomatic.ordinal(), ColorPastel.Dark_Red.getColor());
 			itemRenderer.setSeriesPaint(ClusterType.LOH.ordinal(), ColorPastel.RGB_Blue.getColor());
 			itemRenderer.setSeriesPaint(ClusterType.cnLOH.ordinal(), ColorPastel.CMYK_Yellow.getColor());
-			itemRenderer.setSeriesPaint(ClusterType.HETGermline.ordinal(), ColorPastel.Gray_50.getColor());
+			itemRenderer.setSeriesPaint(ClusterType.HETGermline.ordinal(), ColorPastel.Gray_60.getColor());
 			itemRenderer.setSeriesPaint(ClusterType.HETSomatic.ordinal(), ColorPastel.Red_Orange.getColor());
-			itemRenderer.setSeriesPaint(ClusterType.Noise.ordinal(), ColorPastel.Gray_60.getColor());
+			itemRenderer.setSeriesPaint(ClusterType.Noise.ordinal(), ColorPastel.Dark_Pea_Green.getColor());
 			itemRenderer.setSeriesPaint(ClusterType.Null.ordinal(), ColorPastel.Gray_30.getColor());				
 		}
 		itemRenderer.setSeriesPaint(ClusterType.Null.ordinal() + 1, ColorPastel.Black.getColor());

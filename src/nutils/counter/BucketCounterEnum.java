@@ -6,35 +6,61 @@ package nutils.counter;
  *
  * @param <E>
  */
-public class BucketCounterEnum<E extends Enum<E>> extends BucketCounter {
+public class BucketCounterEnum<E extends Enum<E>> extends BucketCounterCore {
 	
+	// ========================================================================
 	public BucketCounterEnum(Class<E> theClass) {		
 		super(theClass.getEnumConstants().length, 0);		
 	}
-	
-	public void increment(E e) {
-		increment(e, 1);
+		
+	// ========================================================================
+	public BucketCounterEnum(BucketCounterEnum<E> rhs) {
+		super(rhs);
 	}
 	
+	// ========================================================================
+	public BucketCounterEnum<E> getCopy() { return new BucketCounterEnum<E>(this); }
+	
+	// ========================================================================	
+	public void increment(E e) { 
+		increment(e, 1); 
+	}
+	
+	// ========================================================================
 	public void increment(E e, int numToIncrement) {
-		super.increment(e.ordinal(), numToIncrement);
+		super.incrementBucket(e.ordinal(), numToIncrement);
 	}
 	
-	public int    getCount(E e)      { return getCount(e.ordinal()); }
-	public double getProportion(E e) { return getProportion(e.ordinal()); }
+	// ========================================================================
+	public int getCount(E e)         { return super.getCountBucket(e.ordinal()); }
 	
-	/** @override Override this method to throw an exception. 
-	 *  Will throw exception and exit the program.  
-	 */
-	public void increment(int index) {
-		this.increment(index, 1);
+	// ========================================================================
+	public double getProportion(E e) { return super.getProportionBucket(e.ordinal()); }
+		
+	// ========================================================================
+	// A private static enum used for unit testing purposes
+	private static enum Alphabet {
+		A, B, C, D;
 	}
 	
-	/** @override Overrides the method inherited from superclass. 
-	 *  Will throw exception and exit the program. 
-	 */
-	public void increment(int index, int numToIncrement) {
-		(new Exception("ERROR: Cannot increment a numeric index for BucketCounterEnum")).printStackTrace();
-		System.exit(-1);		
+	// ========================================================================
+	private static void TestRobust() {
+		BucketCounterEnum<Alphabet> alphabetCounter  = new BucketCounterEnum<Alphabet>(Alphabet.class);
+		BucketCounterEnum<Alphabet> alphabetCounter2 = new BucketCounterEnum<Alphabet>(Alphabet.class);
+		
+		for (Alphabet letter : Alphabet.values()) {
+			for (int i = 0; i < letter.ordinal(); i++) {
+				alphabetCounter.increment(letter);
+			}
+		}
+		
+		for (Alphabet letter : Alphabet.values()) {
+			System.out.printf("%s\t%d\n", letter.name(), alphabetCounter.getCount(letter));
+		}
+	}
+	
+	// ========================================================================
+	public static void main(String[] args) {
+		TestRobust();
 	}
 }

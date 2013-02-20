@@ -2,7 +2,7 @@ package lohcate;
 import genomeEnums.Chrom;
 import genomeUtils.RegionRange;
 import lohcateEnums.ClusterType;
-import nutils.counter.BucketCounter;
+import nutils.counter.BucketCounterEnum;
 
 
 // ========================================================================
@@ -12,20 +12,22 @@ import nutils.counter.BucketCounter;
 public class CopyNumberRegionRange extends RegionRange {
 	public ClusterType mCopyNumberClusterType;
 	public float mRecurrenceScore;
-	protected BucketCounter mClusterTypeCounts;
+	protected BucketCounterEnum<ClusterType> mClusterTypeCounts;
 	
-	public CopyNumberRegionRange(ClusterType copyNumberClusterType, Chrom chrom, int regionStart) {
+	public CopyNumberRegionRange(ClusterType eventType, Chrom chrom, int regionStart) {
 		super(chrom, regionStart);
-		mCopyNumberClusterType = copyNumberClusterType;
-		mRecurrenceScore = 1.0f;
-		mClusterTypeCounts = new BucketCounter(ClusterType.getNumClusterTypes(), 0);
+		constructorCommon(eventType);
 	}		
 	
-	public CopyNumberRegionRange(ClusterType copyNumberClusterType, Chrom chrom, int regionStart, int regionEnd) {
+	public CopyNumberRegionRange(ClusterType eventType, Chrom chrom, int regionStart, int regionEnd) {
 		super(chrom, regionStart, regionEnd);
-		mCopyNumberClusterType = copyNumberClusterType;
+		constructorCommon(eventType);
+	}
+	
+	private void constructorCommon(ClusterType eventType) {
+		mCopyNumberClusterType = eventType;
 		mRecurrenceScore = 1.0f;
-		mClusterTypeCounts = new BucketCounter(ClusterType.getNumClusterTypes(), 0);
+		mClusterTypeCounts = new BucketCounterEnum<ClusterType>(ClusterType.class);				
 	}
 	
 	public CopyNumberRegionRange(CopyNumberRegionRange rhs) {

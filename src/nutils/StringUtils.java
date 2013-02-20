@@ -3,10 +3,20 @@ package nutils;
 import java.util.BitSet;
 import java.util.Random;
 
-import shared.Utils;
 
 public class StringUtils {
 
+	public static final FileExtensionAndDelimiter FileExtensionCSV = new FileExtensionAndDelimiter(".csv", StringUtils.CommaStr);
+	public static final FileExtensionAndDelimiter FileExtensionTSV = new FileExtensionAndDelimiter(".tsv", StringUtils.TabStr);
+	public static final String TabStr        = "\t";
+	public static final String CommaStr = ",";
+	public static final String TabPatternStr = "\\t";
+	public static final String SemicolonStr = ";";
+	public static final String SpaceString = " ";
+	public static final String ColonString = ":";
+	public static final String DoubleQuoteStr = "\"";
+	public static final String DotStr = ".";
+	
 	// ========================================================================
 	// INNER CLASS
 	// ========================================================================
@@ -28,6 +38,17 @@ public class StringUtils {
 		// TODO Auto-generated method stub
 
 	}
+	
+	// ========================================================================
+	/** This removes any leading whitespace from the start of the string
+	 * @return A new string with all leading whitespace removed
+	 */
+	public static String removeLeadingWhitespace(String s) {
+		int indexSubstringStart = 0;
+		for (; indexSubstringStart < s.length() && Character.isWhitespace(s.charAt(indexSubstringStart)); indexSubstringStart++) {}
+		return s.substring(indexSubstringStart, s.length());
+	}
+	
 
 	// ========================================================================
 	/** Given a string builder, this will convert the characters in the string builder to an integer.  
@@ -236,7 +257,7 @@ public class StringUtils {
 		int numTrials = 10000000;
 		StringBuilder sb = new StringBuilder(4096);
 		Random randomGen = new Random();
-		String delim = Utils.TabStr;
+		String delim = StringUtils.TabStr;
 		
 		for (int trial = 0; trial < numTrials; trial++) {
 			if (trial % 1000 == 0) System.out.println("Trial: " + trial);
@@ -253,9 +274,9 @@ public class StringUtils {
 			String line = sb.toString();
 			//System.out.println(trial + "\t[" + line + "]");
 			
-			String[] truthCols = line.split(Utils.TabPatternStr);
+			String[] truthCols = line.split(StringUtils.TabPatternStr);
 			for (int i = 0; i < truthCols.length; i++) {
-				String colExtracted = extractNthColumnValue(line, i, Utils.TabStr);
+				String colExtracted = extractNthColumnValue(line, i, StringUtils.TabStr);
 				if (!truthCols[i].equals(colExtracted)) {
 					CompareUtils.throwErrorAndExit("ERROR: Values don't match!\n" + line + "\n" + i + "\t[" + truthCols[i] + "]\t[" + colExtracted + "]");
 				}
@@ -277,7 +298,4 @@ public class StringUtils {
 		}
 		return sb;
 	}
-
-	public static final FileExtensionAndDelimiter FileExtensionCSV = new FileExtensionAndDelimiter(".csv", Utils.CommaStr);
-	public static final FileExtensionAndDelimiter FileExtensionTSV = new FileExtensionAndDelimiter(".tsv", Utils.TabStr);
 }

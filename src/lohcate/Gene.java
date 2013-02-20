@@ -8,7 +8,8 @@ import java.util.Comparator;
 import java.util.EnumMap;
 
 import nutils.ArrayUtils;
-import nutils.counter.BucketCounter;
+import nutils.EnumMapSafe;
+import nutils.counter.BucketCounterCore;
 import nutils.counter.BucketCounterEnum;
 
 import lohcateEnums.ClusterType;
@@ -27,7 +28,7 @@ public class Gene implements Comparable<Gene> {
 	
 	public String mLabel;
 	public Chrom mChrom;
-	public EnumMap<ClusterType, ArrayList<String>> mPatients;  	
+	public EnumMapSafe<ClusterType, ArrayList<String>> mPatients;  	
 	
 	public BucketCounterEnum<MutationType> mMutationTypeCounts;	
 	public BucketCounterEnum<ClusterType> mClusterTypeCounts;	
@@ -57,10 +58,7 @@ public class Gene implements Comparable<Gene> {
 	}
 	
 	private void initializePatients() {
-		mPatients = new EnumMap<ClusterType, ArrayList<String>>(ClusterType.class);
-		for (ClusterType ct : ClusterType.values()) {
-			mPatients.put(ct, new ArrayList<String>());
-		}
+		mPatients = ArrayUtils.createEnumMapOfArrayLists(ClusterType.class, String.class);
 	}
 	
 	/** Returns true if the patient was already existing for the clustertype, false otherwise. */

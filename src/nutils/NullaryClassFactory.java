@@ -39,8 +39,8 @@ public class NullaryClassFactory<V> {
 	}
 
 	// ========================================================================
-	public <Key extends Enum<Key>> EnumMap<Key, V> newEnumMap(Class<Key> keyClass) {		
-		EnumMap<Key, V> enumMap = new EnumMap<Key, V>(keyClass);
+	public <Key extends Enum<Key>> EnumMapSafe<Key, V> newEnumMap(Class<Key> keyClass) {		
+		EnumMapSafe<Key, V> enumMap = new EnumMapSafe<Key, V>(keyClass);
 		
 		Key[] keys = keyClass.getEnumConstants();
 		for (Key theKey : keys) {

@@ -38,6 +38,10 @@ public enum Chrom {
 	public static final ArrayList<Chrom> Autosomes = createAutosomeArray();
 	public static final int MaxPositionOnLongestChrom = 0x0FFFFFFF;  // 28 bit mask
 
+	public static final String ChromPrefix_chr_ = "chr_";
+	public static final String ChromPrefix_chr  = "chr";
+	public static final String ChromPrefix_c    = "c";
+	
 	// ========================================================================
 	private static ArrayList<Chrom> createAutosomeArray() {
 		ArrayList<Chrom> autosomes = new ArrayList<Chrom>(NumAutosomes);
@@ -57,12 +61,15 @@ public enum Chrom {
 	public static Chrom getChrom(String chromStr) {
 		chromStr = chromStr.trim().toLowerCase();
 		String subStr = chromStr;		
-		if (chromStr.indexOf("chr_") == 0) {
-			subStr = chromStr.substring("chr_".length());			
-		} else if (chromStr.indexOf("chr") == 0) {
-			subStr = chromStr.substring("chr".length());
-		} else if (chromStr.indexOf("c") == 0) {
-			subStr = chromStr.substring("c".length());
+		
+		if (chromStr.indexOf(ChromPrefix_chr_) == 0) {
+			subStr = chromStr.substring(ChromPrefix_chr_.length());	
+			
+		} else if (chromStr.indexOf(ChromPrefix_chr) == 0) {
+			subStr = chromStr.substring(ChromPrefix_chr.length());
+			
+		} else if (chromStr.indexOf(ChromPrefix_c) == 0) {
+			subStr = chromStr.substring(ChromPrefix_c.length());
 		}
 		
 		if (subStr.charAt(0) == 'x') {

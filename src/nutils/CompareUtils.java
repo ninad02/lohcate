@@ -70,6 +70,9 @@ public class CompareUtils {
 	/** Returns whether an object is null. */
 	public static boolean isNull(Object o) { return (o == null); }
 
+	/** Returns whether an object is not null. */
+	public static boolean isNotNull(Object o) { return (o != null); }
+	
 	/** Given a range minimum and range maximum, this ensures that the input value is within
 	 *  the range, inclusive.  In other words, if the input value is greater than the maximum,
 	 *  the maximum is returned.  If it is smaller than the minimum, the minimum is returned.
@@ -90,6 +93,13 @@ public class CompareUtils {
 	 *  boolean expression is false (after which, the error message is printed. */
 	public static void ensureTrue(boolean condition, String errorString) {
 		if (!condition) throwErrorAndExit(errorString);
+	}
+	
+	/** Given an object, this quits the program if the object is null (after which,
+	 *  the error message is printed.
+	 */
+	public static void ensureNotNull(Object o, String errorString) {
+		ensureTrue(isNotNull(o), errorString);
 	}
 
 }

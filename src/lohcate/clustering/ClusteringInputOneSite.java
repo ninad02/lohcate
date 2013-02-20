@@ -168,6 +168,7 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	// ====================================================================
 	public float calcVAFNormal() { return (float) mCovgVarNormal / (float) mCovgTotalNormal; }
 	public float calcVAFTumor()  { return (float) mCovgVarTumor  / (float) mCovgTotalTumor;  }
+	public int getRsID()         { return mRsID; }
 	
 	public Chrom getChrom()  { return Chrom.getChrom((byte) bsmChrom.getValueInCompactUnit(mDataUnit_ChromProsRevVarAllelesMutType)); }
 	public int getPosition() { return                ((int)   bsmPos.getValueInCompactUnit(mDataUnit_ChromProsRevVarAllelesMutType)); }

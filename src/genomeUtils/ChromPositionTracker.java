@@ -11,20 +11,20 @@ import genomeEnums.Chrom;
  * @author Ninad Dewal
  *
  */
-public class ChromPositionTracker {
-	
-	protected Chrom mChromPrev;
+public class ChromPositionTracker extends ObjectWalkerTracker<Chrom> {
+		
 	protected int   mPositionPrev;
 	protected long  mPositionGenomeWide;
 	
 	// ========================================================================
 	public ChromPositionTracker() {
+		super(Chrom.c0);
 		clear();
 	}
 	
 	// ========================================================================
 	public void clear() {
-		mChromPrev = Chrom.c0;;
+		super.clear();
 		mPositionPrev = 0;
 		mPositionGenomeWide = 0;
 	}
@@ -32,18 +32,17 @@ public class ChromPositionTracker {
 	// ========================================================================
 	/** Returns whether a chromosome boundary has been crossed. */
 	public boolean chromCrossedWithCurrentCoordinates(Chrom chromCurrent, int positionCurrent) {
-		boolean chromCrossed = false;
 		
-		if (chromCurrent == mChromPrev) {			
-			mPositionGenomeWide += (positionCurrent - mPositionPrev);
-		} else {
-			chromCrossed = true;
+		ChangeType chromChangeType = hasChanged(chromCurrent, true);
+		
+		if (chromChangeType.hasChanged()) {
 			mPositionGenomeWide += positionCurrent;
+		} else {
+			mPositionGenomeWide += (positionCurrent - mPositionPrev);
 		}
 		
-		mPositionPrev = positionCurrent;
-		mChromPrev = chromCurrent;
-		return chromCrossed;
+		mPositionPrev = positionCurrent;		
+		return chromChangeType.hasChanged();
 	}
 
 	// ========================================================================

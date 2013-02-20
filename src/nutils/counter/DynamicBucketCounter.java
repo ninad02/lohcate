@@ -6,6 +6,7 @@ import nutils.PrimitiveWrapper;
 import nutils.NullaryClassFactory;
 
 import com.carrotsearch.hppc.DoubleArrayList;
+import com.carrotsearch.hppc.IntArrayList;
 import com.carrotsearch.hppc.LongArrayList;
 
 // ========================================================================
@@ -125,6 +126,19 @@ public class DynamicBucketCounter {
 		}
 		
 		System.out.println("Key with max count: " + dbc.getKeyWithMaxCount());
+	}
+
+	// ========================================================================
+	public IntArrayList[] toArrayListInt() {
+		IntArrayList[] rV = new IntArrayList[2];
+		rV[0] = new IntArrayList();
+		rV[1] = new IntArrayList();
+		
+		for (int i = 0; i < mArray.size(); i++) {				
+			rV[0].add(getKeyAtIndex(i));
+			rV[1].add(getCountAtIndex(i));
+		}
+		return rV;
 	}
 	
 	// ========================================================================

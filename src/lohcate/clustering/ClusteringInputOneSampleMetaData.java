@@ -3,6 +3,7 @@ package lohcate.clustering;
 import genomeEnums.Chrom;
 
 import java.io.PrintWriter;
+import java.util.Arrays;
 
 import lohcate.Script;
 import nutils.PrimitiveWrapper;
@@ -10,7 +11,7 @@ import nutils.counter.DynamicBucketCounter;
 
 // ========================================================================
 // ========================================================================
-class ClusteringInputOneSampleMetaData {
+public class ClusteringInputOneSampleMetaData {
 
 	float[]  mAdjustedVAFNormal;
 	float[]  mAdjustedVAFTumor;
@@ -24,7 +25,8 @@ class ClusteringInputOneSampleMetaData {
 	int[]   mNumSitesPerChrom;
 	float[] mAvgReadCountPerChromNormal;
 	float[] mCopyNumRatioPerChromNormal;
-	float[] mTumorCopyNumRatiosPerGene;
+	float[] mTumorCopyNumRatiosPerGene;	
+	boolean[] mIsSomaticSite;
 	
 	double mFDRNormal = 0;
 	double mFDRTumor = 0;
@@ -35,6 +37,7 @@ class ClusteringInputOneSampleMetaData {
 		mImbalancePValuesTumor    = new double[numSites];
 		mImbalancePValuesNormal   = new double[numSites];
 		mTumorCopyNumRatiosPerGene = new float[numSites];
+		mIsSomaticSite             = new boolean[numSites];
 		
 		mCoverageRatioTumorToNormal = new PrimitiveWrapper.WFloat(0);
 		mReadCountTalliesTumor  = new DynamicBucketCounter();
@@ -42,8 +45,16 @@ class ClusteringInputOneSampleMetaData {
 		
 		mNumSitesPerChrom           = new   int[Chrom.values().length];
 		mAvgReadCountPerChromNormal = new float[Chrom.values().length];
-		mCopyNumRatioPerChromNormal = new float[Chrom.values().length];
+		mCopyNumRatioPerChromNormal = new float[Chrom.values().length];		
+		clear();
 	}		
+	
+	public void clear() {		
+	}
+	
+	public boolean chromHasGermlineGain(Chrom chrom) {
+		return (mCopyNumRatioPerChromNormal[chrom.ordinal()] > ClusteringParams.GlobalClusteringParams.mGermlineTrisomyThreshold.getValue());
+	}
 	
 	public void printSiteInformation(PrintWriter out, int row, boolean printNewLine) {
 		out.printf(  "%g\t%g", mTumorCopyNumRatiosPerGene[row], (mTumorCopyNumRatiosPerGene[row] * Script.DefaultDiploidCopyNumber));  

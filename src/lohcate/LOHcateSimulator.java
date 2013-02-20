@@ -4,8 +4,6 @@ import genomeUtils.GenotypeUtils;
 import genomeUtils.InfoOneSiteOneSample;
 import genomeUtils.RegionSimulator;
 import genomeUtils.SeqReadSimulator;
-import genomeUtils.SeqReadSimulator.SeqReadSimulationAdjustReads;
-import genomeUtils.SeqReadSimulator.SeqReadSimulationParams;
 import genomeEnums.Chrom;
 import genomeEnums.Genotype;
 import genomeEnums.Nuc;
@@ -24,9 +22,9 @@ import lohcateEnums.ClusterType;
 import org.apache.commons.math3.random.JDKRandomGenerator;
 import org.apache.commons.math3.random.RandomDataGenerator;
 
+import com.carrotsearch.hppc.IntArrayList;
 import com.martiansoftware.jsap.JSAP;
 
-import nutils.ArgumentParserUtils;
 import nutils.ArgumentParserUtils.InputParameter;
 import nutils.ArgumentParserUtils.InputParameterDouble;
 import nutils.ArgumentParserUtils.InputParameterInteger;
@@ -35,6 +33,7 @@ import nutils.CompareUtils;
 import nutils.IOUtils;
 import nutils.NumberUtils;
 import nutils.StringUtils;
+import nutils.counter.DynamicBucketCounter;
 
 public class LOHcateSimulator {
 
@@ -60,7 +59,7 @@ public class LOHcateSimulator {
 		protected InputParameterDouble mTumorPurity = new InputParameterDouble(0.50, "TumorPurity", JSAP.NO_SHORTFLAG, "TumorPurity", JSAP.NO_DEFAULT);		
 		protected InputParameterInteger mNumCNARegions = new InputParameterInteger(5, "NumCNARegions", JSAP.NO_SHORTFLAG, "NumCNARegions", JSAP.NO_DEFAULT);
 		
-		protected InputParameterInteger mNumIterations = new InputParameterInteger(10, "NumIterations", JSAP.NO_SHORTFLAG, "NumIterations", JSAP.NO_DEFAULT);
+		protected InputParameterInteger mNumIterations = new InputParameterInteger(1, "NumIterations", JSAP.NO_SHORTFLAG, "NumIterations", JSAP.NO_DEFAULT);
 		
 		public ArrayList<InputParameter<?>> mParams;
 		
@@ -329,12 +328,11 @@ public class LOHcateSimulator {
 				eventTypeToAssign = ClusterType.GainGermline;
 						
 			} else if (cnRegion.mCopyNumberClusterType == ClusterType.GainSomatic) {
-				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getPurity());
-				System.out.println("COPYNUMBER:\t" + (copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] + copyNumber[TissueType.Tumor.mCode][otherPhase.mCode]));
+				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getPurity());				
 				eventTypeToAssign = ClusterType.GainSomatic;
 				
 			} else if (cnRegion.mCopyNumberClusterType == ClusterType.LOH) {				
-				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(0, simParams.getPurity());
+				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(0, simParams.getPurity());				
 				eventTypeToAssign = ClusterType.LOH;
 				
 			} else if (cnRegion.mCopyNumberClusterType == ClusterType.cnLOH) {
@@ -376,7 +374,61 @@ public class LOHcateSimulator {
 			return Genotype.EnumHeterozygous;
 		}
 	}
-	
+
+	// ========================================================================
+	// Test function.  Tests whether distributions of reads differ between separate
+	// copy number and aggregated copy number
+	private static void TestSeparateVersusAggregated() {
+		LOHcateSimulatorParams params = new LOHcateSimulatorParams();
+		params.mTumorPurity.setValue(0.5);
+		double haploidCoverage = 50;
+		int numReadIterations = 1000000; 
+		
+		// First the joint		
+		double jointCopyNum = 1.0;
+		double jointCopyNumTumor = GenotypeUtils.adjustDiploidCopyNumber(jointCopyNum, params.mTumorPurity.getValue());			
+		DynamicBucketCounter jointCounts = new DynamicBucketCounter();
+		
+		// Now the separate
+		double sepCopyNumATumor = 1.0;
+		double sepCopyNumBTumor = 0.0;
+		double sepCopyNumAStroma = 1.0;
+		double sepCopyNumBStroma = 1.0;
+		DynamicBucketCounter sepCounts = new DynamicBucketCounter();
+		
+		LOHcateSimulator simulator =  new LOHcateSimulator();
+		
+		// For the joint, generate
+		for (int iter = 0; iter < numReadIterations; iter++) {
+			// First, the joint
+			int jointNumReads = (int) simulator.mRandomGen.nextPoisson(jointCopyNumTumor * haploidCoverage);
+			jointCounts.incrementCount(jointNumReads);
+			
+			// Now, do seperate
+			int sepReadsATumor =  (int) simulator.mRandomGen.nextPoisson(sepCopyNumATumor  * haploidCoverage);
+			int sepReadsBTumor =  0; //(int) simulator.mRandomGen.nextPoisson(sepCopyNumBTumor  * haploidCoverage);
+			int sepReadsAStroma = (int) simulator.mRandomGen.nextPoisson(sepCopyNumAStroma * haploidCoverage);
+			int sepReadsBStroma = (int) simulator.mRandomGen.nextPoisson(sepCopyNumBStroma * haploidCoverage);
+			
+			sepReadsATumor  = NumberUtils.numSuccessesInTrials(sepReadsATumor,      params.mTumorPurity.getValue(), 0);
+			sepReadsBTumor  = NumberUtils.numSuccessesInTrials(sepReadsBTumor,      params.mTumorPurity.getValue(), 0);
+			sepReadsAStroma = NumberUtils.numSuccessesInTrials(sepReadsAStroma, 1 - params.mTumorPurity.getValue(), 0);
+			sepReadsBStroma = NumberUtils.numSuccessesInTrials(sepReadsBStroma, 1 - params.mTumorPurity.getValue(), 0);
+			int sepTotalReads = sepReadsATumor + sepReadsBTumor + sepReadsAStroma + sepReadsBStroma;
+			sepCounts.incrementCount(sepTotalReads);
+		}
+		
+		IntArrayList[] jointCountsArray = jointCounts.toArrayListInt();		
+		for (int i = 0; i < jointCountsArray[0].size(); i++) {
+			System.out.printf("%d\t%d\n", jointCountsArray[0].get(i), jointCountsArray[1].get(i));
+		}
+		
+		IntArrayList[] sepCountsArray = sepCounts.toArrayListInt();
+		for (int i = 0; i < sepCountsArray[0].size(); i++) {
+			System.out.printf("%d\t%d\n", sepCountsArray[0].get(i), sepCountsArray[1].get(i));
+		}
+
+	}
 	
 	// ========================================================================
 	/**
@@ -384,7 +436,7 @@ public class LOHcateSimulator {
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-
+		TestSeparateVersusAggregated();
 	}
 
 }

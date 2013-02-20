@@ -18,7 +18,7 @@ public class Gene {
 	public Gene(String name) {
 		rank = 0;
 		rank_2 = 0;
-		this.name = Utils.gClean(name);
+		this.name = name.toUpperCase(); 				
 		pathElem = new PathwayElement("default");
 	}
 	

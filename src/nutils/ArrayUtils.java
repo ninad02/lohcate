@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
@@ -214,6 +215,13 @@ public class ArrayUtils {
 		for (int i = 0; i < theArray.length; i++) { sum += theArray[i]; }
 		return sum;
 	}
+	
+	/** Given an array, this returns the sum of the array elements. */
+	public static double arraySum(double[] theArray) {
+		double sum = 0;
+		for (int i = 0; i < theArray.length; i++) { sum += theArray[i]; }
+		return sum;
+	}
 
 	
 	/** Given an array of doubles, this returns the index of the maximum element.  If there
@@ -311,14 +319,16 @@ public class ArrayUtils {
 	/** Given a collection, a dummy object, and a count, this adds "count" instances of 
 	 *  the dummy object to the collection (only a shallow adding, not a deep adding).
 	 */
-	public static <T> void addToCollection(Collection<T> c, T o, int count, boolean clearCollection) {
+	public static <T, C extends Collection<T>> C addToCollection(C c, T o, int count, boolean clearCollection) {
 		if (clearCollection) {
 			c.clear();
 		}
-		
+				
 		for (int i = 0; i < count; i++) {
 			c.add(o);
 		}
+		
+		return c;
 	}
 
 	// ========================================================================
@@ -863,11 +873,12 @@ public class ArrayUtils {
 	
 	
 	// ========================================================================
-	public static<T extends Enum<T>> int[] getEnumTypeCounts(T[] enumTypeArray, int numEnumTypes) {		
-		int[] counts = new int[numEnumTypes];
+	public static<T extends Enum<T>> int[] getEnumTypeCounts(Collection<T> enumTypeList, Class<T> enumClass) {
+		T[] enumConstants = enumClass.getEnumConstants();
+		int[] counts = new int[enumConstants.length];
 		Arrays.fill(counts, 0);
 		
-		for (T enumType : enumTypeArray) {
+		for (T enumType : enumTypeList) {
 			counts[enumType.ordinal()]++;
 		}		
 		return counts;
@@ -887,5 +898,30 @@ public class ArrayUtils {
 	// ========================================================================
 	public static double[][] combineTwoDynamicArraysIntoOneStatic(DoubleArrayList list1, DoubleArrayList list2) {
 		return new double[][] { list1.toArray(), list2.toArray() };
+	}
+	
+	// ========================================================================
+	public static <E extends Enum<E>, V> EnumMapSafe<E, ArrayList<V>> createEnumMapOfArrayLists(Class<E> enumClass, Class<V> arrayTargetObject) {
+		EnumMapSafe<E, ArrayList<V>> newMap = new EnumMapSafe<E, ArrayList<V>>(enumClass);
+		E[] enumValues = enumClass.getEnumConstants();
+		
+		for (E enumValue : enumValues) {
+			newMap.put(enumValue, new ArrayList<V>());
+		}
+		
+		return newMap;
+	}
+	
+	// ========================================================================
+	/** Creates an EnumMap and initializes it with (maps all keys with) the given value. */
+	public static <E extends Enum<E>, V> EnumMapSafe<E, V> createEnumMap(Class<E> enumClass, V initialValue) {
+		EnumMapSafe<E, V> newMap = new EnumMapSafe<E, V>(enumClass);
+		E[] enumValues = enumClass.getEnumConstants();
+		
+		for (E enumValue : enumValues) {
+			newMap.put(enumValue, initialValue);
+		}
+		
+		return newMap;
 	}
 }

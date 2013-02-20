@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import nutils.ArrayUtils;
+import nutils.StringUtils;
 
 
 import shared.*;
@@ -126,7 +127,7 @@ public class Enrichment {
 						pathways.add(pathway);
 						path_genes.add(new ArrayList<String>());
 						if (split[i].split(",")[2].length() > 1)
-							path_genes.get(path_genes.size() - 1).add(Utils.gClean(split[i].split(",")[2]));
+							path_genes.get(path_genes.size() - 1).add( (split[i].split(",")[2]).toUpperCase() );
 					}
 					else
 						if (split[i].split(",")[2].length() > 1)
@@ -477,7 +478,7 @@ public class Enrichment {
 				temp_max_ind_g1 = -1;
 				
 				for (int row = 1; row < load.length; row++) { //iterate through genes
-					String[] columns = load[row].split(Utils.TabStr);
+					String[] columns = load[row].split(StringUtils.TabStr);
 					
 					if (columns[4].equals(Script.MissingGeneNameValue)) { //avoid "." gene name
 						if (ArrayUtils.linearSearch(blacklist, row)==-1 && Float.parseFloat(columns[baseColOfClusterTypes]) > temp_max) {
@@ -542,7 +543,7 @@ public class Enrichment {
 	 */
 	public static String getGOText(String query) throws Exception {
 		String grab = FileOps.getHTML("http://www.ebi.ac.uk/QuickGO/GSearch?q=" + query);
-		return Utils.rmLeadingSpaces(grab.split("<span class=\"obsolete_false\">")[1].split("</span>")[0].replace("\n", ""));
+		return StringUtils.removeLeadingWhitespace(grab.split("<span class=\"obsolete_false\">")[1].split("</span>")[0].replace("\n", ""));
 	}
 
 	public static String[] cluster_names = {"dup", "loh", "roc-loh", "het"}; //het needs to be the last element of cluster_names, but more elem.s can be added to the 'front' (as long as you handle them in the getClusters() method )

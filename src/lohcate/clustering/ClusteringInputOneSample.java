@@ -14,6 +14,7 @@ import nutils.ArrayUtils;
 public class ClusteringInputOneSample implements RegionSimulator.SampleInformation<ClusteringInputOneSite> {
 	ArrayList<ClusteringInputOneSite> mInfoSites;
 	ClusteringInputOneSite mDummySite;
+	String mSampleNameRoot;
 	
 	public ClusteringInputOneSample(int numSitesEstimated) {
 		mInfoSites = new ArrayList<ClusteringInputOneSite>(numSitesEstimated);
@@ -25,6 +26,8 @@ public class ClusteringInputOneSample implements RegionSimulator.SampleInformati
 		constructorCommon();
 		parseLines(rows);
 	}
+	
+	public String getSampleNameRoot() { return mSampleNameRoot; } 
 	
 	private void constructorCommon() {
 		mDummySite = new ClusteringInputOneSite();

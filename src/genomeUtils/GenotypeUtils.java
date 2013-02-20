@@ -1,13 +1,60 @@
 package genomeUtils;
 
+import java.util.Comparator;
+
 import nutils.CompareUtils;
 import nutils.NumberUtils;
+import nutils.StringUtils;
 import genomeEnums.Chrom;
 import genomeEnums.Genotype;
 import genomeEnums.Nuc;
 import shared.Utils;
 
 public class GenotypeUtils {
+
+	// ========================================================================
+	// INNER COMPARATOR CLASS
+	// ========================================================================
+	/** We define a comparator for sorting rows.  This assumes that the columns are tab
+	 *  delimited and that the chromosome resides in the first column (in the form of an 
+	 *  integer or chrN, where N represents an integer), while an integer genomic coordinate 
+	 *  resides in the second column. 
+	 */
+	public static class GenomicCoordinateComparatorInTextFileLine implements Comparator<String> {
+		public int compare(String line1, String line2) {
+			long line1Coordinates = readChromNumAndBasePairPosition(line1);
+			long line2Coordinates = readChromNumAndBasePairPosition(line2);
+			return Long.compare(line1Coordinates, line2Coordinates);			
+		}
+			
+		/** This function reads the chromosome number and base pair position and packs
+		 *  them into a long variable, with the chromosome number taking up the first 32
+		 *  most significant bits and the base pair position taking up the last 32 bits.
+		 *  This allows for returning multiple integer values and for easy sorting therafter
+		 */
+		private long readChromNumAndBasePairPosition(String line) {
+			int firstTabIndexLine = line.indexOf(StringUtils.TabStr);			
+			if (firstTabIndexLine < 0) CompareUtils.throwErrorAndExit("ERROR: Columns are not tab delimited in input line 1!");
+	
+			int secondTabIndexLine = line.indexOf(StringUtils.TabStr, firstTabIndexLine + 1);
+			if (secondTabIndexLine < 0) CompareUtils.throwErrorAndExit("ERROR: Columns are not tab delimited in input line 1!");
+	
+			String chromString = "";
+			int indexChromPrefix = line.indexOf(Chrom.ChromPrefix_chr);
+			if (indexChromPrefix < 0) { // it does not exist
+				chromString = line.substring(0, firstTabIndexLine);
+			} else if (indexChromPrefix < firstTabIndexLine) {
+				chromString = line.substring(indexChromPrefix + Chrom.ChromPrefix_chr.length(), firstTabIndexLine);				
+			} else if (indexChromPrefix < secondTabIndexLine) {
+				CompareUtils.throwErrorAndExit("ERROR: " + Chrom.ChromPrefix_chr + " string in an incorrect place on line!");
+			}  // We don't care if the string exists elsewhere
+			
+			int chromNum = Chrom.getChrom(chromString).getCode();					
+			int basePairPosition = Integer.parseInt(line.substring(firstTabIndexLine + 1, secondTabIndexLine));
+			//System.out.println(chromNum + "\t" + basePairPosition);
+			return ( 0L | (((long) chromNum) << 32) | ((long) basePairPosition) );   // pack two values into one long	
+		}
+	}
 
 	public static final int RsID_Unknown = -1;
 	public static final int RsID_Novel   = -5;

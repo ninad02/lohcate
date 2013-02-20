@@ -14,12 +14,12 @@ import java.util.Iterator;
 import nutils.ArrayUtils;
 import nutils.CompareUtils;
 import nutils.IOUtils;
+import nutils.StringUtils;
 
 
 import com.carrotsearch.hppc.IntArrayList;
 import com.carrotsearch.hppc.LongArrayList;
 
-import shared.Utils;
 
 import nutils.NumberUtils;
 
@@ -74,12 +74,12 @@ public class SNVMap {
 					sb.append(GenotypeUtils.RsPrefix).append(rsID);
 				}
 				
-				sb.append(Utils.TabStr).append(chrom.ordinal());
-				sb.append(Utils.TabStr).append(extractPositionFromCompactForm(compactUnit, !orderedByPosition));
+				sb.append(StringUtils.TabStr).append(chrom.ordinal());
+				sb.append(StringUtils.TabStr).append(extractPositionFromCompactForm(compactUnit, !orderedByPosition));
 				
 				extractNucleotideIDsFromCompactForm(compactUnit, nucs);
-				sb.append(Utils.TabStr).append(nucs[0]).append(Utils.TabStr).append(nucs[1]);
-				sb.append(Utils.TabStr).append(Long.toBinaryString(compactUnit));
+				sb.append(StringUtils.TabStr).append(nucs[0]).append(StringUtils.TabStr).append(nucs[1]);
+				sb.append(StringUtils.TabStr).append(Long.toBinaryString(compactUnit));
 
 				IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 			}
