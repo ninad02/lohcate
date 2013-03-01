@@ -1,5 +1,6 @@
 package lohcate;
 import genomeEnums.Chrom;
+import genomeUtils.GenomeConstants;
 import genomeUtils.RegionRange;
 import lohcateEnums.ClusterType;
 import nutils.counter.BucketCounterEnum;
@@ -12,6 +13,7 @@ import nutils.counter.BucketCounterEnum;
 public class CopyNumberRegionRange extends RegionRange {
 	public ClusterType mCopyNumberClusterType;
 	public float mRecurrenceScore;
+	public double mCopyNumber;
 	protected BucketCounterEnum<ClusterType> mClusterTypeCounts;
 	
 	public CopyNumberRegionRange(ClusterType eventType, Chrom chrom, int regionStart) {
@@ -27,6 +29,7 @@ public class CopyNumberRegionRange extends RegionRange {
 	private void constructorCommon(ClusterType eventType) {
 		mCopyNumberClusterType = eventType;
 		mRecurrenceScore = 1.0f;
+		mCopyNumber = GenomeConstants.DefaultDiploidCopyNumber;
 		mClusterTypeCounts = new BucketCounterEnum<ClusterType>(ClusterType.class);				
 	}
 	
@@ -34,6 +37,7 @@ public class CopyNumberRegionRange extends RegionRange {
 		super(rhs);
 		mCopyNumberClusterType = rhs.mCopyNumberClusterType;
 		mRecurrenceScore       = rhs.mRecurrenceScore;
+		mCopyNumber            = rhs.mCopyNumber;
 		mClusterTypeCounts     = rhs.mClusterTypeCounts.getCopy();
 	}
 	

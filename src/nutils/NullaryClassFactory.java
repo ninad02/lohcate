@@ -14,6 +14,9 @@ public class NullaryClassFactory<V> {
 	}
 	
 	// ========================================================================
+	public Class<V> getClassOfTarget() { return mClass; }
+	
+	// ========================================================================
 	public V newInstanceRaw() throws InstantiationException, IllegalAccessException { 		
 		return mClass.newInstance();
 	}

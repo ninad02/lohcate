@@ -162,11 +162,6 @@ public class NumberUtils {
 		return 0;
 	}
 
-	/** Returns whether the value is in the range, with an exclusive lower bound and inclusive upper bound. */
-	public static boolean inRangeLowerExclusive(float value, float boundLower, float boundUpper) {
-		return ((boundLower < value) && (value <= boundUpper));
-	}
-
 	public static int incrementNum(int x) { return x + 1; }
 
 	/** This returns the probability of k successes in an experiment of n trials, with

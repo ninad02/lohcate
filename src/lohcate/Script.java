@@ -146,7 +146,7 @@ public class Script {
 		
 		for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
 			String row = rows.get(rowIndex);
-			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0 || row.indexOf("chrX") >= 0 || row.indexOf("chrY") >= 0 || row.indexOf("chrM") >= 0) {
+			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0 || row.indexOf("chrX") >= 0 || row.indexOf("chrY") >= 0 || row.indexOf("chrM") >= 0 /*|| row.indexOf("intergenic") >= 0 */) {
 				rows.set(rowIndex, null);
 			} else {
 				// Do some light GC filtering
@@ -205,16 +205,18 @@ public class Script {
 	 */
 	public static void segmentRegionsAllFiles(String inDir, String outDir, String outDirBrowserTracks) {
 		StringUtils.FileExtensionAndDelimiter fileExtDelim = StringUtils.FileExtensionTSV;
-		File[] files = (new File(inDir)).listFiles();
-		ArrayList<CopyNumberRegionsByChromosome> regionsInSamples = new ArrayList<CopyNumberRegionsByChromosome>();
+		File[] files = (new File(inDir)).listFiles();		
 		ArrayList<File> validFilesList = new ArrayList<File>(files.length);
 		SNVMap snvMap = new SNVMap();
 		
 		// Create our output directories
+		System.out.println("Creating sub-directories...");
 		IOUtils.createDirectoryPath(outDir, false);
 		IOUtils.createDirectoryPath(outDirBrowserTracks, false);
 		
 		// First we determine the regions from each sample
+		System.out.println("Constructing regions in samples...");
+		ArrayList<CopyNumberRegionsByChromosome> regionsInSamples = new ArrayList<CopyNumberRegionsByChromosome>();
 		for (File file : files) {
 			CopyNumberRegionsByChromosome regionsInOneSample = segmentRegionsOneFile(file, outDir, snvMap);
 			if (regionsInOneSample != null) {
@@ -241,6 +243,7 @@ public class Script {
 			
 			for (CopyNumberRegionsByChromosome regionsInOneSample : regionsInSamples) {
 				CopyNumberRegionsByChromosome regionsInOneSampleMerged = mergeRegionsWithConstraints(regionsInOneSample, clusterType, maxBasePairsContiguousRegion.get(clusterType));
+				regionsInOneSampleMerged.removeSingletonRegions();
 				regionsInSamplesForOneClusterType.add(regionsInOneSampleMerged);
 				printSegmentedRegionsToFile(outDir, regionsInOneSampleMerged, clusterType, snvMap);
 			}
@@ -253,8 +256,7 @@ public class Script {
 				new EnumMapSafe<ClusterType, CopyNumberRegionsByChromosome>(ClusterType.class);	
 		
 		for (ClusterType clusterType : ClusterType.AmpLOHHetG) { 					
-			CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType = 
-					determineRecurrentRegions(regionsInSamplesPerEventType.get(clusterType), clusterType);
+			CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType = determineRecurrentRegions(regionsInSamplesPerEventType.get(clusterType), clusterType);
 			regionsRecurrentPerEventType.put(clusterType, recurrentRegionsForOneClusterType);
 			recurrentRegionsForOneClusterType.print(out, fileExtDelim.mDelimiter);
 			plotRecurrence(recurrentRegionsForOneClusterType, outDir, clusterType);
@@ -680,13 +682,13 @@ public class Script {
 	// ========================================================================
 	/** The continuation of the @method segmentRegionsAllFiles method, but by individual. */ 
 	public static CopyNumberRegionsByChromosome segmentRegionsOneFile(File inFile, String outDir, SNVMap snvMap) {
-		StringUtils.FileExtensionAndDelimiter fileExtAndDelim = StringUtils.FileExtensionTSV;		
+		StringUtils.FileExtensionAndDelimiter fileExtAndDelim = StringUtils.FileTextTabDelim;		
 		
-		// First check that the file is a file of the desired extension		
-		int indexOfDelimiter = inFile.getName().indexOf(fileExtAndDelim.mExtension); 
-		if (indexOfDelimiter < 0) return null;
-		if (indexOfDelimiter != inFile.getName().length() - fileExtAndDelim.mExtension.length()) return null;
-		String samplenameRoot = inFile.getName().substring(0, indexOfDelimiter);
+		// First check that the file is a file of the desired extension
+		String suffix = ".withCopyNum" + fileExtAndDelim.mExtension;
+		if (!inFile.getName().endsWith(suffix)) return null;
+		String samplenameRoot = inFile.getName().substring(0, inFile.getName().length() - suffix.length());
+		System.out.println("Processing Sample: " + samplenameRoot);
 		
 		StringBuilder sb = new StringBuilder(4096);
 		
@@ -703,8 +705,11 @@ public class Script {
 			events.add(event);
 		}
 		
-		ClusteringInputOneSample oneSampleInfo = new ClusteringInputOneSample(allLines);
-		return segmentRegionsOneSample(oneSampleInfo, events, outDir, snvMap);
+		ClusteringInputOneSample oneSampleInfo = new ClusteringInputOneSample(allLines, samplenameRoot);		
+		CopyNumberRegionsByChromosome rV = segmentRegionsOneSample(oneSampleInfo, events, outDir, snvMap);
+		allLines.clear();
+		oneSampleInfo.clear();
+		return rV;
 	}
 	
 	// ========================================================================
@@ -789,115 +794,6 @@ public class Script {
 				clusterType != ClusterType.Null  && 
 				clusterType != ClusterType.HETSomatic);
 	}
-	
-	// ========================================================================
-	// INNER CLASS
-	// ========================================================================
-	/** Stores the regions for a given sample, split by chromosome.  
-	 *  Chromosomes are indexed starting at 1 */
-	public static class CopyNumberRegionsByChromosome {
-		private static final ArrayList<CopyNumberRegionRange> dummyListForChrom0 = new ArrayList<CopyNumberRegionRange>();
-		
-		// ========================================================================
-		// MEMBER VARIABLES
-		String mSampleName;
-		private EnumMapSafe<Chrom, ArrayList<CopyNumberRegionRange> > mRegionsByChrom;		
-
-		// ========================================================================
-		public CopyNumberRegionsByChromosome(String sampleName) {
-			mRegionsByChrom = ArrayUtils.createEnumMapOfArrayLists(Chrom.class, CopyNumberRegionRange.class);
-			mSampleName = sampleName;
-		}
-		
-		// ========================================================================
-		public CopyNumberRegionsByChromosome(CopyNumberRegionsByChromosome rhs) {
-			this(rhs.mSampleName);
-			
-			// Now deep copy the regions
-			for (Chrom chrom : Chrom.values()) {
-				ArrayList<CopyNumberRegionRange> cnrrListRhs = rhs.mRegionsByChrom.get(chrom);
-				ArrayList<CopyNumberRegionRange> cnrrList    =     mRegionsByChrom.get(chrom); 
-				
-				for (CopyNumberRegionRange cnrrRhs : cnrrListRhs) {
-					cnrrList.add(cnrrRhs.getCopy());					
-				}
-			}
-		}
-		
-		// ========================================================================
-		public void addRegion(Chrom chrom, CopyNumberRegionRange region) {
-			mRegionsByChrom.get(chrom).add(region);
-		}
-		
-		// ========================================================================
-		public void clearClusterCounts() {
-			for (Chrom chrom : Chrom.values()) {			
-				for (CopyNumberRegionRange oneRegionInChrom : mRegionsByChrom.get(chrom)) {
-					oneRegionInChrom.mClusterTypeCounts.clear();
-				}
-			}
-		}
-		
-		// ========================================================================
-		/** Returns an exact replica of this entire object, including copies of any contained regions. */ 
-		public CopyNumberRegionsByChromosome getCopy() { return new CopyNumberRegionsByChromosome(this); }
-		
-		// ========================================================================
-		/** Prints the contents to the PrintStream. */
-		public void print(PrintStream out, String delimiter) {
-			StringBuilder sb = new StringBuilder(65536);
-
-			for (Chrom chrom : Chrom.values()) {
-				for (CopyNumberRegionRange cnrr : mRegionsByChrom.get(chrom)) {
-					sb.setLength(0);
-					sb.append(cnrr.mCopyNumberClusterType);
-					sb.append(delimiter).append(cnrr.mRecurrenceScore);
-					sb.append(delimiter).append(cnrr.toString());
-					sb.append(delimiter).append(cnrr.getChromosome().ordinal());
-					sb.append(delimiter).append(cnrr.getRangeStart());
-					sb.append(delimiter).append(cnrr.getRangeEnd());
-					sb.append(delimiter).append(cnrr.getRangeLength());
-					
-					double densityClusterType =        ((double) cnrr.mClusterTypeCounts.getCount(cnrr.mCopyNumberClusterType) / (double) cnrr.getRangeLength());
-					double densityClusterHetGermline = ((double) cnrr.mClusterTypeCounts.getCount(ClusterType.HETGermline)     / (double) cnrr.getRangeLength());
-					sb.append(delimiter).append(densityClusterType);
-					sb.append(delimiter).append(densityClusterHetGermline);
-					
-					cnrr.mClusterTypeCounts.constructString(sb, false, delimiter);		
-					out.println(sb.toString());
-				}
-			}
-		}		
-		
-		// ========================================================================
-		/** Given a chromosome and position, returns the region that includes the coordinate, or 
-		 *  null if no region includes the coordinate.
-		 */
-		public CopyNumberRegionRange getRegion(Chrom chrom, int position) {
-			int resultIndex = getIndexOfRegion(chrom, position);
-			return ((resultIndex < 0) ? null : mRegionsByChrom.get(chrom).get(resultIndex));
-		}
-		
-		// ========================================================================
-		/** Given a chromosome and position, returns the index of the region that includes the coordinate, or 
-		 *  -1 if no region includes the coordinate.
-		 */
-		public int getIndexOfRegion(Chrom chrom, int position) {
-			ArrayList<CopyNumberRegionRange> regions = mRegionsByChrom.get(chrom);
-			for (int i = 0; i < regions.size(); i++) {			
-				if (regions.get(i).inRange(chrom, position)) {
-					return i; 
-				} else if (regions.get(i).beforeRange(chrom, position)) {
-					break;
-				}
-			}
-			
-			return -1 ;
-		}
-	}
-	// ========================================================================
-	// ========================================================================
-	
 	
 	/** Given an "original" list of regions and an "added" list of regions, this
 	 *  takes the union of the regions.  If there are overlaps, the regions
@@ -1611,8 +1507,7 @@ public class Script {
 		rootFolder.setHelp("Indicate the root directory of the data");
 		ArgumentParserUtils.registerJSAPParameter(jsapTask, rootFolder);
 		
-		long sys_time_init = System.currentTimeMillis();	
-		
+		long sys_time_init = System.currentTimeMillis();			
 		
 		if (taskName.equals(taskClustering)) {
 			String allelicBiasFile = "AllelicBiasFile";
@@ -1630,7 +1525,7 @@ public class Script {
 			clusteringParams.configureParameters(jsapResult);
 			
 			if (allelicBiasFilename == null) {
-				clusteringParams.setIgnoreAllelicBias(true);
+				//clusteringParams.setIgnoreAllelicBias(true);
 			}
 			
 			//SeqPlatform platform = SeqPlatform.getPlatform(Integer.parseInt(args[2]));
@@ -1642,10 +1537,11 @@ public class Script {
 									 rootFolderName + File.separator + copyNumPlots,
 					                 SeqPlatform.Illumina); //args[2] --> 0::Illumina, 1::SOLiD
 					                 
-		} else if (taskName.equals(taskRegions)) {
+		} else if (taskName.equals(taskRegions)) {			
 			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
 			String rootFolderName = jsapResult.getString(rootFolderPath);
 			
+			System.out.println("Task: Segmentation of regions...");
 			segmentRegionsAllFiles(rootFolderName + File.separator + classifiedSites, 
 								   rootFolderName + File.separator + regions,
 								   rootFolderName + File.separator + browserTracks);

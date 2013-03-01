@@ -14,7 +14,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import lohcate.clustering.AlleleFrequencyStatsForSample;
+import lohcate.clustering.AlleleFractionStatsForSample;
 import lohcate.clustering.ClusteringInputOneSample;
 import lohcate.clustering.ClusteringInputOneSite;
 import lohcateEnums.ClusterType;
@@ -56,7 +56,7 @@ public class LOHcateSimulator {
 				new InputParameterDouble(100.0, "CoverageExpectedNormal", JSAP.NO_SHORTFLAG, "CoverageExpectedNormal", JSAP.NO_DEFAULT)
 		};	
 		
-		protected InputParameterDouble mTumorPurity = new InputParameterDouble(0.50, "TumorPurity", JSAP.NO_SHORTFLAG, "TumorPurity", JSAP.NO_DEFAULT);		
+		protected InputParameterDouble mTumorPurity = new InputParameterDouble(0.80, "TumorPurity", JSAP.NO_SHORTFLAG, "TumorPurity", JSAP.NO_DEFAULT);		
 		protected InputParameterInteger mNumCNARegions = new InputParameterInteger(5, "NumCNARegions", JSAP.NO_SHORTFLAG, "NumCNARegions", JSAP.NO_DEFAULT);
 		
 		protected InputParameterInteger mNumIterations = new InputParameterInteger(1, "NumIterations", JSAP.NO_SHORTFLAG, "NumIterations", JSAP.NO_DEFAULT);
@@ -208,7 +208,7 @@ public class LOHcateSimulator {
 		boolean[] chromsUsed = new boolean[Chrom.values().length];
 		Arrays.fill(chromsUsed, false);
 		
-		int meanLengthCNARegion = 20000000;
+		int meanLengthCNARegion = 80000000;
 		for (int regionIndex = 0; regionIndex < simParams.getNumCNARegions(); regionIndex++) {
 			int regionLength = (int) readSimulator.getRandomDataGenerator().nextExponential(meanLengthCNARegion);
 			//SequenceLogger.outputPrintln("Region Length: " + regionLength);
@@ -366,9 +366,9 @@ public class LOHcateSimulator {
 	// ========================================================================
 	/** Based on the variant allele frequency, this determines the genotype. */
 	private Genotype deduceGenotype(double vaf) {
-		if (vaf <= AlleleFrequencyStatsForSample.VAFNormalFrameLower) {
+		if (vaf <= AlleleFractionStatsForSample.VAFNormalFrameLower) {
 			return Genotype.EnumHomozygous00;
-		} else if (vaf > AlleleFrequencyStatsForSample.VAFNormalFrameUpper) {
+		} else if (vaf > AlleleFractionStatsForSample.VAFNormalFrameUpper) {
 			return Genotype.EnumHomozygous11;
 		} else {
 			return Genotype.EnumHeterozygous;

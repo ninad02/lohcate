@@ -42,7 +42,6 @@ public class SNVMap {
 		mSNVsByRsId     = new ArrayList<LongArrayList>();	
 		
 		for (Chrom chrom : Chrom.values()) {
-			System.out.println(chrom);
 			mSNVsByPosition.add(new LongArrayList());
 			mSNVsByRsId.add(new LongArrayList());
 		}

@@ -6,6 +6,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 import nutils.ArrayUtils;
+import nutils.CompareUtils;
+import nutils.EnumMapSafe;
+import nutils.EnumSortedMap;
 import nutils.IOUtils;
 import nutils.StringUtils;
 
@@ -19,34 +22,42 @@ import com.carrotsearch.hppc.LongArrayList;
 public class AllelicBiasTable {
 	
 	// An arraylist for each chromosome
-	ArrayList< ArrayList<PositionAndPayload> > mPositionsAndVAFs;
+	EnumSortedMap<Chrom, PositionAndPayload> mPositionsAndVAFs;
 	PositionAndPayload mDummyPayload;
-	
+
+	// ========================================================================
 	public AllelicBiasTable() {
 		mDummyPayload = new PositionAndPayload(0, 0, 0);
-		mPositionsAndVAFs = ArrayUtils.addNewEmptyArrayLists(null, Chrom.values().length);
+		mPositionsAndVAFs = new EnumSortedMap<Chrom, PositionAndPayload>(Chrom.class); 
 	}
 
 	// ========================================================================
-	/** Given a chromosome and position, this returns the average VAF reported for that position. */
+	/** Given a chromosome and position, this returns the average VAF reported for that position. 
+	 *  @return the average vaf, or -1 if it doesn't exist. */
 	public float getAvgVAF(Chrom chrom, int position) {
-		ArrayList<PositionAndPayload> listForChrom = mPositionsAndVAFs.get(chrom.ordinal());
-		mDummyPayload.mPosition = position;
-		int resultIndex = Collections.binarySearch(listForChrom, mDummyPayload);
-		if (resultIndex >= 0) {
-			PositionAndPayload pap = listForChrom.get(resultIndex);
-			return pap.mVAFNormal;
-		}
-		
-		return -1;
+		return getAvgVAF(chrom, position, 0);
 	}
 	
-	
 	// ========================================================================
-	/** Sorts the table by position per chromosome. */
-	private void sortTable() {
-		for (ArrayList<PositionAndPayload> listPerChrom : mPositionsAndVAFs) {
-			Collections.sort(listPerChrom);
+	/** Given a chromosome, position, and site threshold, this returns the average VAF reported for that position
+	 *  so long as the number of sites that contribute to the average VAF meet or exceed the threshold (inclusive).
+	 *  @return the average VAF, -1 if the position does not exist, or -2 if not enough sites meet the threshold.
+	 */
+	public float getAvgVAF(Chrom chrom, int position, int siteThresholdInclusive) {
+		mDummyPayload.mPosition = position;
+		final PositionAndPayload pap = mPositionsAndVAFs.get(chrom, mDummyPayload);
+		return ( (pap == null) ? -1 : (pap.mNumSamplesRepresented >= siteThresholdInclusive ? pap.mVAFNormal : -2) );
+	}
+
+	// ========================================================================
+	/** Registers a site with a normal vaf value. If a site already exists, the vaf value is weighted-averaged with the existing vaf value. */
+	public void registerSite(Chrom chrom, int position, float vafNormal) {
+		mDummyPayload.set(position, 1, vafNormal);
+		PositionAndPayload papExists = mPositionsAndVAFs.addSorted(chrom, mDummyPayload);
+		if (papExists == null) {
+			mDummyPayload = new PositionAndPayload(0, 0, 0);  // Create new dummy object since previous was put into map			
+		} else {
+			papExists.registerVAFNormalForAnotherSite(vafNormal);
 		}
 	}
 	
@@ -67,15 +78,16 @@ public class AllelicBiasTable {
 			float avgVAFNormal        = Float.parseFloat(StringUtils.extractNthColumnValue(line, colAvgVAFNormal, delim));
 			PositionAndPayload posAndPay = new PositionAndPayload(position, numSamplesRepresented, avgVAFNormal);
 			
-			allelicBiasTable.mPositionsAndVAFs.get(chrom.ordinal()).add(posAndPay);
+			allelicBiasTable.mPositionsAndVAFs.addToTail(chrom, posAndPay);			
 		}		
 		IOUtils.closeBufferedReader(in);
-		
-		allelicBiasTable.sortTable();
+
+		allelicBiasTable.mPositionsAndVAFs.sortTable();
 		return allelicBiasTable;
 	}
 	
 	
+	// ========================================================================
 	/**
 	 * @param args
 	 */
@@ -84,23 +96,38 @@ public class AllelicBiasTable {
 
 	}
 
+	// ========================================================================
 	private static class PositionAndPayload implements Comparable<PositionAndPayload> {
 		int mPosition;
 		int mNumSamplesRepresented;
 		float mVAFNormal;
 		
 		public PositionAndPayload(int position, int numSamplesRepresented, float avgVafNormal) {
+			set(position, numSamplesRepresented, avgVafNormal);
+		}
+		
+		public void set(int position, int numSamplesRepresented, float avgVafNormal) {
 			mPosition = position;
 			mNumSamplesRepresented = numSamplesRepresented;
-			mVAFNormal = avgVafNormal;
+			mVAFNormal = avgVafNormal;			
 		}
 		
 		public int compareTo(PositionAndPayload rhs) {
 			return Integer.compare(mPosition, rhs.mPosition);
 		}
 		
+		public float registerVAFNormalForAnotherSite(double vafNormal) {
+			CompareUtils.ensureTrue(vafNormal >= 0, "ERROR: vafNormal cannot be less than 0!");
+			CompareUtils.ensureTrue(vafNormal <= 1, "ERROR: vafNormal cannot be greater than 1!");
+						
+			mVAFNormal *= mNumSamplesRepresented;
+			mVAFNormal += vafNormal;
+			mVAFNormal /= (++mNumSamplesRepresented);
+			return mVAFNormal;
+		}		
 	}
 	
+	// ========================================================================
 	/** Given a base pair position and a vafNormal value, and the number of samples
 	 *  involved in the averaging of the vafNormal value, this packs them into a
 	 *  long variable.  The vafNormal is rounded to the nearing 0.0001 and coverted

@@ -18,7 +18,7 @@ public class ChromPositionTracker extends ObjectWalkerTracker<Chrom> {
 	
 	// ========================================================================
 	public ChromPositionTracker() {
-		super(Chrom.c0);
+		super(Chrom.c0, null);
 		clear();
 	}
 	

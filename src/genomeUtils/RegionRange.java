@@ -40,6 +40,9 @@ public class RegionRange {
 	/** Returns the range length, inclusive of start and end. */
 	public int getRangeLength() { return mRangeEnd - mRangeStart + 1; }
 	
+	/** Returns whether the range spans only one site (in other words, has range length of 1. */
+	public boolean spansOneSite() { return (getRangeLength() == 1); }
+	
 	/** Returns the chromosome. */
 	public Chrom getChromosome() { return mChrom; }
 	

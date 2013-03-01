@@ -4,19 +4,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import lohcateEnums.SeqPlatform;
-import nutils.NumberUtils;
+import nutils.RangeDouble;
 
 // ========================================================================
 // INNER CLASS
 // ========================================================================
 /** An inner class that calculates statistics for a set of sites (with variant 
  *  allele frequencies information for tumor and matched normal). */
-public class AlleleFrequencyStatsForSample {
+public class AlleleFractionStatsForSample {
 	
 	//NAF {het, loh, dup} FRAME definition via peak detection and parameter-tuned standard deviation expansion
 	//we have to avoid the often hugely dense peak of homozygous mutations (AF > 0.8) and the occasionally hugely dense peak of neg. tail noise / somatics / &c. (AF < 0.2)
-	public static float VAFNormalFrameLower = Clustering.correctAllelicBias() ? 0.1f : 0.2f;
-	public static float VAFNormalFrameUpper = Clustering.correctAllelicBias() ? 0.9f : 0.8f; 
+	public static final float VAFNormalFrameLower = Clustering.correctAllelicBias() ? 0.1f : 0.2f;
+	public static final float VAFNormalFrameUpper = Clustering.correctAllelicBias() ? 0.9f : 0.8f; 
 	public static float BinSize             = 0.025f; //smoothing parameter
 	
 	int   mNumBins;
@@ -28,7 +28,7 @@ public class AlleleFrequencyStatsForSample {
 	float mVariance = -1;
 	float mStdDev = -1;
 	
-	public AlleleFrequencyStatsForSample() {
+	public AlleleFractionStatsForSample() {
 		mNumBins = (int) ((VAFNormalFrameUpper - VAFNormalFrameLower) / BinSize) + 1;
 		mBinCount = new   int[mNumBins];
 		mBinValue = new float[mNumBins];
@@ -37,7 +37,7 @@ public class AlleleFrequencyStatsForSample {
 	}
 	
 	public void tabulateAndPerformStatistics(ArrayList<ClusteringInputOneSite> rows, SeqPlatform platform) {			
-		tallyVariantAlleleFrequenciesIntoBins(rows, platform, true);
+		tallyVariantAlleleFractionsIntoBins(rows, platform, true);
 		calculateSummaryStatistics();
 	}
 	
@@ -49,7 +49,7 @@ public class AlleleFrequencyStatsForSample {
 		}
 	}
 	
-	private void tallyVariantAlleleFrequenciesIntoBins(ArrayList<ClusteringInputOneSite> rows, SeqPlatform platform, boolean clearBinCountBins) {
+	private void tallyVariantAlleleFractionsIntoBins(ArrayList<ClusteringInputOneSite> rows, SeqPlatform platform, boolean clearBinCountBins) {
 		if (clearBinCountBins) {
 			Arrays.fill(mBinCount, 0);
 		}
@@ -57,7 +57,7 @@ public class AlleleFrequencyStatsForSample {
 		// First, tally the variant allele frequencies into bins
 		for (int row = 0; row < rows.size(); row++) {
 			float vafNormal = rows.get(row).calcVAFNormal(); 
-			if (NumberUtils.inRangeLowerExclusive(vafNormal, VAFNormalFrameLower, VAFNormalFrameUpper)) {
+			if (RangeDouble.inRangeLowerExclusive(vafNormal, VAFNormalFrameLower, VAFNormalFrameUpper)) {
 				int binNumber = (int) ((vafNormal - VAFNormalFrameLower) / BinSize);
 				mBinCount[binNumber]++;
 			}

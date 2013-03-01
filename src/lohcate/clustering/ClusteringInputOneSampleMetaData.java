@@ -3,10 +3,14 @@ package lohcate.clustering;
 import genomeEnums.Chrom;
 
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
 
+import lohcate.CopyNumberRegionRange;
+import lohcate.CopyNumberRegionsByChromosome;
 import lohcate.Script;
 import nutils.PrimitiveWrapper;
+import nutils.RangeDouble;
 import nutils.counter.DynamicBucketCounter;
 
 // ========================================================================
@@ -28,10 +32,13 @@ public class ClusteringInputOneSampleMetaData {
 	float[] mTumorCopyNumRatiosPerGene;	
 	boolean[] mIsSomaticSite;
 	
+	CopyNumberRegionsByChromosome mGeneRegions;
+	RangeDouble mVAFNormalHetRange;
+	
 	double mFDRNormal = 0;
 	double mFDRTumor = 0;
 	
-	public ClusteringInputOneSampleMetaData(int numSites) {
+	public ClusteringInputOneSampleMetaData(int numSites, String sampleName) {
 		mAdjustedVAFNormal         = new float[numSites];
 		mAdjustedVAFTumor          = new float[numSites];
 		mImbalancePValuesTumor    = new double[numSites];
@@ -42,10 +49,14 @@ public class ClusteringInputOneSampleMetaData {
 		mCoverageRatioTumorToNormal = new PrimitiveWrapper.WFloat(0);
 		mReadCountTalliesTumor  = new DynamicBucketCounter();
 		mReadCountTalliesNormal = new DynamicBucketCounter();
+		mGeneRegions = new CopyNumberRegionsByChromosome(sampleName);
 		
 		mNumSitesPerChrom           = new   int[Chrom.values().length];
 		mAvgReadCountPerChromNormal = new float[Chrom.values().length];
-		mCopyNumRatioPerChromNormal = new float[Chrom.values().length];		
+		mCopyNumRatioPerChromNormal = new float[Chrom.values().length];
+		
+		mVAFNormalHetRange = new RangeDouble(AlleleFractionStatsForSample.VAFNormalFrameLower, AlleleFractionStatsForSample.VAFNormalFrameUpper);
+		
 		clear();
 	}		
 	

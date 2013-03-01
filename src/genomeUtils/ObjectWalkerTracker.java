@@ -1,5 +1,7 @@
 package genomeUtils;
 
+import java.util.Comparator;
+
 /**
  * This is a convenience class used when traversing a list.  The 
  * purpose is to implement a pattern of testing the current object
@@ -37,15 +39,27 @@ public class ObjectWalkerTracker<E extends Comparable<E>> {
 	// ========================================================================
 	protected E mObjPrev;
 	protected E mObjInitial;
+	protected Comparator<E> mComparator = null;
 
 	// ========================================================================
 	public ObjectWalkerTracker() {
-		this(null);
+		this(null, null);
 	}
 	
 	// ========================================================================
 	public ObjectWalkerTracker(E initialObject) {
+		this(initialObject, null);
+	}
+	
+	// ========================================================================
+	public ObjectWalkerTracker(Comparator<E> comparator) {
+		this(null, comparator);
+	}
+	
+	// ========================================================================
+	public ObjectWalkerTracker(E initialObject, Comparator<E> comparator) {
 		mObjPrev = mObjInitial = initialObject;
+		mComparator = comparator;
 	}
 	
 	// ========================================================================
@@ -73,7 +87,7 @@ public class ObjectWalkerTracker<E extends Comparable<E>> {
 			changeType = ChangeType.Changed_NotNull_To_Null;
 		} else {
 			// Both are not null.  Must check now if they are the same
-			int result = mObjPrev.compareTo(nextObj);
+			int result = performComparison(mObjPrev, nextObj);
 			if (result == 0) {
 				changeType = ChangeType.Unchanged_BothNotNull;
 			} else if (result < 0) {
@@ -92,6 +106,16 @@ public class ObjectWalkerTracker<E extends Comparable<E>> {
 		return changeType;
 	}
 
+	// ========================================================================
+	/** Internal function. */
+	protected int performComparison(E object1, E object2) {
+		if (null == mComparator) {
+			return object1.compareTo(object2);
+		} else {
+			return mComparator.compare(object1, object2);			
+		}
+	}
+	
 	// ========================================================================
 	public static enum TestEnum { A, B, C, D, E };
 	

@@ -22,12 +22,25 @@ public class ClusteringInputOneSample implements RegionSimulator.SampleInformati
 	}
 	
 	public ClusteringInputOneSample(ArrayList<String> rows) {
+		this(rows, "");
+	}
+	
+	public ClusteringInputOneSample(ArrayList<String> rows, String sampleNameRoot) {
+		mSampleNameRoot = sampleNameRoot;
 		mInfoSites = new ArrayList<ClusteringInputOneSite>(rows.size());
 		constructorCommon();
 		parseLines(rows);
 	}
 	
-	public String getSampleNameRoot() { return mSampleNameRoot; } 
+	public String getSampleNameRoot() { return mSampleNameRoot; }
+	
+	public void clear() {
+		for (ClusteringInputOneSite oneSiteInfo : mInfoSites) {
+			oneSiteInfo.clear();
+		}
+		
+		mSampleNameRoot = "";
+	}
 	
 	private void constructorCommon() {
 		mDummySite = new ClusteringInputOneSite();

@@ -8,6 +8,8 @@ public class StringUtils {
 
 	public static final FileExtensionAndDelimiter FileExtensionCSV = new FileExtensionAndDelimiter(".csv", StringUtils.CommaStr);
 	public static final FileExtensionAndDelimiter FileExtensionTSV = new FileExtensionAndDelimiter(".tsv", StringUtils.TabStr);
+	public static final FileExtensionAndDelimiter FileTextTabDelim = new FileExtensionAndDelimiter(".txt", StringUtils.TabStr);
+	
 	public static final String TabStr        = "\t";
 	public static final String CommaStr = ",";
 	public static final String TabPatternStr = "\\t";
