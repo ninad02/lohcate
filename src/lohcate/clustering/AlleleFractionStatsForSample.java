@@ -17,6 +17,7 @@ public class AlleleFractionStatsForSample {
 	//we have to avoid the often hugely dense peak of homozygous mutations (AF > 0.8) and the occasionally hugely dense peak of neg. tail noise / somatics / &c. (AF < 0.2)
 	public static final float VAFNormalFrameLower = Clustering.correctAllelicBias() ? 0.1f : 0.2f;
 	public static final float VAFNormalFrameUpper = Clustering.correctAllelicBias() ? 0.9f : 0.8f; 
+	public static final RangeDouble VAFNormalRange = new RangeDouble(VAFNormalFrameLower, VAFNormalFrameUpper);
 	public static float BinSize             = 0.025f; //smoothing parameter
 	
 	int   mNumBins;

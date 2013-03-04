@@ -80,6 +80,9 @@ public class Clustering {
 	private static final int HET_BALL_MINPTS = 100; //DBSCAN parameters for HET ball / DUP wedge detection
 	private static final int DUP_WEDGE_MINPTS = 100;	
 	
+	public static final int AllelicBiasTable_Col_NumSamples   = 3;
+	public static final int AllelicBiasTable_Col_AvgVAFNormal = 4;
+	
 	public static final boolean Doing3D = false;	
 	public static final boolean UsePValuePlane = true;	
 		
@@ -139,9 +142,17 @@ public class Clustering {
 		ArrayUtils.removeNullElements(rows);
 		return numDuplicateSites;
 	}
-	
+
 	// ========================================================================
-	private static ClusteringInputOneSample readLinesFromFiles(File file) {
+	private static ClusteringInputOneSample readLinesFromFiles(File file) {	
+		ArrayList<String> allVariantRowsStr = readLinesFromFilesAsStringList(file, true, Script.EliminateHighDensitySNVs, Script.EliminateExtremeGCSites);
+		ClusteringInputOneSample oneSampleData = new ClusteringInputOneSample(allVariantRowsStr);				
+		allVariantRowsStr.clear();
+		return oneSampleData;
+	}
+	
+	// ========================================================================	
+	private static ArrayList<String> readLinesFromFilesAsStringList(File file, boolean removeDuplicateRows, boolean removeHighDensitySNVSites, boolean removeExtremeGCSites) {
 		String somaticFilename = file.getAbsolutePath().replace(VariantLocation.Germline.toLowerCase(), VariantLocation.Somatic.toLowerCase());
 		ArrayList<String> somaticSpecificVariantRows  = IOUtils.readAllLinesFromFile(somaticFilename);
 		ArrayList<String> germlineSpecificVariantRows = IOUtils.readAllLinesFromFile(file.getAbsolutePath());
@@ -153,8 +164,8 @@ public class Clustering {
 
 		//upstream pipelines will randomly spit header lines into the 
 		// middle of a naf-taf-input file. we're just avoiding those
-		germlineSpecificVariantRows = Script.curateSNPCalls_removeHeaderLinesFromRows(germlineSpecificVariantRows);
-		somaticSpecificVariantRows  = Script.curateSNPCalls_removeHeaderLinesFromRows(somaticSpecificVariantRows);
+		germlineSpecificVariantRows = Script.curateSNPCalls_removeHeaderLinesFromRows(germlineSpecificVariantRows, removeHighDensitySNVSites, removeExtremeGCSites);
+		somaticSpecificVariantRows  = Script.curateSNPCalls_removeHeaderLinesFromRows(somaticSpecificVariantRows,  removeHighDensitySNVSites, removeExtremeGCSites);
 		System.out.printf("\tNum Sites Retained after Header and GC Removal: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
 		
 		// Create a combined set of rows
@@ -168,14 +179,12 @@ public class Clustering {
 		Collections.sort(allVariantRowsStr,              Script.LineComparatorTab);
 		System.out.println("\tAll Sites Finished Sorting...");
 		
-		int numDuplicateRows = removeDuplicateSites(allVariantRowsStr);
-		System.out.printf("\tRemoved %d duplicate Rows.  Num Rows left: %d\n", numDuplicateRows, allVariantRowsStr.size());
+		if (removeDuplicateRows) {
+			int numDuplicateRows = removeDuplicateSites(allVariantRowsStr);
+			System.out.printf("\tRemoved %d duplicate Rows.  Num Rows left: %d\n", numDuplicateRows, allVariantRowsStr.size());
+		}
 		
-		// Now parse into numeric values
-		ClusteringInputOneSample oneSampleData = new ClusteringInputOneSample(allVariantRowsStr);				
-		allVariantRowsStr.clear();
-		
-		return oneSampleData;
+		return allVariantRowsStr;
 	}
 
 	// ========================================================================
@@ -278,7 +287,22 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	//public static 
+	public static AllelicBiasTable constrcutAllelicBiasTable(ArrayList<File> files, AllelicBiasTable biasTable, FileExtensionAndDelimiter fileExtAndDelim, SeqPlatform platform) {
+		biasTable = CompareUtils.isNull(biasTable) ? new AllelicBiasTable() : biasTable;
+		for (File inFile : files) {
+			ArrayList<String> allLines = readLinesFromFilesAsStringList(inFile, false, false, false);
+			for (String line : allLines) { 
+				final Chrom chrom  = Chrom.getChrom(   StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_Chrom,    fileExtAndDelim.mDelimiter) );
+				final int position = Integer.parseInt( StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_Position, fileExtAndDelim.mDelimiter) );
+				final float vafNormal = extractVAFNormal(line, platform);
+				
+				if (AlleleFractionStatsForSample.VAFNormalRange.inRangeBothExclusive(vafNormal)) {
+					biasTable.registerSite(chrom, position, vafNormal);
+				}
+			}
+		}
+		return biasTable;
+	}
 	
 	// ========================================================================
 	/**
@@ -289,42 +313,45 @@ public class Clustering {
 	public static void classifySites(String inDir, String allelicBiasInFile, String sitesClassifiedDir, String vafComparisonPlotDir, String vafWaterfallPlotDir, String copyNumberPlotDir, SeqPlatform platform) {
 		File[] files = (new File(inDir)).listFiles();
 		
-		// First, see whether the bias file exists.  If not, calculate the biases from the input files.
-		if (allelicBiasInFile == null) {
-			if (correctAllelicBias()) {
-				for (File file : files) {
-					
-				}
+		// Get the list of valid files
+		ArrayList<File> validFiles = new ArrayList<File>(files.length);		
+		for (File file : files) {
+			int indexOfSubstring = file.getName().indexOf(Script.GermlineSuffix);
+			if (indexOfSubstring >= 0) {
+				validFiles.add(file);
 			}
 		}
 		
-		// TODO -- make column names static constants
-		System.out.println("Reading Allelic Bias file...");
-		AllelicBiasTable allelicBiasTable = correctAllelicBias() ? AllelicBiasTable.readFileAndConstructTable(allelicBiasInFile, 3, 4) : null;		
-		System.out.println("Finished Reading Allelic Bias file...");
+		// We now handle the construction or reading of the allelic bias table.  If we are to correct
+		// allelic biases, we either construct it from the input files themselves, or we read pre-calculated
+		// allelic biases from an independent file.
+		AllelicBiasTable allelicBiasTable = null;
+		if (correctAllelicBias()) {
+			if (allelicBiasInFile == null) {
+				System.out.println((new Date()).toString() + " Calculating Allelic Biases...");
+				allelicBiasTable = constrcutAllelicBiasTable(validFiles, null, StringUtils.FileExtensionTSV, platform);
+				System.out.println((new Date()).toString() + " Finished Calculating Allelic Biases...");
+			} else {
+				System.out.println((new Date()).toString() + " Reading Allelic Bias file...");
+				allelicBiasTable = AllelicBiasTable.readFileAndConstructTable(allelicBiasInFile, AllelicBiasTable_Col_NumSamples, AllelicBiasTable_Col_AvgVAFNormal);
+				System.out.println((new Date()).toString() + " Finished Reading Allelic Bias file...");
+			}
+		}
 		
 		// Create output directory
 		classifySitesHelper_MakeSubDirs(sitesClassifiedDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir);
-
-		//0.486486	0.532609	0.424775	0.301206
 	
 		EnumMapSafe<Chrom, DynamicBucketCounter> dbcByChromLOH = DynamicBucketCounter.ClassFactory.newEnumMap(Chrom.class);		
 		//LOHcateSimulator.LOHcateSimulatorParams simulatorParams = new LOHcateSimulator.LOHcateSimulatorParams();
 		LOHcateSimulator.LOHcateSimulatorParams simulatorParams = null;
 		
-		int countAtPositionMax = -1; 
-		int fileIndex = 0;
-		for (File file : files) {			
-			int indexOfSubstring = file.getName().indexOf(Script.GermlineSuffix);
-			if (indexOfSubstring >= 0) {
-				String filename = file.getName();
-				String sampleNameRoot = filename.substring(0, indexOfSubstring);  	
-				String extension = filename.substring(filename.lastIndexOf(StringUtils.DotStr), filename.length());
-				System.out.println("Processing (" + ++fileIndex + "): " + file.getName());
-				
-				classifySitesOneSample(file, sampleNameRoot, extension, allelicBiasTable, dbcByChromLOH, simulatorParams, sitesClassifiedDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir, platform);
-
-			}
+		int fileIndex = 0;		
+		for (File file : validFiles) {			
+			String filename = file.getName();
+			String sampleNameRoot = filename.substring(0, file.getName().indexOf(Script.GermlineSuffix));  	
+			String extension = filename.substring(filename.lastIndexOf(StringUtils.DotStr), filename.length());
+			System.out.println("Processing (" + ++fileIndex + " / " + validFiles.size() + "): " + file.getName());				
+			classifySitesOneSample(file, sampleNameRoot, extension, allelicBiasTable, dbcByChromLOH, simulatorParams, sitesClassifiedDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir, platform);
 		}
 		
 		// Now plot the LOH recurrence across samples
@@ -565,7 +592,7 @@ public class Clustering {
 			if (correctAllelicBias()) {
 				if (RangeDouble.inRangeLowerExclusive(vafNormal, AlleleFractionStatsForSample.VAFNormalFrameLower, AlleleFractionStatsForSample.VAFNormalFrameUpper)) {
 					boolean isGermlineChromGain = metaData.chromHasGermlineGain(chrom); 							
-					float avgVAFNormal = allelicBiasTable.getAvgVAF(chrom, position);
+					float avgVAFNormal = allelicBiasTable.getAvgVAF(chrom, position, ClusteringParams.GlobalClusteringParams.mAllelicBiasMinNumSamples.getValue());
 					if (avgVAFNormal > 0) {
 						// Site exists in table
 						if (isGermlineChromGain) {

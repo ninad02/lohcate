@@ -138,7 +138,7 @@ public class Script {
 	
 	// ========================================================================
 	/** This removes the header lines and filters out sites. */
-	public static ArrayList<String> curateSNPCalls_removeHeaderLinesFromRows(ArrayList<String> rows) {
+	public static ArrayList<String> curateSNPCalls_removeHeaderLinesFromRows(ArrayList<String> rows, boolean removeHighDensitySNVSites, boolean removeExtremeGCSites) {
 		int windowPositionStart = 0;
 		int windowRowStart = 0;
 		Chrom chromPrev = Chrom.c0;
@@ -161,10 +161,10 @@ public class Script {
 					if (numSitesSpanned > MaxSitesInWindowAllowed) {
 						for (int rowToClean = windowRowStart; rowToClean < rowIndex; rowToClean++) {
 							//System.out.println("Removing:\t" + rows.get(rowToClean));
-							if (EliminateHighDensitySNVs) {
+							if (removeHighDensitySNVSites) {
 								rows.set(rowToClean, null);
-							}
-							numSitesRemoved++;
+								numSitesRemoved++;
+							}							
 						}
 					}	
 
@@ -174,7 +174,7 @@ public class Script {
 				} 
 				
 				double fractionGCNormal = GenotypeUtils.calcFractionGC(gcString);
-				if (EliminateExtremeGCSites && (fractionGCNormal < GCContentThresholdLow) || (fractionGCNormal >= GCContentThresholdHigh)) {
+				if (removeExtremeGCSites && (fractionGCNormal < GCContentThresholdLow) || (fractionGCNormal >= GCContentThresholdHigh)) {
 					rows.set(rowIndex, null);
 				}
 			}
