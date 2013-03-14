@@ -62,6 +62,10 @@ public class CopyNumberRegionsByChromosome {
 			}
 		}
 	}
+
+	// ========================================================================
+	/** Returns the list of regions for a chromosome. */
+	public ArrayList<CopyNumberRegionRange> getRegions(Chrom chrom) { return mRegionsByChrom.get(chrom); }
 	
 	// ========================================================================
 	/** Returns an exact replica of this entire object, including copies of any contained regions. */ 

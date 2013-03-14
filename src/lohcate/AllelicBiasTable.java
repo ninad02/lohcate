@@ -2,19 +2,10 @@ package lohcate;
 import genomeEnums.Chrom;
 
 import java.io.BufferedReader;
-import java.util.ArrayList;
-import java.util.Collections;
-
-import nutils.ArrayUtils;
 import nutils.CompareUtils;
-import nutils.EnumMapSafe;
 import nutils.EnumSortedMap;
 import nutils.IOUtils;
 import nutils.StringUtils;
-
-
-
-import com.carrotsearch.hppc.LongArrayList;
 
 
 /** This table will contain values of bias in an optimized fashion. */

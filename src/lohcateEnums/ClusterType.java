@@ -28,7 +28,8 @@ public enum ClusterType {
 	}
 	
 	public boolean isLOH() { 
-		return (this == LOH || this == cnLOH); 
+		//return (this == LOH || this == cnLOH);
+		return (this == LOH);
 	}
 	
 	/** Compare with lowercase to increase compatibility. */

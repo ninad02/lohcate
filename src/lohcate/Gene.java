@@ -76,49 +76,51 @@ public class Gene implements Comparable<Gene> {
 		return mPatients.get(ct);
 	}
 	
-	public void incrementCountForClusterType(ClusterType clusterType)    { mClusterTypeCounts.increment(clusterType); }	
-	public void incrementCountForMutationType(MutationType mutationType) { mMutationTypeCounts.increment(mutationType); } 			
-	public void incrementCountForVariantLocation(VariantLocation varLoc) { mVariantLocationCounts.increment(varLoc); }
+	public void incrementCount(ClusterType clusterType)    { mClusterTypeCounts.increment(clusterType); }	
+	public void incrementCount(MutationType mutationType) { mMutationTypeCounts.increment(mutationType); } 			
+	public void incrementCount(VariantLocation varLoc) { mVariantLocationCounts.increment(varLoc); }
 	
-	public int getCountVariantLocation(VariantLocation varLoc) { return mVariantLocationCounts.getCount(varLoc); }
-	public int getCountMutationType(MutationType mutationType) { return mMutationTypeCounts.getCount(mutationType); }
-	public int getCountClusterType(ClusterType clusterType)    { return mClusterTypeCounts.getCount(clusterType); }	
+	public int getCount(ClusterType clusterType)    { return mClusterTypeCounts.getCount(clusterType); }
+	public int getCount(MutationType mutationType) { return mMutationTypeCounts.getCount(mutationType); }
+	public int getCount(VariantLocation varLoc) { return mVariantLocationCounts.getCount(varLoc); }
+	
+		
 	
 	public float getRecurrence(ClusterType ct, int total) { return (float) mPatients.get(ct).size() / (float) total; }
 	
 	public int getRangeLength() { return (mMaxBasePairPosition - mMinBasePairPosition + 1); }
 	
 	public float getDensityVariantLocation(VariantLocation varLoc) {
-		return (float) getCountVariantLocation(varLoc) / (float) getRangeLength();
+		return (float) getCount(varLoc) / (float) getRangeLength();
 	}
 	
 	public float getDensityMutationType(MutationType mutationType) {
-		return (float) getCountMutationType(mutationType) / (float) getRangeLength();
+		return (float) getCount(mutationType) / (float) getRangeLength();
 	}
 	
 	public float getDensityClusterType(ClusterType clusterType) {
-		return (float) getCountClusterType(clusterType) / (float) getRangeLength(); 
+		return (float) getCount(clusterType) / (float) getRangeLength(); 
 	}
 		
 	public String countsToString(String delim) {
 		StringBuilder sb = new StringBuilder(8192);
 		
-		sb.append(getCountMutationType(MutationType.NonSynonymous_SNV))
-		  .append(delim).append(getCountMutationType(MutationType.Synonymous_SNV))
-		  .append(delim).append(getCountVariantLocation(VariantLocation.Germline))
-		  .append(delim).append(getCountVariantLocation(VariantLocation.Somatic))
+		sb.append(getCount(MutationType.NonSynonymous_SNV))
+		  .append(delim).append(getCount(MutationType.Synonymous_SNV))
+		  .append(delim).append(getCount(VariantLocation.Germline))
+		  .append(delim).append(getCount(VariantLocation.Somatic))
 		  
-		  .append(delim).append(getCountClusterType(ClusterType.GainSomatic))
-		  .append(delim).append(getCountClusterType(ClusterType.LOH))
+		  .append(delim).append(getCount(ClusterType.GainSomatic))
+		  .append(delim).append(getCount(ClusterType.LOH))
 		  .append(delim).append(mCountLOHreferenceLost)
-		  .append(delim).append(getCountClusterType(ClusterType.HETGermline))
-		  .append(delim).append(getCountClusterType(ClusterType.HETSomatic))
+		  .append(delim).append(getCount(ClusterType.HETGermline))
+		  .append(delim).append(getCount(ClusterType.HETSomatic))
 		  
-		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.GainSomatic)))
-		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.LOH)))
+		  .append(delim).append(Utils.log(getCount(ClusterType.GainSomatic)))
+		  .append(delim).append(Utils.log(getCount(ClusterType.LOH)))
 		  .append(delim).append(Utils.log(mCountLOHreferenceLost))
-		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.HETGermline)))
-		  .append(delim).append(Utils.log(getCountClusterType(ClusterType.HETSomatic)))
+		  .append(delim).append(Utils.log(getCount(ClusterType.HETGermline)))
+		  .append(delim).append(Utils.log(getCount(ClusterType.HETSomatic)))
 		  
 		  .append(delim).append(getDensityClusterType(ClusterType.GainSomatic))
 		  .append(delim).append(getDensityClusterType(ClusterType.LOH))

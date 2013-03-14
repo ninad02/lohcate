@@ -227,8 +227,7 @@ public class BitSetUtils {
 				indicesOfExistingValuesThatCanBeFlippedFastFalseToTrue[numFalse] = i;
 				numFalse++;
 			}
-		}
-		if (5 + 1 == 3 + 3) return;
+		}		
 		
 		// Now determine how we did
 		if (numTrue == numTrueValuesDesired) {

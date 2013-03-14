@@ -166,6 +166,11 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	}
 	
 	// ====================================================================
+	public boolean refOrVarHasZeroReadCount() {
+		return ((this.mCovgVarNormal == this.mCovgTotalNormal) || (this.mCovgVarNormal == 0));
+	}
+	
+	// ====================================================================
 	public float calcVAFNormal() { return (float) mCovgVarNormal / (float) mCovgTotalNormal; }
 	public float calcVAFTumor()  { return (float) mCovgVarTumor  / (float) mCovgTotalTumor;  }
 	public int getRsID()         { return mRsID; }

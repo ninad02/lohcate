@@ -1,24 +1,19 @@
 package lohcate.clustering;
 import genomeEnums.Chrom;
+import genomeEnums.TissueType;
 import genomeEnums.VariantLocation;
 import genomeUtils.ChromPositionTracker;
 import genomeUtils.GenomeConstants;
 import genomeUtils.ObjectWalkerTracker;
 import genomeUtils.SNVMap;
 
-//import java.awt.geom.Ellipse2D.Double;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
-import java.util.EnumMap;
 import java.util.ListIterator;
-
-import javax.swing.text.html.HTMLDocument.HTMLReader.IsindexAction;
 
 import kMeans.DataPoint;
 import kMeans.JCA;
@@ -28,19 +23,16 @@ import lohcate.CopyNumberRegionRange;
 import lohcate.CopyNumberRegionsByChromosome;
 import lohcate.LOHcateSimulator;
 import lohcate.Script;
-import lohcate.LOHcateSimulator.LOHcateSimulatorGoldStandard;
 import lohcate.LOHcateSimulator.LOHcateSimulatorParams;
 import lohcateEnums.ClusterType;
 import lohcateEnums.SeqPlatform;
 
-import nutils.ArgumentParserUtils;
 import nutils.ArrayUtils;
 import nutils.ArrayUtils.ParallelArrayDouble;
 import nutils.CompareUtils;
 import nutils.ContingencyTable;
 import nutils.EnumMapSafe;
 import nutils.IOUtils;
-import nutils.NullaryClassFactory;
 import nutils.PrimitiveWrapper;
 import nutils.ContingencyTable.ContingencyTableValue;
 import nutils.RangeDouble;
@@ -48,20 +40,15 @@ import nutils.StringUtils;
 import nutils.StringUtils.FileExtensionAndDelimiter;
 import nutils.counter.BucketCounterEnum;
 import nutils.counter.DynamicBucketCounter;
+import nutils.math.PoissonDistributionList;
 
-import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.PoissonDistribution;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.jfree.data.xy.DefaultXYDataset;
 
 import com.carrotsearch.hppc.DoubleArrayList;
 import com.carrotsearch.hppc.IntArrayList;
-import com.martiansoftware.jsap.FlaggedOption;
-import com.martiansoftware.jsap.JSAP;
-import com.martiansoftware.jsap.JSAPResult;
-
 import nutils.NumberUtils;
-import sun.text.CompactByteArray;
 
 
 public class Clustering {
@@ -206,7 +193,7 @@ public class Clustering {
 		}		
 		
 		// First, get the copy number ratios at a per-chromosome level				
-		float[] tumorNormalCopyNumRatiosPerChrom = calcAvgCoverageRatioPerChrom(oneSampleData.mInfoSites, metaData);
+		float[] tumorNormalCopyNumRatiosPerChrom = calcAvgCoverageRatioPerChrom(oneSampleData, metaData);
 						
 		// Now get the copy number ratios at a segmented sub-chromosomal level (by gene)
 		calcRoughCopyNumberRatioPerSite(oneSampleData.mInfoSites, metaData);	
@@ -421,10 +408,12 @@ public class Clustering {
 			System.out.printf("FDR Alpha:\t%g\nFDR Tumor p-value: \t%g\nFDR Normal p-value:\t%g\n", ClusteringParams.GlobalClusteringParams.mFDRAlpha.getValue(), metaData.mFDRTumor, metaData.mFDRNormal);
 			System.out.println("\tInferred Copy Number and Allelic Imbalance Per Site...");					
 
+			// KEY STEP: Obtain the clusters
 			int indexFirstSomaticRowInAllVariants = 0;  // Set as invalid value for now
 			ArrayList<ClusterType> events = Clustering.getClusters_withPlane(oneSampleData.mInfoSites, metaData, metaData.mVAFNormalHetRange, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
 			System.out.println("\tGot clusters");
 
+			// BEGIN POST-PROCESSING
 			boolean doOverride = true;
 			if (isSimulation || doOverride) {
 				SNVMap snvMap = new SNVMap();
@@ -435,11 +424,41 @@ public class Clustering {
 
 				for (ClusterType eventType : ClusterType.AmpLOHcnLOH) {
 					CopyNumberRegionsByChromosome regionsInOneSampleMerged = Script.mergeRegionsWithConstraints(regionsByChrom, eventType, Script.REGION_SEGMENTATION_DIST_THRESHOLD);
-					regionsInOneSampleMerged.removeSingletonRegions();
+					//regionsInOneSampleMerged.removeSingletonRegions();
 					regionsInSamplePerEventType.put(eventType, regionsInOneSampleMerged);
 					//regionsInOneSampleMerged.print(System.out, StringUtils.FileExtensionTSV.mDelimiter);
+					
+					for (Chrom chrom : Chrom.values()) {
+						ArrayList<CopyNumberRegionRange> regionsOnChrom = regionsInOneSampleMerged.getRegions(chrom);
+						for (CopyNumberRegionRange region : regionsOnChrom) {
+							int mostLikelyList = 0;
+							int indexStart = oneSampleData.getIndex(chrom, region.getRangeStart());
+							CompareUtils.ensureTrue(indexStart >= 0, "ERROR: Starting index must be > 0");
+							int indexEnd   = oneSampleData.getIndex(chrom, region.getRangeEnd());
+							CompareUtils.ensureTrue(indexEnd >= indexStart, "ERROR: Ending index must be >= starting index!");
+							
+							if (!region.spansOneSite()) {
+								String listOfListOfMeansStr = "({0.5};{0.3333,0.6667})";
+								ArrayList<double[]> listOfListOfMeans = ArrayUtils.getListOfDoubleListsFromStringForm(listOfListOfMeansStr, true);							
+								mostLikelyList = determineCopyGainVAFMaxLikelihood(oneSampleData, metaData, region, listOfListOfMeans, TissueType.Tumor);								
+							} 
+							
+							if (mostLikelyList == 0) {
+								for (int row = indexStart; row <= indexEnd; row++) {									
+									ClusterType event = events.get(row);
+									if (event == eventType) {
+										events.set(row, ClusterType.HETGermline);
+									}
+								}
+							
+							}
+						}
+					}
+					
 				}			
-
+				
+				
+				if (isSimulation) {
 				for (int row = 0; row < oneSampleData.mInfoSites.size(); row++) {
 					ClusteringInputOneSite oneSiteInfo = oneSampleData.mInfoSites.get(row);		
 					final ClusterType event = isSimulation ? goldStandard.getEvent(row) : events.get(row);
@@ -456,6 +475,7 @@ public class Clustering {
 							}							
 						}
 					}
+				}
 				}
 			}
 			
@@ -825,7 +845,7 @@ public class Clustering {
 
 	// ========================================================================
 	/** Tumor : Normal avg coverage ratio per chromosome. */
-	public static float[] calcAvgCoverageRatioPerChrom(ArrayList<ClusteringInputOneSite> rows, ClusteringInputOneSampleMetaData metaData) {		
+	public static float[] calcAvgCoverageRatioPerChrom(ClusteringInputOneSample oneSampleInfo, ClusteringInputOneSampleMetaData metaData) {		
 		
 		float[] tumorNormalRatioPerChrom = new float[Chrom.values().length];
 		int[] totalReadCountPerChromNormal = new int[Chrom.values().length];
@@ -842,8 +862,8 @@ public class Clustering {
 		metaData.mReadCountTalliesTumor.clear();
 		metaData.mReadCountTalliesNormal.clear();
 		
-		for (int row = 0; row < rows.size(); row++) {
-			ClusteringInputOneSite oneSiteInfo = rows.get(row);
+		for (int row = 0; row < oneSampleInfo.mInfoSites.size(); row++) {
+			ClusteringInputOneSite oneSiteInfo = oneSampleInfo.mInfoSites.get(row);
 			
 			int chromIndex = oneSiteInfo.getChrom().ordinal();
 			totalReadCountPerChromNormal[chromIndex] += oneSiteInfo.mCovgTotalNormal;
@@ -891,8 +911,134 @@ public class Clustering {
 			System.out.printf("Chrom: %d\tNormal Ratio:%g\tTumor-Normal Ratio %g\tNum Sites: %d\n", chromIndex, metaData.mCopyNumRatioPerChromNormal[chromIndex], tumorNormalRatioPerChrom[chromIndex], metaData.mNumSitesPerChrom[chromIndex]);
 		}
 					
+		determineGermlineAneuploidiesByVAF(oneSampleInfo, metaData);
 		return tumorNormalRatioPerChrom;
 	}	
+
+	// ========================================================================
+	public static int determineCopyGainVAFMaxLikelihood(ClusteringInputOneSample oneSampleInfo, ClusteringInputOneSampleMetaData metaData, CopyNumberRegionRange range, ArrayList<double[]> listOfListOfMeans, TissueType targetTissue) {
+		Chrom chrom = range.getChromosome();
+		if (chrom.isInvalid()) return -1;  // Return if not on a valid chromosome
+
+		int indexChromStart = oneSampleInfo.getIndex(chrom, range.getRangeStart());
+		int indexChromEnd   = oneSampleInfo.getIndex(chrom, range.getRangeEnd());		
+
+		indexChromStart = Math.max(0, indexChromStart);
+		indexChromEnd = Math.min(indexChromEnd, oneSampleInfo.getNumSites() - 1);
+		
+		// Construct our lists
+		int multiplier = 100;
+		ArrayList<PoissonDistributionList> pdListofLists = new ArrayList<PoissonDistributionList>();				
+		for (double[] doubleArray : listOfListOfMeans) {
+			PoissonDistributionList pdList = new PoissonDistributionList();
+			pdListofLists.add(pdList);
+			for (double d : doubleArray) {
+				pdList.registerMean(multiplier * d);
+			}			
+		}
+		
+		double[] prob = new double[pdListofLists.size()];		
+		Arrays.fill(prob, 0);
+		for (int row = indexChromStart; row <= indexChromEnd; row++) {
+			ClusteringInputOneSite oneSiteInfo = oneSampleInfo.mInfoSites.get(row);				
+
+			// Get the relevant variant allele fraction
+			double vafTissue = (targetTissue == TissueType.Normal) ? oneSiteInfo.calcVAFNormal() : oneSiteInfo.calcVAFTumor();
+			
+			// Skip homozygous or near-homozygous sites
+			if (oneSiteInfo.refOrVarHasZeroReadCount()) continue;  // skip homozygous sites
+			if (!metaData.mVAFNormalHetRange.inRangeLowerExclusive(vafTissue)) continue;  // skip almost homozygous sites
+
+			
+			PrimitiveWrapper.WDouble probVar = new PrimitiveWrapper.WDouble(0);
+			for (int indexDist = 0; indexDist < pdListofLists.size(); indexDist++) {
+				PoissonDistributionList pdList = pdListofLists.get(indexDist);
+				pdList.getMeanOfMostLikelyDistribution((int) Math.round(multiplier * vafTissue), probVar);					
+				prob[indexDist] += probVar.mDouble;
+			}
+		}
+
+		return ArrayUtils.getIndexOfMaxElement(prob, 0);
+	}
+	
+	
+	// ========================================================================
+	public static void determineGermlineAneuploidiesByVAF(ClusteringInputOneSample oneSampleInfo, ClusteringInputOneSampleMetaData metaData) {
+		String listOfListOfMeansStr = "({0.5};{0.6667,0.3333})";
+		ArrayList<double[]> listOfListOfMeans = ArrayUtils.getListOfDoubleListsFromStringForm(listOfListOfMeansStr, true);
+		
+		for (Chrom chrom : Chrom.values()) {
+			if (chrom.isInvalid()) continue;  // move on if not on a valid chromosome
+			
+			int indexChromStart = oneSampleInfo.getIndexChromStart(chrom);
+			if (indexChromStart < 0) continue;
+
+			int indexChromEnd = oneSampleInfo.getIndexChromEnd(chrom);
+			CompareUtils.ensureTrue(indexChromEnd >= 0, "ERROR: Chromosome must have last position!");
+						
+			CopyNumberRegionRange range = new CopyNumberRegionRange(ClusterType.Null, chrom, oneSampleInfo.getSiteAtIndex(indexChromStart).getPosition(), oneSampleInfo.getSiteAtIndex(indexChromEnd).getPosition());
+			int indexOfMostLikelyList = determineCopyGainVAFMaxLikelihood(oneSampleInfo, metaData, range, listOfListOfMeans, TissueType.Normal);
+			
+			metaData.mChromHasGermlineGain[chrom.ordinal()] = (indexOfMostLikelyList > 0);					
+			//System.out.printf("GermProb\tchr%d\t%g\t%g\t%b\n", chrom.ordinal(), prob[0], prob[1], metaData.mChromHasGermlineGain[chrom.ordinal()]);
+		}
+	}
+
+	
+	// ========================================================================
+	public static void determineGermlineAneuploidies(ClusteringInputOneSample oneSampleInfo, ClusteringInputOneSampleMetaData metaData) {
+		ArrayList<PoissonDistributionList> pdListofLists = new ArrayList<PoissonDistributionList>();
+		double[] prob = new double[2];		
+		
+		for (Chrom chrom : Chrom.values()) {
+			if (chrom.isInvalid()) continue;
+			
+			int indexChromStart = oneSampleInfo.getIndexChromStart(chrom);
+			if (indexChromStart < 0) continue;
+			
+			int indexChromEnd = oneSampleInfo.getIndexChromEnd(chrom);
+			CompareUtils.ensureTrue(indexChromEnd >= 0, "ERROR: Chromosome must have last position!");
+			
+			double avgReadCountOnChrom = metaData.mAvgReadCountPerChromNormal[chrom.ordinal()];
+			pdListofLists.clear();
+
+			PoissonDistributionList pdList1 = new PoissonDistributionList();
+			pdList1.registerMean(avgReadCountOnChrom / GenomeConstants.DefaultDiploidCopyNumber);
+			pdListofLists.add(pdList1);
+			
+			PoissonDistributionList pdList2 = new PoissonDistributionList();
+			pdList2.registerMean(avgReadCountOnChrom * (2.0 / 3.0));
+			pdList2.registerMean(avgReadCountOnChrom * (1.0 / 3.0));
+			pdListofLists.add(pdList2);
+						
+			Arrays.fill(prob, 0);
+			for (int row = indexChromStart; row <= indexChromEnd; row++) {
+				ClusteringInputOneSite oneSiteInfo = oneSampleInfo.mInfoSites.get(row);
+				int covgVar = oneSiteInfo.mCovgVarNormal;
+				int covgRef = oneSiteInfo.mCovgTotalNormal - covgVar;
+				
+				if (oneSiteInfo.refOrVarHasZeroReadCount()) continue; // skip homozygous sites
+				if (!metaData.mVAFNormalHetRange.inRangeLowerExclusive(oneSiteInfo.calcVAFNormal())) continue;  // skip almost homozygous sites
+				
+				PrimitiveWrapper.WDouble probRef = new PrimitiveWrapper.WDouble(0);
+				PrimitiveWrapper.WDouble probVar = new PrimitiveWrapper.WDouble(0);
+				
+				for (int indexDist = 0; indexDist < pdListofLists.size(); indexDist++) {
+					PoissonDistributionList pdList = pdListofLists.get(indexDist);
+					pdList.getMeanOfMostLikelyDistribution(covgRef, probRef);				
+					pdList.getMeanOfMostLikelyDistribution(covgVar, probVar);
+					//prob[indexDist] += probRef.mDouble + probVar.mDouble;
+					prob[indexDist] += probVar.mDouble;
+				}
+
+				//int maxIndex = ArrayUtils.getIndexOfMaxElement(prob, 0);				
+			}
+			
+			metaData.mChromHasGermlineGain[chrom.ordinal()] = prob[1] > prob[0];
+			System.out.println("Gain\t" + chrom + "\t" + metaData.mChromHasGermlineGain[chrom.ordinal()]);
+		}
+		
+	}
 	
 	// ========================================================================
 	public static ArrayList<ClusterType> getClusters_withPlane(

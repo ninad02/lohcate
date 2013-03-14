@@ -15,7 +15,6 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.ListIterator;
 
 import nutils.ArgumentParserUtils;
@@ -26,20 +25,17 @@ import nutils.IOUtils;
 import nutils.NullaryClassFactory;
 import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
-import nutils.StringUtils.FileExtensionAndDelimiter;
-import nutils.counter.BucketCounterCore;
 import nutils.counter.BucketCounterEnum;
 import nutils.counter.DynamicBucketCounter;
 
-import org.jfree.chart.renderer.xy.XYDotRenderer;
-
+import com.carrotsearch.hppc.IntArrayList;
 import com.martiansoftware.jsap.FlaggedOption;
 import com.martiansoftware.jsap.JSAP;
 import com.martiansoftware.jsap.JSAPResult;
+import com.martiansoftware.jsap.StringParser;
 
 import lohcate.clustering.Clustering;
 import lohcate.clustering.ClusteringInputOneSample;
-import lohcate.clustering.ClusteringInputOneSampleMetaData;
 import lohcate.clustering.ClusteringInputOneSite;
 import lohcate.clustering.ClusteringParams;
 import lohcate.clustering.ClusteringPlotting;
@@ -47,7 +43,6 @@ import lohcateEnums.ClusterType;
 import lohcateEnums.ColorPastel;
 import lohcateEnums.MutationType;
 import lohcateEnums.SeqPlatform;
-import shared.Utils;
 
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
@@ -770,7 +765,7 @@ public class Script {
 					// The cluster types are different, or the chrom didn't match, 
 					// or the position was too far away.  Create a new region and add it
 					// if it is not null or it is not noise.					
-					if  (segmentRegionsOneFile_isValidCluster(eventType)) {
+					if (segmentRegionsOneFile_isValidCluster(eventType)) {
 						currentRegion.makeFinalized();
 						currentRegion = new CopyNumberRegionRange(eventType, chrom, position);
 						regionsByChrom.addRegion(chrom, currentRegion);
@@ -1127,7 +1122,8 @@ public class Script {
 					if (mutationType != null) {
 						switch(mutationType) {
 						case NonSynonymous_SNV: theColorMutationType = ColorPastel.RGB_Red;    break;
-						case Synonymous_SNV:    theColorMutationType = ColorPastel.Dark_Green; break;					
+						case Synonymous_SNV:    theColorMutationType = ColorPastel.Dark_Green; break;		
+						default: break;
 						}
 					}
 					
@@ -1141,7 +1137,8 @@ public class Script {
 					if (mutationType != null) {
 						switch(mutationType) {
 						case NonSynonymous_SNV: theColorMutationType = ColorPastel.Yellow_Orange; break;
-						case Synonymous_SNV:    theColorMutationType = ColorPastel.Light_Green;   break;						
+						case Synonymous_SNV:    theColorMutationType = ColorPastel.Light_Green;   break;	
+						default: break;
 						}
 					}
 				} else if (clusterTypeForSite == ClusterType.HETSomatic) {
@@ -1388,15 +1385,15 @@ public class Script {
 						}
 												
 						MutationType mutationType = MutationType.getSNVType(components[ColCuratedTSV_MutationType]);
-						currentGene.incrementCountForMutationType(mutationType);  // increment synonymous or nonsynonymous variant count						
+						currentGene.incrementCount(mutationType);  // increment synonymous or nonsynonymous variant count						
 						
 						VariantLocation variantLocation = 
 								Clustering.isVariantInGermline(Double.parseDouble(components[ColCuratedTSV_VafNormal])) ? VariantLocation.Germline : VariantLocation.Somatic; 						
-						currentGene.incrementCountForVariantLocation(variantLocation);
+						currentGene.incrementCount(variantLocation);
 																
 						ClusterType clusterType = ClusterType.getClusterType(components[ColCuratedTSV_Cluster]);
 						if (clusterType == null) { CompareUtils.throwErrorAndExit("ERROR: Invalid cluster type: " + components[ColCuratedTSV_Cluster]); }
-						currentGene.incrementCountForClusterType(clusterType);  // increment LOH/DUP/&c. count
+						currentGene.incrementCount(clusterType);  // increment LOH/DUP/&c. count
 						double vafTumor = Double.parseDouble(components[ColCuratedTSV_VafTumor]);
 						if ((clusterType == ClusterType.LOH) && (vafTumor > 0.5)) {
 							currentGene.mCountLOHreferenceLost++;
@@ -1489,8 +1486,8 @@ public class Script {
 		String taskClustering = "clustering";
 		String taskRegions = "regions";
 		String taskGenes = "genes";
-		
-		String[] argsMajor = (args.length > 0) ? (new String[] { args[0] }) : (new String[] { " " });
+				
+		String[] argsMajor = (args.length > 0) ? (new String[] { args[0], args[1] }) : (new String[] { " " });
 		JSAP jsapTask = new JSAP();
 		
 		String lohcateTask = "TaskName";
@@ -1498,14 +1495,15 @@ public class Script {
 				.setShortFlag('t').setLongFlag("task").setUsageName(lohcateTask);
 		task.setHelp("Indicate which task LOHcate should perform: {" + taskClustering + ", " + taskRegions + ", " + taskGenes + "}");
 		ArgumentParserUtils.registerJSAPParameter(jsapTask, task);
-		JSAPResult jsapResult = ArgumentParserUtils.parseAndCheck(argsMajor, jsapTask, LOHcate.class.getName());		
-		String taskName = jsapResult.getString(lohcateTask);		
 		
 		String rootFolderPath = "RootFolderPath";
 		FlaggedOption rootFolder = new FlaggedOption(rootFolderPath).setStringParser(JSAP.STRING_PARSER).setRequired(true)
 				.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("root").setUsageName(rootFolderPath);
 		rootFolder.setHelp("Indicate the root directory of the data");
 		ArgumentParserUtils.registerJSAPParameter(jsapTask, rootFolder);
+		
+		JSAPResult jsapResult = ArgumentParserUtils.parseAndCheck(argsMajor, jsapTask, LOHcate.class.getName());		
+		String taskName = jsapResult.getString(lohcateTask);		
 		
 		long sys_time_init = System.currentTimeMillis();			
 		
@@ -1523,6 +1521,10 @@ public class Script {
 			String rootFolderName      = jsapResult.getString(rootFolderPath);
 			String allelicBiasFilename = jsapResult.getString(allelicBiasFile);
 			clusteringParams.configureParameters(jsapResult);
+			
+			if (rootFolderName == null) {
+				CompareUtils.ensureTrue(false, "ERROR: Must specify valid root folder name!");
+			}
 			
 			if (allelicBiasFilename == null) {
 				//clusteringParams.setIgnoreAllelicBias(true);

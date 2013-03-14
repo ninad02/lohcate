@@ -228,8 +228,8 @@ public class ArrayUtils {
 	 *  are multiple maximal elements, this returns the index of the first one.  The second
 	 *  argument is the index at which searching should begin. */
 	public static int getIndexOfMaxElement(double[] theArray, int indexToStartSearch) {
-		int maxIndex = 0;
-		double maxElement = Double.MAX_VALUE * -1; 
+		int maxIndex = -1;
+		double maxElement = -Double.MAX_VALUE; 
 		for (int i = indexToStartSearch; i < theArray.length; i++) {
 			if (theArray[i] > maxElement) {
 				maxElement = theArray[i];

@@ -31,6 +31,7 @@ public class ClusteringInputOneSampleMetaData {
 	float[] mCopyNumRatioPerChromNormal;
 	float[] mTumorCopyNumRatiosPerGene;	
 	boolean[] mIsSomaticSite;
+	boolean[] mChromHasGermlineGain;
 	
 	CopyNumberRegionsByChromosome mGeneRegions;
 	RangeDouble mVAFNormalHetRange;
@@ -54,6 +55,9 @@ public class ClusteringInputOneSampleMetaData {
 		mNumSitesPerChrom           = new   int[Chrom.values().length];
 		mAvgReadCountPerChromNormal = new float[Chrom.values().length];
 		mCopyNumRatioPerChromNormal = new float[Chrom.values().length];
+		mChromHasGermlineGain       = new boolean[Chrom.values().length];
+		
+		Arrays.fill(mChromHasGermlineGain, false);
 		
 		mVAFNormalHetRange = new RangeDouble(AlleleFractionStatsForSample.VAFNormalFrameLower, AlleleFractionStatsForSample.VAFNormalFrameUpper);
 		
@@ -64,7 +68,8 @@ public class ClusteringInputOneSampleMetaData {
 	}
 	
 	public boolean chromHasGermlineGain(Chrom chrom) {
-		return (mCopyNumRatioPerChromNormal[chrom.ordinal()] > ClusteringParams.GlobalClusteringParams.mGermlineTrisomyThreshold.getValue());
+		//return (mCopyNumRatioPerChromNormal[chrom.ordinal()] > ClusteringParams.GlobalClusteringParams.mGermlineTrisomyThreshold.getValue());
+		return mChromHasGermlineGain[chrom.ordinal()];
 	}
 	
 	public void printSiteInformation(PrintWriter out, int row, boolean printNewLine) {
