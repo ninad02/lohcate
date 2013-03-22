@@ -7,8 +7,14 @@ import java.util.Collection;
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.PoissonDistribution;
 
+import cern.jet.random.Binomial;
+import cern.jet.random.engine.DRand;
+
 public class NumberUtils {
 
+	
+	private static Binomial BinomialDistGlobalInstance = new Binomial(100, 0.5, new DRand());
+	
 	// ========================================================================
 	public static final double Log10OfZero = -50;
 	
@@ -154,6 +160,7 @@ public class NumberUtils {
 		
 		for (int k = pValuesClone.length - 1; k >= 0; k--) {
 			double threshold = ((double) (k + 1) / ((double) pValuesClone.length * c_m)) * fdrAlpha;
+			//System.out.println("" + k + "\t" + pValuesClone[k] + "\t" + threshold);
 			if (pValuesClone[k] <= threshold) {
 				return pValuesClone[k];
 			}
@@ -189,10 +196,32 @@ public class NumberUtils {
 			return 1.0;  // since probability Pr(X >= 0) is always 1.0 with positive number of trials
 		}
 	
-		BinomialDistribution bd = new BinomialDistribution(n, p);
-		double result = 1 - bd.cumulativeProbability(k - 1);					
+		//BinomialDistribution bd = new BinomialDistribution(n, p);				
+		//double result = 1 - bd.cumulativeProbability(k - 1);
+		BinomialDistGlobalInstance.setNandP(n, p);
+		double result = 1 - BinomialDistGlobalInstance.cdf(k - 1);
+		
 		return result;
 	}
+	
+	/*
+	public static double binomDist_PMF(int n, int k, double p) throws IllegalArgumentException {
+		
+		if (k > n) {
+			throw new IllegalArgumentException("Argument k cannot be greater than argument n!");
+		}
+		
+		if ((p < 0) || (p > 1)) {
+			throw new IllegalArgumentException("Argument p must be between 0 and 1, inclusive!");
+		}
+		
+		if (n <= 0) {
+			return 1.0;
+		}
+		
+		double nChooseKResultLog = nChooseK(n, k, true);
+		
+	}*/
 
 	/** Given an integer array of counts, this picks a random number, and based
 	 *  on the proportion of the counts, this returns the index of the chosen count.

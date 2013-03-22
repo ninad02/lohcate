@@ -3,7 +3,7 @@ package lohcate.clustering;
 import genomeEnums.Chrom;
 import genomeEnums.Nuc;
 import genomeUtils.GenotypeUtils;
-import genomeUtils.RegionSimulator;
+import genomeUtils.SiteInformation;
 
 import java.util.Comparator;
 
@@ -15,9 +15,10 @@ import nutils.CompareUtils;
 import nutils.NumberUtils;
 import nutils.StringUtils;
 import nutils.BitSetUtils.BitShiftAndMask;
+import nutils.StringUtils.FileExtensionAndDelimiter;
 import shared.Utils;
 
-public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite>, RegionSimulator.SiteInformation {
+public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite>, SiteInformation.Writeable {
 
 	// ========================================================================
 	public static Comparator<ClusteringInputOneSite> ClusteringInputOneSiteComparator = new Comparator<ClusteringInputOneSite>() {
@@ -136,6 +137,12 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	}
 
 	// ====================================================================
+	public void set(Chrom chrom, int position) {
+		setChrom(chrom);
+		setPosition(position);
+	}
+	
+	// ====================================================================
 	public void setChrom(Chrom chrom) {
 		mDataUnit_ChromProsRevVarAllelesMutType = bsmChrom.setValueInCompactUnit(chrom.ordinal(), mDataUnit_ChromProsRevVarAllelesMutType);
 	}
@@ -200,10 +207,14 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 		// The compact unit variable has chromosome and position ordered such that it's easy to sort
 		return Long.compare(mDataUnit_ChromProsRevVarAllelesMutType, rhs.mDataUnit_ChromProsRevVarAllelesMutType);
 	}
+
+	// ====================================================================	
+	public String toString() {		
+		return printToString(new StringBuilder(2048), true, StringUtils.FileExtensionTSV.mDelimiter).toString();
+	}
 	
-	// ====================================================================
-	
-	public StringBuilder printToString(StringBuilder sb, boolean clearStringBuilder, String delimiter) {
+	// ====================================================================	
+	public StringBuilder printToString(StringBuilder sb, boolean clearStringBuilder, String delimiter) {		
 		if (clearStringBuilder) {
 			sb.setLength(0);
 		}

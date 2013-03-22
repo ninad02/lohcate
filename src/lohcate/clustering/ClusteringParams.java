@@ -26,11 +26,13 @@ public class ClusteringParams {
 	protected InputParameterDouble mAmplificationThreshold   = new InputParameterDouble(2.2,  "AmplificationThreshold",   JSAP.NO_SHORTFLAG, "ampThresh", "Copy_Number_Threshold_for_Amplification");
 	protected InputParameterDouble mDeletionThreshold        = new InputParameterDouble(1.8,  "DeletionThreshold",        JSAP.NO_SHORTFLAG, "delThresh", "Copy_Number_Threshold_for_Deletion");
 	protected InputParameterDouble mGermlineTrisomyThreshold = new InputParameterDouble(1.4, "GermlineTrisomyThreshold", JSAP.NO_SHORTFLAG, "germlineAneuploidyGainThreshold", "Copy_Number_Threshold_for_Germline_Chromosomal_Gain");
-	protected InputParameterDouble mFDRAlpha                 = new InputParameterDouble(0.01, "mFDRAlpha",                JSAP.NO_SHORTFLAG, "FDR_Alpha", "FDR_Alpha_Value_for_Allelic_Fraction_Imbalance");
+	protected InputParameterDouble mFDRAlpha                 = new InputParameterDouble(0.99, "mFDRAlpha",                JSAP.NO_SHORTFLAG, "FDR_Alpha", "FDR_Alpha_Value_for_Allelic_Fraction_Imbalance");
 	protected InputParameterInteger mAllelicBiasMinNumSamples = new InputParameterInteger(2, "AllelicBiasMinNumSamples", JSAP.NO_SHORTFLAG, "allelicBiasNumSites", "Minimum_Number_of_Samples_at_Site_for_Allelic_Bias_Correction"); 
 
 	protected InputParameterBoolean mIgnoreAllelicBias     = new InputParameterBoolean(false, "IgnoreAllelicBias",     JSAP.NO_SHORTFLAG, "ignoreAllelicBias", "Specifies whether allelic bias is to be ignored and not corrected");
-	protected InputParameterBoolean mIgnoreMultipleTesting = new InputParameterBoolean(false, "IgnoreMultipleTesting", JSAP.NO_SHORTFLAG, "ignoreMultipleTesting", "Specifies whether multiple testing correction is not to be done"); 
+	protected InputParameterBoolean mIgnoreMultipleTesting = new InputParameterBoolean(false, "IgnoreMultipleTesting", JSAP.NO_SHORTFLAG, "ignoreMultipleTesting", "Specifies whether multiple testing correction is not to be done");
+	protected InputParameterBoolean mSimulation            = new InputParameterBoolean(false, "simulation", 'S', "simulation", "Specifies whether to run internal testing by simulation");
+	
 		
 	protected ArrayList<InputParameterDouble>  mParamsDouble;
 	protected ArrayList<InputParameterInteger> mParamsInteger;
@@ -49,6 +51,7 @@ public class ClusteringParams {
 		mParamsBoolean = new ArrayList<InputParameterBoolean>();
 		mParamsBoolean.add(mIgnoreAllelicBias);
 		mParamsBoolean.add(mIgnoreMultipleTesting);
+		mParamsBoolean.add(mSimulation);
 	}
 
 	// ========================================================================
@@ -60,8 +63,9 @@ public class ClusteringParams {
 	public JSAP registerClusteringParameters(JSAP jsap) {
 		jsap = (jsap == null) ? new JSAP() : jsap;
 		
-		ArgumentParserUtils.createSwitch(mIgnoreAllelicBias, jsap);
-		ArgumentParserUtils.createSwitch(mIgnoreMultipleTesting, jsap);		
+		for (InputParameterBoolean pb : mParamsBoolean) {
+			ArgumentParserUtils.createSwitch(pb, jsap);
+		}
 		
 		for (InputParameterNumber<?> pn : mParamsDouble) {
 			registerParameterHelper(jsap, pn, JSAP.DOUBLE_PARSER);
@@ -93,6 +97,10 @@ public class ClusteringParams {
 		
 		for (InputParameterInteger pi : mParamsInteger) {
 			pi.setValue(config.getInt(pi.getName()));
+		}
+		
+		for (InputParameterBoolean pb : mParamsBoolean) {
+			pb.setValue(config.getBoolean(pb.getName()));
 		}
 	}
 	

@@ -119,6 +119,7 @@ public abstract class ArrayListSortedAbstract<E> extends ArrayList<E> {
 		super.add(index, element);
 		if (!wasInsertedInSortedManner(index)) {
 			mIsSorted = false;
+			System.out.println("Not Sorted: " + index + "\t" + element);
 		}
 	}
 	
@@ -338,7 +339,7 @@ public abstract class ArrayListSortedAbstract<E> extends ArrayList<E> {
 			
 			for (int index = 0; index < size(); index++) {
 				setUnsorted(index, newArray[index]);
-			}			
+			}						
 		} else {
 			//System.out.println("Not sorting");
 		}

@@ -11,12 +11,6 @@ import nutils.NumberUtils;
 public class RegionSimulator {
 	
 	// ========================================================================
-	public static interface SiteInformation {
-		public int getPosition();
-		public Chrom getChrom();
-	}
-
-	// ========================================================================
 	public static interface SampleInformation<E extends SiteInformation> {
 		public int getIndexChromStart(Chrom chrom);
 		public int getIndexChromEnd(Chrom chrom);

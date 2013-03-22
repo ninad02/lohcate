@@ -6,6 +6,7 @@ import genomeUtils.ChromPositionTracker;
 import genomeUtils.GenomeConstants;
 import genomeUtils.ObjectWalkerTracker;
 import genomeUtils.SNVMap;
+import genomeUtils.SiteList;
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -43,6 +44,8 @@ import nutils.counter.DynamicBucketCounter;
 import nutils.math.PoissonDistributionList;
 
 import org.apache.commons.math3.distribution.PoissonDistribution;
+import org.apache.commons.math3.random.RandomDataGenerator;
+import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.jfree.data.xy.DefaultXYDataset;
 
@@ -84,6 +87,8 @@ public class Clustering {
 	public static final float ExpectedVAFNormalTrisomy = 2.0f / 3.0f;
 	
 	public static boolean correctAllelicBias() { return !ClusteringParams.GlobalClusteringParams.mIgnoreAllelicBias.getValue(); }			
+	public static double[] sigPValues = new double[65000];
+	
 
 	// ========================================================================
 	/**
@@ -187,48 +192,100 @@ public class Clustering {
 			metaData.mVAFNormalHetRange.setBoundUpper(AlleleFractionStatsForSample.VAFNormalFrameUpper);
 		} else {
 			AlleleFractionStatsForSample afStatsSample = new AlleleFractionStatsForSample();
-			afStatsSample.tabulateAndPerformStatistics(oneSampleData.mInfoSites, platform);
+			afStatsSample.tabulateAndPerformStatistics(oneSampleData, platform);
 			metaData.mVAFNormalHetRange.setBoundLower( afStatsSample.getValueNStandardDeviationsAway(-NAF_STRIP_EXPANDER) );
 			metaData.mVAFNormalHetRange.setBoundUpper( afStatsSample.getValueNStandardDeviationsAway( NAF_STRIP_EXPANDER) );
 		}		
+		
+		
+/*		for (Chrom chrom : Chrom.values()) {
+			if (!chrom.isInvalid() && chrom.isAutosomal()) {
+				System.out.println("Chrom Index: " + chrom + "\t" + oneSampleData.getIndexChromStart(chrom) + "\t" + oneSampleData.getIndexChromEnd(chrom));
+				System.out.println(oneSampleData.getSiteAtIndex(oneSampleData.getIndexChromStart(chrom)).toString());
+				System.out.println(oneSampleData.getSiteAtIndex(oneSampleData.getIndexChromEnd(chrom)).toString());
+			}
+		}*/
 		
 		// First, get the copy number ratios at a per-chromosome level				
 		float[] tumorNormalCopyNumRatiosPerChrom = calcAvgCoverageRatioPerChrom(oneSampleData, metaData);
 						
 		// Now get the copy number ratios at a segmented sub-chromosomal level (by gene)
-		calcRoughCopyNumberRatioPerSite(oneSampleData.mInfoSites, metaData);	
+		calcRoughCopyNumberRatioPerSite(oneSampleData, metaData);	
 		
 		// Now smooth the copy numbers
-		smoothCopyNumbers(oneSampleData.mInfoSites, metaData);
+		smoothCopyNumbers(oneSampleData, metaData);
 		
 		// Now adjust the VAF values basead on biases
-		calculateAdjustedVAFs(oneSampleData.mInfoSites, metaData, allelicBiasTable, platform);
+		calculateAdjustedVAFs(oneSampleData, metaData, allelicBiasTable, platform);
 
 		// Calculate the imbalance p-values
-		getPValuesImbalance(oneSampleData.mInfoSites, metaData);
+		getPValuesImbalance(oneSampleData, metaData);
 		
 		// Calculate the FDR for tumor and normal
 		boolean pointsIndependent = false;
-		double[] tumorPValWithoutGermline = getSitesPvaluesAfterElimintingGermlineGain(oneSampleData, metaData, metaData.mVAFNormalHetRange);
+		double[] tumorPValWithoutGermline = getSitesPvaluesAfterEliminatingGermlineGain(oneSampleData, metaData, metaData.mVAFNormalHetRange);
 		//metaData.mFDRTumor  = NumberUtils.getFDR_BenjaminiHochberg(metaData.mImbalancePValuesTumor,  ClusteringParams.GlobalClusteringParams.mFDRAlpha.getValue(), pointsIndependent);
-		metaData.mFDRTumor  = NumberUtils.getFDR_BenjaminiHochberg(tumorPValWithoutGermline,  ClusteringParams.GlobalClusteringParams.mFDRAlpha.getValue(), pointsIndependent);
+		metaData.mFDRTumor  = NumberUtils.getFDR_BenjaminiHochberg(tumorPValWithoutGermline,         ClusteringParams.GlobalClusteringParams.mFDRAlpha.getValue(), pointsIndependent);
 		metaData.mFDRNormal = NumberUtils.getFDR_BenjaminiHochberg(metaData.mImbalancePValuesNormal, ClusteringParams.GlobalClusteringParams.mFDRAlpha.getValue(), pointsIndependent);
+		
+		// Calculate permutation-based significance thresholds
+		calculatePermutationThresholds(oneSampleData, metaData);
 	}
 
 	// ========================================================================
+	private static void calculatePermutationThresholds(ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
+		int numIterations = 10000;
+		double[] pValueBuffer = new double[numIterations];
+		
+		System.out.println("Permuting for Significant P-Value Calculation...");
+		int numSites = oneSampleData.getNumSites();
+		for (int row = 0; row < numSites; row++) {
+			ClusteringInputOneSite oneSiteInfo = oneSampleData.getSiteAtIndex(row); 
+						
+			if (!metaData.chromHasGermlineGain(oneSiteInfo.getChrom()) && metaData.mVAFNormalHetRange.inRangeLowerExclusive(oneSiteInfo.calcVAFNormal())) {
+				if (sigPValues[oneSiteInfo.mCovgTotalTumor] < 0) {
+					sigPValues[oneSiteInfo.mCovgTotalTumor] = calcSigPValueByPermutation(oneSiteInfo.mCovgTotalTumor, 0.05, pValueBuffer); 
+				}				
+				metaData.mSigPValuesPerSite[row] = sigPValues[oneSiteInfo.mCovgTotalTumor];
+			} else {
+				metaData.mSigPValuesPerSite[row] = -1;
+			}
+			//System.out.println(row + "\t" + metaData.mSigPValuesPerSite[row]);
+		}
+		System.out.println("Finished Permuting for Significant P-Value Calculation...");
+	}
+	
+	// ========================================================================
+	private static double calcSigPValueByPermutation(int readCountTotal, double significanceLevel, double[] pValueBuffer) {
+		double readCountHaplotype = readCountTotal / 2.0;
+		RandomDataGenerator randomGen = new RandomDataGenerator();
+		
+		int numIter = pValueBuffer.length;		
+		for (int iter = 0; iter < numIter; iter++) {
+			int numReadsA = (int) randomGen.nextPoisson(readCountHaplotype);
+			numReadsA = Math.min(numReadsA, readCountTotal);								
+			pValueBuffer[iter] = getPValuesImbalanceTissue(readCountTotal, numReadsA);
+		}
+		
+		Arrays.sort(pValueBuffer);
+		int indexOfSignificance = (int) (pValueBuffer.length * significanceLevel);
+		return pValueBuffer[indexOfSignificance];
+	}
+	
+	// ========================================================================
 	// Conve
-	private static double[] getSitesPvaluesAfterElimintingGermlineGain(ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData, RangeDouble vafNormalRange) {		
+	private static double[] getSitesPvaluesAfterEliminatingGermlineGain(ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData, RangeDouble vafNormalRange) {		
 		int numSites = oneSampleData.getNumSites();
 		DoubleArrayList pValues = new DoubleArrayList(numSites);
 		
 		for (int row = 0; row < numSites; row++) {
 			ClusteringInputOneSite oneSiteInfo = oneSampleData.getSiteAtIndex(row); 
 			
-			if (!metaData.chromHasGermlineGain(oneSiteInfo.getChrom()) && vafNormalRange.inRangeLowerExclusive(oneSiteInfo.calcVAFNormal())) {
+			if (!metaData.chromHasGermlineGain(oneSiteInfo.getChrom()) /* && vafNormalRange.inRangeLowerExclusive(oneSiteInfo.calcVAFNormal()) */) {
 				pValues.add(metaData.mImbalancePValuesTumor[row]);
 			}
 		}
-		System.out.printf("Shorted Pvalue List:\t%d\t%d\n", numSites, pValues.size());
+		System.out.printf("Shortened Pvalue List:\t%d\t%d\n", numSites, pValues.size());
 		return pValues.toArray();
 	}
 	
@@ -309,6 +366,8 @@ public class Clustering {
 			}
 		}
 		
+		Arrays.fill(sigPValues, -1);
+		
 		// We now handle the construction or reading of the allelic bias table.  If we are to correct
 		// allelic biases, we either construct it from the input files themselves, or we read pre-calculated
 		// allelic biases from an independent file.
@@ -328,9 +387,16 @@ public class Clustering {
 		// Create output directory
 		classifySitesHelper_MakeSubDirs(sitesClassifiedDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir);
 	
-		EnumMapSafe<Chrom, DynamicBucketCounter> dbcByChromLOH = DynamicBucketCounter.ClassFactory.newEnumMap(Chrom.class);		
-		//LOHcateSimulator.LOHcateSimulatorParams simulatorParams = new LOHcateSimulator.LOHcateSimulatorParams();
-		LOHcateSimulator.LOHcateSimulatorParams simulatorParams = null;
+		// Create counters for all events
+		EnumMapSafe<ClusterType, EnumMapSafe<Chrom, DynamicBucketCounter>> eventCounts = new EnumMapSafe<>(ClusterType.class);
+		for (ClusterType event : ClusterType.values()) {			
+			eventCounts.put(event, DynamicBucketCounter.ClassFactory.newEnumMap(Chrom.class));
+		}
+		
+				
+		LOHcateSimulator.LOHcateSimulatorParams simulatorParams = 
+				ClusteringParams.GlobalClusteringParams.mSimulation.getValue() ? 
+				new LOHcateSimulator.LOHcateSimulatorParams() : null;
 		
 		int fileIndex = 0;		
 		for (File file : validFiles) {			
@@ -338,18 +404,18 @@ public class Clustering {
 			String sampleNameRoot = filename.substring(0, file.getName().indexOf(Script.GermlineSuffix));  	
 			String extension = filename.substring(filename.lastIndexOf(StringUtils.DotStr), filename.length());
 			System.out.println("Processing (" + ++fileIndex + " / " + validFiles.size() + "): " + file.getName());				
-			classifySitesOneSample(file, sampleNameRoot, extension, allelicBiasTable, dbcByChromLOH, simulatorParams, sitesClassifiedDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir, platform);
+			classifySitesOneSample(file, sampleNameRoot, extension, allelicBiasTable, eventCounts, simulatorParams, sitesClassifiedDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir, platform);
 		}
 		
 		// Now plot the LOH recurrence across samples
-		ClusteringPlotting.plotRecurrenceGenomeWide(dbcByChromLOH, copyNumberPlotDir, ClusterType.LOH);
+		ClusteringPlotting.plotRecurrenceGenomeWide(eventCounts, copyNumberPlotDir);
 
 	}
 
 	// ========================================================================
 	public static void classifySitesOneSample(File file, String sampleNameRoot, String sampleFilenameExtension, 
 			AllelicBiasTable allelicBiasTable,
-			EnumMapSafe<Chrom, DynamicBucketCounter> dbcByChromLOH, 
+			EnumMapSafe<ClusterType, EnumMapSafe<Chrom, DynamicBucketCounter>> eventCounts, 
 			LOHcateSimulatorParams simulatorParams,
 			String sitesClassifiedDir, String vafComparisonPlotDir, String vafWaterfallPlotDir, String copyNumberPlotDir, 
 			SeqPlatform platform) {
@@ -402,7 +468,7 @@ public class Clustering {
 			}
 
 			// Declare meta-data and fill it
-			ClusteringInputOneSampleMetaData metaData = new ClusteringInputOneSampleMetaData(oneSampleData.mInfoSites.size(), sampleNameRoot);
+			ClusteringInputOneSampleMetaData metaData = new ClusteringInputOneSampleMetaData(oneSampleData.getNumSites(), sampleNameRoot);
 			classifySitesHelper_preprocessMetaData(oneSampleData, metaData, allelicBiasTable, platform);				
 
 			System.out.printf("FDR Alpha:\t%g\nFDR Tumor p-value: \t%g\nFDR Normal p-value:\t%g\n", ClusteringParams.GlobalClusteringParams.mFDRAlpha.getValue(), metaData.mFDRTumor, metaData.mFDRNormal);
@@ -410,7 +476,7 @@ public class Clustering {
 
 			// KEY STEP: Obtain the clusters
 			int indexFirstSomaticRowInAllVariants = 0;  // Set as invalid value for now
-			ArrayList<ClusterType> events = Clustering.getClusters_withPlane(oneSampleData.mInfoSites, metaData, metaData.mVAFNormalHetRange, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
+			ArrayList<ClusterType> events = Clustering.getClusters_withPlane(oneSampleData, metaData, metaData.mVAFNormalHetRange, outFilenameFullPath, indexFirstSomaticRowInAllVariants, platform); //get cluster assignments (HET ball, LOH sidelobes, DUP wedge, &c.)
 			System.out.println("\tGot clusters");
 
 			// BEGIN POST-PROCESSING
@@ -442,22 +508,25 @@ public class Clustering {
 								ArrayList<double[]> listOfListOfMeans = ArrayUtils.getListOfDoubleListsFromStringForm(listOfListOfMeansStr, true);							
 								mostLikelyList = determineCopyGainVAFMaxLikelihood(oneSampleData, metaData, region, listOfListOfMeans, TissueType.Tumor);								
 							} 
-							
-							if (mostLikelyList == 0) {
-								for (int row = indexStart; row <= indexEnd; row++) {									
-									ClusterType event = events.get(row);
+
+							for (int row = indexStart; row <= indexEnd; row++) {									
+								final ClusterType event = events.get(row);
+								if (mostLikelyList == 0) {
 									if (event == eventType) {
 										events.set(row, ClusterType.HETGermline);
 									}
+								} else {
+									if (event == ClusterType.HETGermline || event == ClusterType.Noise) {
+										events.set(row, eventType);
+									}
 								}
-							
 							}
 						}
 					}
 					
 				}			
 				
-				
+				/*
 				if (isSimulation) {
 				for (int row = 0; row < oneSampleData.mInfoSites.size(); row++) {
 					ClusteringInputOneSite oneSiteInfo = oneSampleData.mInfoSites.get(row);		
@@ -477,6 +546,7 @@ public class Clustering {
 					}
 				}
 				}
+				*/
 			}
 			
 			// Now initialize the data structure needed to plot
@@ -494,8 +564,9 @@ public class Clustering {
 			
 			
 			int startingRowGermlineOrSomaticOrAll = 0;  // 0 because header line has been stripped away
-			for (int row = startingRowGermlineOrSomaticOrAll; row < oneSampleData.mInfoSites.size(); row++) {
-				ClusteringInputOneSite oneSiteInfo = oneSampleData.mInfoSites.get(row);
+			int numSites = oneSampleData.getNumSites();
+			for (int row = startingRowGermlineOrSomaticOrAll; row < numSites; row++) {
+				ClusteringInputOneSite oneSiteInfo = oneSampleData.getSiteAtIndex(row);						
 				ClusterType eventType = events.get(row);
 
 				// Print to output
@@ -517,9 +588,7 @@ public class Clustering {
 				}
 
 				// Add recurrence count
-				if (eventType.isLOH()) {
-					dbcByChromLOH.get(oneSiteInfo.getChrom()).incrementCount(oneSiteInfo.getPosition());					
-				}
+				eventCounts.get(eventType).get(oneSiteInfo.getChrom()).incrementCount(oneSiteInfo.getPosition());
 
 				clusterCoordinates [eventType.ordinal()].add( metaData.mAdjustedVAFTumor[row],         metaData.mAdjustedVAFNormal[row] );
 				waterfallPlotTumor [eventType.ordinal()].add( chromPosTracker.getPositionGenomeWide(), metaData.mAdjustedVAFTumor[row]);
@@ -588,15 +657,15 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	private static void calculateAdjustedVAFs(ArrayList<ClusteringInputOneSite> rows,
+	private static void calculateAdjustedVAFs(SiteList<ClusteringInputOneSite> sites,
 											  ClusteringInputOneSampleMetaData metaData,
 											  AllelicBiasTable allelicBiasTable, 											  
 											  SeqPlatform platform) {
 		
 		final float defaultVAFNormal = 0.50f;
 			
-		for (int row = 0; row < rows.size(); row++) {
-			ClusteringInputOneSite oneSiteInfo = rows.get(row);
+		for (int row = 0; row < sites.getNumSites(); row++) {
+			ClusteringInputOneSite oneSiteInfo = sites.getSiteAtIndex(row);
 			
 			Chrom chrom  = oneSiteInfo.getChrom();
 			int position = oneSiteInfo.getPosition();
@@ -647,10 +716,10 @@ public class Clustering {
 		}		
 	}
 	// ========================================================================
-	public static void getPValuesImbalance(ArrayList<ClusteringInputOneSite> rows, ClusteringInputOneSampleMetaData metaData) { 
+	public static void getPValuesImbalance(SiteList<ClusteringInputOneSite> sites, ClusteringInputOneSampleMetaData metaData) { 
 		
-		for (int row = 0; row < rows.size(); row++) {
-			ClusteringInputOneSite oneSiteInfo = rows.get(row);
+		for (int row = 0; row < sites.getNumSites(); row++) {
+			ClusteringInputOneSite oneSiteInfo = sites.getSiteAtIndex(row);
 												
 			int varCovgTumor =  (int) Math.round(oneSiteInfo.mCovgTotalTumor  * metaData.mAdjustedVAFTumor[row]);
 			int varCovgNormal = (int) Math.round(oneSiteInfo.mCovgTotalNormal * metaData.mAdjustedVAFNormal[row]);
@@ -667,7 +736,7 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	private static void smoothCopyNumbers(ArrayList<ClusteringInputOneSite> rows, ClusteringInputOneSampleMetaData metaData) {
+	private static void smoothCopyNumbers(SiteList<ClusteringInputOneSite> sites, ClusteringInputOneSampleMetaData metaData) {
 		
 		ArrayList<CopyNumberRegionRange> setOfRegions = new ArrayList<CopyNumberRegionRange>();
 		int positionDiffThreshold = 5_000_000;
@@ -682,7 +751,9 @@ public class Clustering {
 				CopyNumberRegionRange currentRegion = regionsOnChrom.next();
 				
 				if (!setOfRegions.isEmpty()) {
-					int positionDiff = rows.get(currentRegion.getRangeStart()).getPosition() - rows.get(setOfRegions.get(0).getRangeStart()).getPosition();
+					int positionDiff = sites.getSiteAtIndex(currentRegion.getRangeStart()).getPosition() - 
+							           sites.getSiteAtIndex(setOfRegions.get(0).getRangeStart()).getPosition();
+					
 					if (positionDiff > positionDiffThreshold) {
 						//System.out.println("Num Regions: " + setOfRegions.size());
 						double copyNumber = smoothCopyNumbersHelper_findAverage(setOfRegions);
@@ -721,11 +792,12 @@ public class Clustering {
 	}
 	
 	// ========================================================================
-	public static float[] calcRoughCopyNumberRatioPerSite(ArrayList<ClusteringInputOneSite> rows, ClusteringInputOneSampleMetaData metaData) {		
+	public static float[] calcRoughCopyNumberRatioPerSite(SiteList<ClusteringInputOneSite> sites, ClusteringInputOneSampleMetaData metaData) {		
 		
 		ObjectWalkerTracker<String> prevGene = new ObjectWalkerTracker<String>("", String.CASE_INSENSITIVE_ORDER);
 		int rowOfFirstInstanceOfGene = -1;
 		int positionPrev = 0;
+		int numSites = sites.getNumSites();
 		
 		float ratioSum = 0;
 		int readCountSumTumor = 0;
@@ -748,8 +820,8 @@ public class Clustering {
 		
 		Arrays.fill(metaData.mTumorCopyNumRatiosPerGene, Script.DefaultTumorNormalRatio);  // Initialize
 		
-		for (int row = 0; row < rows.size(); row++) {
-			ClusteringInputOneSite oneSiteInfo = rows.get(row);
+		for (int row = 0; row < numSites; row++) {
+			ClusteringInputOneSite oneSiteInfo = sites.getSiteAtIndex(row);
 			int positionDifference = oneSiteInfo.getPosition() - positionPrev;
 			positionPrev = oneSiteInfo.getPosition();
 
@@ -790,7 +862,7 @@ public class Clustering {
 						double readCountAverageNormal = (double) readCountSumNormal / (double) numRowsWithSameGene;
 						int indexDistTumor  = NumberUtils.getIndexOfPoissonWithHighestProbability((int) Math.round(readCountAverageTumor),  pdTumor);
 						int indexDistNormal = NumberUtils.getIndexOfPoissonWithHighestProbability((int) Math.round(readCountAverageNormal), pdNormal);
-						averageRatio = (float) (indexDistTumor + 1) / (float) (indexDistNormal + 1);
+						//averageRatio = (float) (indexDistTumor + 1) / (float) (indexDistNormal + 1);
 						
 						//averageRatio = ((ratioSum / (float) numRowsWithSameGene) / coverageRatioTumorNormalGenomeWide);
 						averageRatio = ((float) readCountSumTumor / (float) readCountSumNormal) / metaData.mCoverageRatioTumorToNormal.mFloat;								
@@ -829,14 +901,14 @@ public class Clustering {
 		
 		// Normalize to diploid
 		DescriptiveStatistics ds = new DescriptiveStatistics();
-		for (int row = 0; row < rows.size(); row++) {
+		for (int row = 0; row < numSites; row++) {
 			ds.addValue(metaData.mTumorCopyNumRatiosPerGene[row]);
 		}
 		double median = ds.getPercentile(50);
 		System.out.println("Median: " + median);
 		double diff = 1.0 - median;
 		
-		for (int row = 0; row < rows.size(); row++) {
+		for (int row = 0; row < numSites; row++) {
 			metaData.mTumorCopyNumRatiosPerGene[row] += (float) diff;
 		}
 		
@@ -862,8 +934,9 @@ public class Clustering {
 		metaData.mReadCountTalliesTumor.clear();
 		metaData.mReadCountTalliesNormal.clear();
 		
-		for (int row = 0; row < oneSampleInfo.mInfoSites.size(); row++) {
-			ClusteringInputOneSite oneSiteInfo = oneSampleInfo.mInfoSites.get(row);
+		int numSites = oneSampleInfo.getNumSites();
+		for (int row = 0; row < numSites; row++) {
+			ClusteringInputOneSite oneSiteInfo = oneSampleInfo.getSiteAtIndex(row);
 			
 			int chromIndex = oneSiteInfo.getChrom().ordinal();
 			totalReadCountPerChromNormal[chromIndex] += oneSiteInfo.mCovgTotalNormal;
@@ -940,7 +1013,7 @@ public class Clustering {
 		double[] prob = new double[pdListofLists.size()];		
 		Arrays.fill(prob, 0);
 		for (int row = indexChromStart; row <= indexChromEnd; row++) {
-			ClusteringInputOneSite oneSiteInfo = oneSampleInfo.mInfoSites.get(row);				
+			ClusteringInputOneSite oneSiteInfo = oneSampleInfo.getSiteAtIndex(row);				
 
 			// Get the relevant variant allele fraction
 			double vafTissue = (targetTissue == TissueType.Normal) ? oneSiteInfo.calcVAFNormal() : oneSiteInfo.calcVAFTumor();
@@ -1013,7 +1086,7 @@ public class Clustering {
 						
 			Arrays.fill(prob, 0);
 			for (int row = indexChromStart; row <= indexChromEnd; row++) {
-				ClusteringInputOneSite oneSiteInfo = oneSampleInfo.mInfoSites.get(row);
+				ClusteringInputOneSite oneSiteInfo = oneSampleInfo.getSiteAtIndex(row);						
 				int covgVar = oneSiteInfo.mCovgVarNormal;
 				int covgRef = oneSiteInfo.mCovgTotalNormal - covgVar;
 				
@@ -1042,7 +1115,7 @@ public class Clustering {
 	
 	// ========================================================================
 	public static ArrayList<ClusterType> getClusters_withPlane(
-			ArrayList<ClusteringInputOneSite> rows, 
+			SiteList<ClusteringInputOneSite> sites, 
 			ClusteringInputOneSampleMetaData metaData,
 			RangeDouble vafNormalRange,
 			String outFilenameFullPath, int startingRowGermlineOrSomaticOrAll, SeqPlatform platform) {
@@ -1050,11 +1123,11 @@ public class Clustering {
 		//apply DBScan to points within NAF frame
 		ArrayList<Floint> pointsUpperPlane = new ArrayList<Floint>();
 		ArrayList<Floint> pointsLowerPlane = new ArrayList<Floint>();
-		int[] indexMapToUpperLowerPlane    = new int[rows.size()];
-		IntArrayList mapToRowsFromUpper = new IntArrayList(rows.size());
-		IntArrayList mapToRowsFromLower = new IntArrayList(rows.size());
+		int[] indexMapToUpperLowerPlane    = new int      [sites.getNumSites()];
+		IntArrayList mapToRowsFromUpper = new IntArrayList(sites.getNumSites());
+		IntArrayList mapToRowsFromLower = new IntArrayList(sites.getNumSites());
 
-		getValidPointsForClustering(rows, pointsUpperPlane, pointsLowerPlane, indexMapToUpperLowerPlane, 
+		getValidPointsForClustering(sites, pointsUpperPlane, pointsLowerPlane, indexMapToUpperLowerPlane, 
 				                    mapToRowsFromUpper, mapToRowsFromLower, 
 				                    metaData,				                    
 				                    ScalingFactor, 				                     
@@ -1118,7 +1191,7 @@ public class Clustering {
 				clusterAssignmentsUpperPlane[ind] = clusterTypeIDsFromAlgorithm[ClusterType.cnLOH.ordinal()];
 			}
 			
-			ClusteringInputOneSite oneSiteInfo = rows.get(indexIntoOriginalRows);
+			ClusteringInputOneSite oneSiteInfo = sites.getSiteAtIndex(indexIntoOriginalRows);
 			Chrom chrom = oneSiteInfo.getChrom();
 			if (metaData.chromHasGermlineGain(chrom)) {
 				clusterAssignmentsUpperPlane[ind] = clusterTypeIDsFromAlgorithm[ClusterType.GainGermline.ordinal()];
@@ -1136,7 +1209,7 @@ public class Clustering {
 		
 		// Now merge the two planes into one array
 		ArrayUtils.IntArray clusterAssignmentsFinal = new ArrayUtils.IntArray(pointsLowerPlane.size() + pointsUpperPlane.size());  		
-		for (int row = 0; row < rows.size(); row++) {
+		for (int row = 0; row < sites.getNumSites(); row++) {
 			if (indexMapToUpperLowerPlane[row] != Integer.MAX_VALUE) {				
 				if (indexMapToUpperLowerPlane[row] >= 0) {
 					int trueIndex = indexMapToUpperLowerPlane[row];
@@ -1149,12 +1222,12 @@ public class Clustering {
 		}
 		
 
-		return Clustering.assignClusters(rows, platform, vafNormalRange, clusterAssignmentsFinal.mArray, clusterTypeIDsFromAlgorithm);
+		return Clustering.assignClusters(sites, platform, vafNormalRange, clusterAssignmentsFinal.mArray, clusterTypeIDsFromAlgorithm);
 	}
 
 	// ========================================================================
 	// Convenience private function to break up caller function
-	private static ArrayList<ClusterType> assignClusters(ArrayList<ClusteringInputOneSite> rows, 
+	private static ArrayList<ClusterType> assignClusters(SiteList<ClusteringInputOneSite> sites, 
 			SeqPlatform platform,
 			//int startingRowSomatic,												
 			RangeDouble vafNormalRange,
@@ -1162,11 +1235,11 @@ public class Clustering {
 			int[] clusterTypeIDsFromAlgorithm) {
 
 		int indexInClusterAssignments = -1;  // we need to keep a special index, since not all rows are used.
-		ArrayList<ClusterType> returnEvents = ArrayUtils.addToCollection(new ArrayList<ClusterType>(rows.size()), ClusterType.Null, rows.size(), true);		
+		ArrayList<ClusterType> returnEvents = ArrayUtils.addToCollection(new ArrayList<ClusterType>(sites.getNumSites()), ClusterType.Null, sites.getNumSites(), true);		
 
-		for (int row = 0; row < rows.size(); row++) {
+		for (int row = 0; row < sites.getNumSites(); row++) {
 
-			ClusteringInputOneSite oneSiteInfo = rows.get(row);
+			ClusteringInputOneSite oneSiteInfo = sites.getSiteAtIndex(row);
 			float vafNormal = oneSiteInfo.calcVAFNormal();
 			boolean vafInRangeNormal = vafNormalRange.inRangeLowerExclusive(vafNormal); 					
 			ClusterType eventAtSite = null;
@@ -1256,7 +1329,7 @@ public class Clustering {
 	}
 
 	// ========================================================================	
-	private static void getValidPointsForClustering(ArrayList<ClusteringInputOneSite> rows, // input
+	private static void getValidPointsForClustering(SiteList<ClusteringInputOneSite> sites, // input
 													ArrayList<Floint> pointsUpperPlane,    // output
 													ArrayList<Floint> pointsLowerPlane,    // output
 													int[] indexMapToUpperLowerPlane,       // output - if positive, to upper plane, if negative, to lower plane, if does not map, contains Integer.MAX_VALUE													
@@ -1273,15 +1346,17 @@ public class Clustering {
 //				 PValueBinDistAlpha_UpperPlaneThresh :
 //				(PValueBinDistAlpha_UpperPlaneThresh * 0.008 /* Light FDR */);
 				
-		for (int row = 0; row < rows.size(); row++) {
-			ClusteringInputOneSite oneSiteInfo = rows.get(row);			
+		for (int row = 0; row < sites.getNumSites(); row++) {
+			ClusteringInputOneSite oneSiteInfo = sites.getSiteAtIndex(row);			
 			
 			float vafNormal = oneSiteInfo.calcVAFNormal();
 			if (vafNormalRange.inRangeLowerExclusive(vafNormal)) {				
 				Floint thePoint = new Floint(metaData.mAdjustedVAFTumor[row], metaData.mAdjustedVAFNormal[row], (float) (metaData.mImbalancePValuesTumor[row] * scalingFactor));
 				
 				// Assume p-value as vertical row factor
-				boolean tumorSigImbalanced = (metaData.mImbalancePValuesTumor[row] <= metaData.mFDRTumor);
+				//boolean tumorSigImbalanced = (metaData.mImbalancePValuesTumor[row] <= metaData.mFDRTumor);
+				// TODO
+				boolean tumorSigImbalanced = (metaData.mImbalancePValuesTumor[row] <= metaData.mSigPValuesPerSite[row]);
 				Chrom chrom = oneSiteInfo.getChrom();
 				boolean normalSigImbalanced = /* (imbalancePValuesNormal[row] <= fdrNormal) && */ (metaData.chromHasGermlineGain(chrom));
 				

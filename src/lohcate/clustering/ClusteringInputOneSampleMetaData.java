@@ -20,7 +20,8 @@ public class ClusteringInputOneSampleMetaData {
 	float[]  mAdjustedVAFNormal;
 	float[]  mAdjustedVAFTumor;
 	double[] mImbalancePValuesTumor;
-	double[] mImbalancePValuesNormal;		
+	double[] mImbalancePValuesNormal;
+	double[] mSigPValuesPerSite;
 	
 	PrimitiveWrapper.WFloat mCoverageRatioTumorToNormal;
 	DynamicBucketCounter mReadCountTalliesTumor;
@@ -46,6 +47,7 @@ public class ClusteringInputOneSampleMetaData {
 		mImbalancePValuesNormal   = new double[numSites];
 		mTumorCopyNumRatiosPerGene = new float[numSites];
 		mIsSomaticSite             = new boolean[numSites];
+		mSigPValuesPerSite        = new double[numSites];
 		
 		mCoverageRatioTumorToNormal = new PrimitiveWrapper.WFloat(0);
 		mReadCountTalliesTumor  = new DynamicBucketCounter();

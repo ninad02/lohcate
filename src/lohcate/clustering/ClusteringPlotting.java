@@ -73,7 +73,7 @@ public class ClusteringPlotting {
 
 	// ========================================================================
 	/** Plots the event recurrence genome-wide. */
-	public static void plotRecurrenceGenomeWide(EnumMapSafe<Chrom, DynamicBucketCounter> dbcCountByEvent, String outDir, ClusterType clusterType) {
+	public static void plotRecurrenceGenomeWideByEvent(EnumMapSafe<Chrom, DynamicBucketCounter> eventCount, String outDir, ClusterType eventType) {
 		DoubleArrayList positionsGenomeWideAllSamples = new DoubleArrayList();
 		DoubleArrayList lohCountAllSamples            = new DoubleArrayList();
 		double lastPositionOnPrevChrom = 0;
@@ -84,7 +84,7 @@ public class ClusteringPlotting {
 		
 		for (Chrom chrom : Chrom.values()) {
 			if (chrom.isAutosomal()) {
-				DoubleArrayList[] positionAndCount = dbcCountByEvent.get(chrom).toArrayListDouble();
+				DoubleArrayList[] positionAndCount = eventCount.get(chrom).toArrayListDouble();
 				for (int i = 0; i < positionAndCount[0].size(); i++) {
 					positionAndCount[0].set(i, positionAndCount[0].get(i) + lastPositionOnPrevChrom);
 				}
@@ -92,10 +92,10 @@ public class ClusteringPlotting {
 				positionsGenomeWideAllSamples.addAll(positionAndCount[0]);
 				lohCountAllSamples.addAll           (positionAndCount[1]);
 				
-				boolean lastKeyExists = dbcCountByEvent.get(chrom).getKeyLast(lastKey);
+				boolean lastKeyExists = eventCount.get(chrom).getKeyLast(lastKey);
 				lastPositionOnPrevChrom += (lastKeyExists) ? lastKey.mInt : 30000000;
 				
-				int maxValue = dbcCountByEvent.get(chrom).getCountMax();
+				int maxValue = eventCount.get(chrom).getCountMax();
 				maxValue = Math.max(maxValue, 1);
 				
 				double increment = (maxValue) / 50.0;
@@ -105,10 +105,17 @@ public class ClusteringPlotting {
 				}
 			}
 		}
-		DefaultXYDataset posAndLOHCountDataset = new DefaultXYDataset();
-		posAndLOHCountDataset.addSeries(ClusterType.LOH.name(), ArrayUtils.combineTwoDynamicArraysIntoOneStatic(positionsGenomeWideAllSamples, lohCountAllSamples));
-		posAndLOHCountDataset.addSeries("Boundary",             ArrayUtils.combineTwoDynamicArraysIntoOneStatic(chromBoundaryXValue, chromBoundaryYValue));
-		ClusteringPlotting.plotEventSampleRecurrence(posAndLOHCountDataset, outDir + File.separator + "All_Samples." + clusterType.name());
+		DefaultXYDataset posAndEventCountDataset = new DefaultXYDataset();
+		posAndEventCountDataset.addSeries(eventType.name(), ArrayUtils.combineTwoDynamicArraysIntoOneStatic(positionsGenomeWideAllSamples, lohCountAllSamples));
+		posAndEventCountDataset.addSeries("Boundary",       ArrayUtils.combineTwoDynamicArraysIntoOneStatic(chromBoundaryXValue, chromBoundaryYValue));
+		ClusteringPlotting.plotEventSampleRecurrence(posAndEventCountDataset, outDir + File.separator + "All_Samples." + eventType.name());
+	}
+	
+	// ========================================================================
+	public static void plotRecurrenceGenomeWide(EnumMapSafe<ClusterType, EnumMapSafe<Chrom, DynamicBucketCounter>> eventCounts, String outDir) {
+		for (ClusterType event : ClusterType.values()) {
+			plotRecurrenceGenomeWideByEvent(eventCounts.get(event), outDir, event);
+		}
 	}
 
 	// ========================================================================

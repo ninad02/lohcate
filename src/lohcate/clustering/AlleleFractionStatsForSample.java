@@ -1,5 +1,7 @@
 package lohcate.clustering;
 
+import genomeUtils.SiteList;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -37,8 +39,8 @@ public class AlleleFractionStatsForSample {
 		Arrays.fill(mBinCount, 0);			
 	}
 	
-	public void tabulateAndPerformStatistics(ArrayList<ClusteringInputOneSite> rows, SeqPlatform platform) {			
-		tallyVariantAlleleFractionsIntoBins(rows, platform, true);
+	public void tabulateAndPerformStatistics(SiteList<ClusteringInputOneSite> sites, SeqPlatform platform) {			
+		tallyVariantAlleleFractionsIntoBins(sites, platform, true);
 		calculateSummaryStatistics();
 	}
 	
@@ -50,14 +52,14 @@ public class AlleleFractionStatsForSample {
 		}
 	}
 	
-	private void tallyVariantAlleleFractionsIntoBins(ArrayList<ClusteringInputOneSite> rows, SeqPlatform platform, boolean clearBinCountBins) {
+	private void tallyVariantAlleleFractionsIntoBins(SiteList<ClusteringInputOneSite> sites, SeqPlatform platform, boolean clearBinCountBins) {
 		if (clearBinCountBins) {
 			Arrays.fill(mBinCount, 0);
 		}
 		
 		// First, tally the variant allele frequencies into bins
-		for (int row = 0; row < rows.size(); row++) {
-			float vafNormal = rows.get(row).calcVAFNormal(); 
+		for (int row = 0; row < sites.getNumSites(); row++) {
+			float vafNormal = sites.getSiteAtIndex(row).calcVAFNormal(); 
 			if (RangeDouble.inRangeLowerExclusive(vafNormal, VAFNormalFrameLower, VAFNormalFrameUpper)) {
 				int binNumber = (int) ((vafNormal - VAFNormalFrameLower) / BinSize);
 				mBinCount[binNumber]++;

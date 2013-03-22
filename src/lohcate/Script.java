@@ -286,9 +286,9 @@ public class Script {
 	
 	// ========================================================================
 	/** Plots a genome wide recurrence plot. */
-	public static void plotRecurrence(CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType, String outDir, ClusterType clusterType) {
+	public static void plotRecurrence(CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType, String outDir, ClusterType eventType) {
 		
-		EnumMapSafe<Chrom, DynamicBucketCounter> dbcByChrom = DynamicBucketCounter.ClassFactory.newEnumMap(Chrom.class);
+		EnumMapSafe<Chrom, DynamicBucketCounter> eventCount = DynamicBucketCounter.ClassFactory.newEnumMap(Chrom.class);
 		
 		float maxRecurrenceScore = -1.0f;
 		for (Chrom chrom : Chrom.values()) {
@@ -296,7 +296,7 @@ public class Script {
 			if (cnrrOnChrom.isEmpty()) continue;
 			
 			for (CopyNumberRegionRange cnrr : cnrrOnChrom) {
-				DynamicBucketCounter dbc = dbcByChrom.get(chrom);				
+				DynamicBucketCounter dbc = eventCount.get(chrom);				
 				
 				int range = cnrr.getRangeLength();
 				int rangeIncr = Math.max(range / 20, 1);
@@ -306,7 +306,7 @@ public class Script {
 			}
 		}
 		
-		ClusteringPlotting.plotRecurrenceGenomeWide(dbcByChrom, outDir, clusterType);
+		ClusteringPlotting.plotRecurrenceGenomeWideByEvent(eventCount, outDir, eventType);
 	}
 	
 	// ========================================================================
