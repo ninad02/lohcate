@@ -7,7 +7,7 @@ import java.util.Comparator;
 import nutils.ArrayUtils;
 import nutils.collectionsSorted.ArrayListSortedComparable;
 
-public class SiteList<E extends Comparable<E> & SiteInformation.Writeable> {
+public abstract class SiteList<E extends Comparable<E> & SiteInformation.Writeable> {
 	
 	// ========================================================================
 	protected ArrayListSortedComparable<E> mInfoSites;

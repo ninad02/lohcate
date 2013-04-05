@@ -10,8 +10,29 @@ public class BucketCounterEnum<E extends Enum<E>> extends BucketCounterCore {
 	
 	// ========================================================================
 	public BucketCounterEnum(Class<E> theClass) {		
-		super(theClass.getEnumConstants().length, 0);		
+		super(theClass.getEnumConstants().length, 0);
 	}
+	
+	// ========================================================================
+	public BucketCounterEnum(Class<E> theClass, int initialCountForEachBucket) {
+		this(theClass);
+		
+		E[] enumConstants = theClass.getEnumConstants();
+		for (E enumConstant : enumConstants) {
+			increment(enumConstant, initialCountForEachBucket);
+		}
+	}
+	
+	// ========================================================================
+	public BucketCounterEnum(Class<E> theClass, int[] countsForEnums) {
+		this(theClass);
+
+		E[] enumConstants = theClass.getEnumConstants();
+		int index = -1;
+		for (E enumConstant : enumConstants) {
+			increment(enumConstant, countsForEnums[++index]);
+		}
+	}	
 		
 	// ========================================================================
 	public BucketCounterEnum(BucketCounterEnum<E> rhs) {
@@ -45,7 +66,7 @@ public class BucketCounterEnum<E extends Enum<E>> extends BucketCounterCore {
 	
 	// ========================================================================
 	private static void TestRobust() {
-		BucketCounterEnum<Alphabet> alphabetCounter  = new BucketCounterEnum<Alphabet>(Alphabet.class);
+		BucketCounterEnum<Alphabet> alphabetCounter  = new BucketCounterEnum<Alphabet>(Alphabet.class, 5);
 		BucketCounterEnum<Alphabet> alphabetCounter2 = new BucketCounterEnum<Alphabet>(Alphabet.class);
 		
 		for (Alphabet letter : Alphabet.values()) {

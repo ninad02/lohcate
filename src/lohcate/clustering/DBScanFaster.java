@@ -37,8 +37,8 @@ public class DBScanFaster extends DBSCAN2 {
 		mBlocks = new Block[numBlocksAlongXAxis][numBlocksAlongYAxis];
 		
 		for (DBScanPoint point : mPoints) {
-			int blockIndexX = getBlockIndexAlongXAxis(point.mFloint.mX);
-			int blockIndexY = getBlockIndexAlongYAxis(point.mFloint.mY);
+			int blockIndexX = getBlockIndexAlongXAxis(point.mFloint.getX());
+			int blockIndexY = getBlockIndexAlongYAxis(point.mFloint.getY());
 			if (mBlocks[blockIndexX][blockIndexY] == null) {
 				mBlocks[blockIndexX][blockIndexY] = new Block(getBlockValueX(blockIndexX), getBlockValueY(blockIndexY), mEpsilonDivided);
 			}
@@ -79,20 +79,20 @@ public class DBScanFaster extends DBSCAN2 {
 			neighbors.clear(); 
 		}
 
-		int blockIndexX = getBlockIndexAlongXAxis(point.mFloint.mX);
-		int blockIndexY = getBlockIndexAlongYAxis(point.mFloint.mY);
+		float pointX = point.mFloint.getX();  // cache values for efficiency
+		float pointY = point.mFloint.getY();  
+
+		int blockIndexX = getBlockIndexAlongXAxis(pointX);
+		int blockIndexY = getBlockIndexAlongYAxis(pointY);
 		
 		int maxNumAdditionalBlocksThatCouldBeWithinRnage = DBScanFaster.EpsilonDivider;
 		int blockIndexMinX = Math.max(0, blockIndexX - maxNumAdditionalBlocksThatCouldBeWithinRnage);
 		int blockIndexMinY = Math.max(0, blockIndexY - maxNumAdditionalBlocksThatCouldBeWithinRnage);
 		
 		int blockIndexMaxX = Math.min(mBlocks.length    - 1, blockIndexX + maxNumAdditionalBlocksThatCouldBeWithinRnage);
-		int blockIndexMaxY = Math.min(mBlocks[0].length - 1, blockIndexY + maxNumAdditionalBlocksThatCouldBeWithinRnage);
+		int blockIndexMaxY = Math.min(mBlocks[0].length - 1, blockIndexY + maxNumAdditionalBlocksThatCouldBeWithinRnage);		
 		
-		float pointX = point.mFloint.mX;  // cache values for efficiency
-		float pointY = point.mFloint.mY;  
-		
-		int allCorners = 4;
+		final int allCorners = 4;
 		for (int xIndex = blockIndexMinX; xIndex <= blockIndexMaxX; xIndex++) {
 			for (int yIndex = blockIndexMinY; yIndex <= blockIndexMaxY; yIndex++) {
 				Block theBlock = mBlocks[xIndex][yIndex];
@@ -138,8 +138,8 @@ public class DBScanFaster extends DBSCAN2 {
 		
 		double minDistanceToCenterPoint = Double.MAX_VALUE;
 		for (DBScanPoint thePoint : mPoints) {
-			if (!Clustering.Doing3D || Math.abs(thePoint.mFloint.mZ - 0.51 * Clustering.ScalingFactor) <= 0.05) { 
-				double distanceToCenterPoint = Block.getCartesianDistanceSquared(centralX, centralY, thePoint.mFloint.mX, thePoint.mFloint.mY);
+			if (!Clustering.Doing3D || Math.abs(thePoint.mFloint.getZ() - 0.51 * Clustering.ScalingFactor) <= 0.05) { 
+				double distanceToCenterPoint = Block.getCartesianDistanceSquared(centralX, centralY, thePoint.mFloint.getX(), thePoint.mFloint.getY());
 				if (distanceToCenterPoint < minDistanceToCenterPoint) {
 					minDistanceToCenterPoint = distanceToCenterPoint;
 					centralClusterID = thePoint.mClusterAssigned;
@@ -161,8 +161,8 @@ public class DBScanFaster extends DBSCAN2 {
 		// Find the centroid of the points in the cluster
 		for (DBScanPoint point : mPoints) {
 			if (clusterID == point.mClusterAssigned) {
-				totalX += point.mFloint.mX;
-				totalY += point.mFloint.mY;
+				totalX += point.mFloint.getX();
+				totalY += point.mFloint.getY();
 				numClusterPoints++;
 			}
 		}
@@ -175,8 +175,8 @@ public class DBScanFaster extends DBSCAN2 {
 		
 		for (DBScanPoint point : mPoints) {
 			if (clusterID == point.mClusterAssigned) {
-				float diffX = Math.abs(point.mFloint.mX - centerX);
-				float diffY = Math.abs(point.mFloint.mY - centerY);
+				float diffX = Math.abs(point.mFloint.getX() - centerX);
+				float diffY = Math.abs(point.mFloint.getY() - centerY);
 				maxDiffX = Math.max(diffX, maxDiffX);
 				maxDiffY = Math.max(diffY, maxDiffY);
 			}
@@ -189,7 +189,7 @@ public class DBScanFaster extends DBSCAN2 {
 		for (DBScanPoint point : mPoints) {
 			++index;
 			if (clusterID == point.mClusterAssigned) {
-				float distanceSquared = Block.getCartesianDistanceSquared(centerX, centerY, point.mFloint.mX, point.mFloint.mY);
+				float distanceSquared = Block.getCartesianDistanceSquared(centerX, centerY, point.mFloint.getX(), point.mFloint.getY());
 				pointsWithinRadius[index] = (distanceSquared <= minRadiusSquared) ? Boolean.TRUE : Boolean.FALSE;
 			} else {
 				pointsWithinRadius[index] = null;

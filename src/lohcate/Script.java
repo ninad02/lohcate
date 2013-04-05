@@ -51,7 +51,7 @@ import lohcateEnums.SeqPlatform;
  * 
  * This runner class is the big enchilada. See main method for 'switchboard' / pipeline overview.
  * 
- * @author Siddharth G. Reddy, Ninad Dewal
+ * @author Ninad Dewal, Siddharth G. Reddy
  *
  */
 public class Script {
@@ -1325,10 +1325,10 @@ public class Script {
 	 * @param inDir curated SNP calls
 	 */
 	public static void getGeneEnrichment(String inDir, String outDir) {
-		String outFilename = outDir + File.separator + "geneEnrichment." + StringUtils.FileExtensionTSV.mExtension;
+		String outFilename = outDir + File.separator + "geneEnrichment" + StringUtils.FileExtensionTSV.mExtension;
 		IOUtils.createDirectoryPath(outDir, false);
 		File[] files = (new File(inDir)).listFiles();
-		StringUtils.FileExtensionAndDelimiter fileExtDelim = StringUtils.FileExtensionTSV; 
+		StringUtils.FileExtensionAndDelimiter fileExtDelim = StringUtils.FileTextTabDelim; 
 				
 		StringBuilder sb = new StringBuilder(4096);
 		BucketCounterEnum<ClusterType> clusterTypeCountsGene = new BucketCounterEnum<ClusterType>(ClusterType.class);

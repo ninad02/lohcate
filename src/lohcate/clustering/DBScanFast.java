@@ -25,12 +25,12 @@ public class DBScanFast extends DBSCAN2 {
 		mPointsSortedX.addAll(mPoints);
 		mPointsSortedY.addAll(mPoints);
 		
-		Collections.sort(mPointsSortedX, DBScanPoint.DBScanPointCompareXObj);
-		Collections.sort(mPointsSortedY, DBScanPoint.DBScanPointCompareYObj);		
+		Collections.sort(mPointsSortedX, DBScanPoint.DBScanPointCompareXY);
+		Collections.sort(mPointsSortedY, DBScanPoint.DBScanPointCompareYX);		
 		
 		System.out.println("\tAssignStart: " + (new Date()).toString());
-		assignIndexToPoints(true,  mPointsSortedX, DBScanPoint.DBScanPointCompareXObj);
-		assignIndexToPoints(false, mPointsSortedY, DBScanPoint.DBScanPointCompareYObj);
+		assignIndexToPoints(true,  mPointsSortedX, DBScanPoint.DBScanPointCompareXY);
+		assignIndexToPoints(false, mPointsSortedY, DBScanPoint.DBScanPointCompareYX);
 		System.out.println("\tAssignEnd: " + (new Date()).toString());
 	}
 	
@@ -93,8 +93,8 @@ public class DBScanFast extends DBSCAN2 {
 			neighbors.clear(); 
 		}
 		
-		getNeighborsHelper(point, neighbors, mPointsSortedX, DBScanPoint.DBScanPointCompareXObj, DBScanPoint.DBScanPointDistanceXObj, true);
-		getNeighborsHelper(point, neighbors, mPointsSortedY, DBScanPoint.DBScanPointCompareYObj, DBScanPoint.DBScanPointDistanceYObj, false);
+		getNeighborsHelper(point, neighbors, mPointsSortedX, DBScanPoint.DBScanPointCompareXY, DBScanPoint.DBScanPointDistanceX, true);
+		getNeighborsHelper(point, neighbors, mPointsSortedY, DBScanPoint.DBScanPointCompareYX, DBScanPoint.DBScanPointDistanceY, false);
 		return neighbors;
 	}
 	

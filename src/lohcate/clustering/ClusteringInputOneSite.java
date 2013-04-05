@@ -15,7 +15,6 @@ import nutils.CompareUtils;
 import nutils.NumberUtils;
 import nutils.StringUtils;
 import nutils.BitSetUtils.BitShiftAndMask;
-import nutils.StringUtils.FileExtensionAndDelimiter;
 import shared.Utils;
 
 public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite>, SiteInformation.Writeable {
@@ -261,4 +260,34 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 			CompareUtils.ensureTrue(position == oneSiteInfo.getPosition(), "Position not equal!");
 		}
 	}
+
+	
+	// ====================================================================
+	// ====================================================================		
+	// INTERFACE IMPLEMENTATIONS: Floint
+	// ====================================================================
+	// ====================================================================
+	/*
+	@Override
+	public float getX() { return calcVAFTumor(); }
+
+	// ====================================================================
+	@Override
+	public float getY() { return calcVAFNormal(); }
+
+	@Override
+	public float getZ() { return 0; }
+
+	@Override
+	public double getCartesianDistanceSquared(Floint rhs) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public double getCartesianDistance(Floint rhs) { return Math.sqrt(getCartesianDistanceSquared(rhs)); }
+
+	@Override
+	public double getTheoreticalFurthestDifferenceXOrYWithinDistance(double distance) { return distance; }
+	*/
 }

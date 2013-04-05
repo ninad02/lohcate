@@ -2,7 +2,6 @@ package lohcate.clustering;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.ListIterator;
 
 /**
@@ -206,95 +205,5 @@ public class DBSCAN2 {
 
 		//System.out.println("partition " + rtn + " :: " + counts.get(rtn) + " of " + points.length);
 		return indexOfMaxCount;
-	}
-	
-	// ========================================================================
-	// INNER CLASS: DBScanPoint
-	// ========================================================================
-	/** This class contains meta information for each point in DBScan in order
-	 *  to decrease run-time for the DBScan algorithm.
-	 */
-	protected static class DBScanPoint implements Comparable<DBScanPoint> {
-		
-		private boolean mVisited;
-		public boolean mAdded;
-		public int mClusterAssigned;
-		
-		public int mIndexSortedX;
-		public int mIndexSortedY;		
-		
-		protected Floint mFloint; 
-		
-		protected DBScanPoint(Floint floint) {
-			mFloint = floint;
-			reset();
-		}
-		
-		public boolean getVisited() { return mVisited; }
-		public void    setVisited() { mVisited = true; }	
-		public void  resetVisited() { mVisited = false; }
-		
-		public void reset() {
-			resetForClustering();
-			mIndexSortedX = mIndexSortedY = -1;
-		}
-		
-		public void resetForClustering() {
-			resetVisited();
-			mClusterAssigned = DBSCAN2.ClusterIDOfNoise;
-			mAdded = false;
-		}
-		
-		public double getCartesianDistance(DBScanPoint rhs) {
-			return mFloint.getCartesianDistance(rhs.mFloint);
-		}
-		
-		public double getCartesianDistanceSquared(DBScanPoint rhs) {
-			return mFloint.getCartesianDistanceSquared(rhs.mFloint);
-		}
-		
-		/** Default sorting by x-coordinate */
-		public int compareTo(DBScanPoint rhs) {
-			return mFloint.compareTo(rhs.mFloint);
-		}
-
-		// ========================================================================
-		// Global Comparator object for public use	
-		public static final DBScanPointCompareX  DBScanPointCompareXObj  = new DBScanPointCompareX();
-		public static final DBScanPointCompareY  DBScanPointCompareYObj  = new DBScanPointCompareY();
-		
-		public static final DBScanPointDistanceX DBScanPointDistanceXObj = new DBScanPointDistanceX();
-		public static final DBScanPointDistanceY DBScanPointDistanceYObj = new DBScanPointDistanceY();
-		
-		// ====================================================================
-		/** Comparator. */
-		public static class DBScanPointCompareX implements Comparator<DBScanPoint> {
-			public int compare(DBScanPoint p1, DBScanPoint p2) {
-				return Floint.FlointCompareXObj.compare(p1.mFloint, p2.mFloint);
-			}
-		}
-		
-		public static class DBScanPointCompareY implements Comparator<DBScanPoint> {
-			public int compare(DBScanPoint p1, DBScanPoint p2) {
-				return Floint.FlointCompareYObj.compare(p1.mFloint, p2.mFloint);
-			}
-		}
-		
-		// ====================================================================
-		public static abstract class DBScanPointDistance {
-			public abstract double distance(DBScanPoint n1, DBScanPoint n2); 
-		}
-		
-		public static class DBScanPointDistanceX extends DBScanPointDistance {
-			public double distance(DBScanPoint n1, DBScanPoint n2) { 
-				return Floint.FlointDistanceXObj.distance(n1.mFloint, n2.mFloint); 
-			} 
-		}
-		
-		public static class DBScanPointDistanceY extends DBScanPointDistance {
-			public double distance(DBScanPoint n1, DBScanPoint n2) { 
-				return Floint.FlointDistanceYObj.distance(n1.mFloint, n2.mFloint); 
-			}
-		}		
 	}
 }

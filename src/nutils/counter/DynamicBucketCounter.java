@@ -5,6 +5,7 @@ import nutils.BitSetUtils;
 import nutils.PrimitiveWrapper;
 import nutils.NullaryClassFactory;
 
+import com.carrotsearch.hppc.FloatArrayList;
 import com.carrotsearch.hppc.DoubleArrayList;
 import com.carrotsearch.hppc.IntArrayList;
 import com.carrotsearch.hppc.LongArrayList;
@@ -16,19 +17,25 @@ public class DynamicBucketCounter {
 	
 	LongArrayList mArray;
 	private int mSumOfCounts;
-	private int mTotalSum;
+	private int mWeightedTotalSum;
 	private int mIndexOfMaxCount;
 	
+	// ========================================================================
 	public DynamicBucketCounter() {
-		mArray = new LongArrayList();
-		clear();
+		this(10);
+	}
+	
+	// ========================================================================
+	public DynamicBucketCounter(int initialCapacity) {
+		mArray = new LongArrayList(initialCapacity);
+		clear();		
 	}
 	
 	// ========================================================================
 	public void clear() { 
 		mArray.clear();
 		mSumOfCounts = 0; 	
-		mTotalSum = 0;
+		mWeightedTotalSum = 0;
 		mIndexOfMaxCount = -1;
 	}
 	
@@ -37,6 +44,18 @@ public class DynamicBucketCounter {
 		int indexOfKey = getIndexOfKey(key);
 		if (indexOfKey < 0) return indexOfKey;
 		return getCountAtIndex(indexOfKey);			
+	}
+	
+	// ========================================================================
+	public void getCounts(IntArrayList countsBuffer) {
+		countsBuffer.clear();
+		
+		int numKeys = getNumKeys();
+		countsBuffer.ensureCapacity(numKeys);
+		
+		for (int i = 0; i < numKeys; i++) {
+			countsBuffer.add(getCountAtIndex(i));
+		}
 	}
 	
 	// ========================================================================
@@ -67,11 +86,15 @@ public class DynamicBucketCounter {
 	}
 	
 	// ========================================================================
+	public int getNumKeys() { return mArray.size(); }
+	
+	// ========================================================================
 	public int incrementCount(int key) { return incrementCount(key, 1); }
 	
 	// ========================================================================
 	public int incrementCount(int key, int numToIncrement) {
 		mSumOfCounts += numToIncrement;
+		mWeightedTotalSum += (key * numToIncrement);
 		
 		int indexOfKey = getIndexOfKey(key);
 		if (indexOfKey < 0) {
@@ -109,6 +132,66 @@ public class DynamicBucketCounter {
 	public long getKeyValueWithMaxCount() {
 		return ArrayUtils.searchMaxValue(mArray, BitSetUtils.IntExtractorLSB);
 	}
+
+	// ========================================================================
+	public void getProportions(FloatArrayList proportionsBuffer) {
+		proportionsBuffer.clear();
+		
+		int numKeys = getNumKeys();
+		proportionsBuffer.ensureCapacity(numKeys);
+		for (int i = 0; i < numKeys; i++) {
+			float fraction = (float) getCountAtIndex(i) / (float) mSumOfCounts;
+			proportionsBuffer.add(fraction);
+		}
+	}
+	
+	// ========================================================================
+	public void getProportionsCumulativeForward(FloatArrayList proportionsBuffer) {
+		getProportions(proportionsBuffer);
+		
+		// Return early if empty list		
+		int numKeys = getNumKeys();
+		if (numKeys == 0) return;
+		
+		for (int i = 1; i < numKeys; i++) {
+			proportionsBuffer.set(i, proportionsBuffer.get(i) + proportionsBuffer.get(i - 1));			
+		}		
+	}
+	
+	// ========================================================================
+	public void getCumulativeSumsForward(IntArrayList cumulativeCountsBuffer) {		
+		cumulativeCountsBuffer.clear();		
+		
+		// Return early if empty list		
+		int numKeys = getNumKeys();
+		if (numKeys == 0) return;
+		cumulativeCountsBuffer.ensureCapacity(numKeys);
+		
+		// First initialize first element
+		cumulativeCountsBuffer.add(getCountAtIndex(0));
+		
+		for (int i = 1; i < numKeys; i++) {
+			cumulativeCountsBuffer.add(cumulativeCountsBuffer.get(i - 1) + getCountAtIndex(i));			
+		}
+	}
+	
+	// ========================================================================
+	public void getCumulativeSumsBackward(IntArrayList cumulativeCountsBuffer) {
+		cumulativeCountsBuffer.clear();		
+		
+		// Return early if empty list		
+		int numKeys = getNumKeys();
+		if (numKeys == 0) return;
+		cumulativeCountsBuffer.ensureCapacity(numKeys);
+		
+		// Initialize
+		getCounts(cumulativeCountsBuffer);
+		
+		// Now go through and add
+		for (int i = numKeys - 2; i >= 0; i--) {
+			cumulativeCountsBuffer.set(i, cumulativeCountsBuffer.get(i) + cumulativeCountsBuffer.get(i + 1));			 
+		 }
+	}
 	
 	// ========================================================================
 	public static void TestDynamicBucketCounter() {
@@ -117,7 +200,7 @@ public class DynamicBucketCounter {
 		
 		for (int i = 1; i <= numVals; i++) {				
 			for (int j = 0; j < i; j++) {
-				dbc.incrementCount(i);
+				dbc.incrementCount(i * 2);
 			}
 		}
 		
@@ -125,7 +208,22 @@ public class DynamicBucketCounter {
 			System.out.printf("%d\t%d\n", i, dbc.getCount(i));
 		}
 		
+		IntArrayList cumulativeForward = new IntArrayList();
+		IntArrayList cumulativeBackward = new IntArrayList();
+		FloatArrayList proportionsBuffer =  new FloatArrayList();
+		FloatArrayList proportionsBufferCumulativeForward =  new FloatArrayList();
+		dbc.getCumulativeSumsForward(cumulativeForward);
+		dbc.getCumulativeSumsBackward(cumulativeBackward);
+		dbc.getProportions(proportionsBuffer);
+		dbc.getProportionsCumulativeForward(proportionsBufferCumulativeForward);
+		
+		for (int i = 0; i < dbc.getNumKeys(); i++) {
+			System.out.printf("%d\t%d\t%d\t%d\t%d\t%g\t%g\n", i, dbc.getKeyAtIndex(i), dbc.getCountAtIndex(i), cumulativeForward.get(i), cumulativeBackward.get(i), proportionsBuffer.get(i), proportionsBufferCumulativeForward.get(i));
+		}
+		
 		System.out.println("Key with max count: " + dbc.getKeyWithMaxCount());
+		System.out.println("Sum of counts: " + dbc.mSumOfCounts);
+		System.out.println("Total counts: " + dbc.mWeightedTotalSum);
 	}
 
 	// ========================================================================
@@ -152,6 +250,11 @@ public class DynamicBucketCounter {
 			rV[1].add(getCountAtIndex(i));
 		}
 		return rV;
+	}
+	
+	// ========================================================================
+	public static void main(String[] args) {
+		TestDynamicBucketCounter();
 	}
 	
 }

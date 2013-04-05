@@ -14,7 +14,7 @@ import java.util.ArrayList;
  */
 public class DBSCAN {
 	
-	protected ArrayList<DBSCAN2.DBScanPoint> mPoints; //data points
+	protected ArrayList<DBScanPoint> mPoints; //data points
 	protected float mEps; //neighborhood parameter
 	protected int mMinPts; //neighborhood density parameter
 	
@@ -31,9 +31,9 @@ public class DBSCAN {
 	 */
 	public void cluster() {
 		mClusterIndex = 0; // start at default
-		ArrayList<DBSCAN2.DBScanPoint> neighbors;
+		ArrayList<DBScanPoint> neighbors;
 		
-		for (DBSCAN2.DBScanPoint thePoint : mPoints) {				
+		for (DBScanPoint thePoint : mPoints) {				
 			if (!thePoint.getVisited()) { 
 				//System.out.println(i + " of " + points.length);
 				thePoint.setVisited();
@@ -48,16 +48,16 @@ public class DBSCAN {
 		}
 	}
 	
-	private void expandCluster(DBSCAN2.DBScanPoint point, ArrayList<DBSCAN2.DBScanPoint> neighbors, int c) {
+	private void expandCluster(DBScanPoint point, ArrayList<DBScanPoint> neighbors, int c) {
 		point.mClusterAssigned = c;   // assign our 'core' point to cluster c
 		
-		ArrayList<DBSCAN2.DBScanPoint> neighborsOfNeighbors;		
+		ArrayList<DBScanPoint> neighborsOfNeighbors;		
 		//int count = 0;
 		
 		// We perform a loop on the neighbors list, which can grow 
 		// in size during the body of the loop. 
 		for (int i = 0; i < neighbors.size(); i++) { //iterate through neighbors (later becomes neighbors' neighbors', neighbors' neighbors' neighbors', &c.) of core point
-			DBSCAN2.DBScanPoint theNeighbor = neighbors.get(i);
+			DBScanPoint theNeighbor = neighbors.get(i);
 			
 			if (!theNeighbor.getVisited()) {
 				//count++;
@@ -79,11 +79,11 @@ public class DBSCAN {
 	}
 	
 	
-	private ArrayList<DBSCAN2.DBScanPoint> getNeighbors(DBSCAN2.DBScanPoint point) {
-		ArrayList<DBSCAN2.DBScanPoint> pre_rtn = new ArrayList<DBSCAN2.DBScanPoint>();
+	private ArrayList<DBScanPoint> getNeighbors(DBScanPoint point) {
+		ArrayList<DBScanPoint> pre_rtn = new ArrayList<DBScanPoint>();
 		
-		for (DBSCAN2.DBScanPoint elem : mPoints)
-			if (Math.sqrt(Math.pow(elem.mFloint.mX - point.mFloint.mX, 2) + Math.pow(elem.mFloint.mY - point.mFloint.mY, 2)) < mEps) //if point is within parameter-defined neighborhood
+		for (DBScanPoint elem : mPoints)
+			if (elem.mFloint.getCartesianDistance(point.mFloint) < mEps)	//if point is within parameter-defined neighborhood
 				pre_rtn.add(elem);
 		return pre_rtn;
 	}
@@ -103,7 +103,7 @@ public class DBSCAN {
 		if (mClusterIndex == 0) return -1;
 		
 		int[] counts = new int[mClusterIndex + 1];
-		for (DBSCAN2.DBScanPoint thePoint : mPoints) {
+		for (DBScanPoint thePoint : mPoints) {
 			counts[thePoint.mClusterAssigned]++;
 		}
 		

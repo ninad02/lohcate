@@ -78,6 +78,7 @@ public class ClusteringInputOneSampleMetaData {
 		out.printf(  "%g\t%g", mTumorCopyNumRatiosPerGene[row], (mTumorCopyNumRatiosPerGene[row] * Script.DefaultDiploidCopyNumber));  
 		out.printf("\t%g\t%g", mAdjustedVAFTumor[row], mAdjustedVAFNormal[row]);
 		out.printf("\t%g\t%g", mImbalancePValuesTumor[row], mImbalancePValuesNormal[row]);
+		out.printf("\t%g", mSigPValuesPerSite[row]);
 		if (printNewLine) {
 			out.println("");
 		}			

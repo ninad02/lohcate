@@ -10,6 +10,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
+import nutils.counter.BucketCounterEnum;
+
 import com.carrotsearch.hppc.DoubleArrayList;
 import com.carrotsearch.hppc.LongArrayList;
 
@@ -873,15 +875,13 @@ public class ArrayUtils {
 	
 	
 	// ========================================================================
-	public static<T extends Enum<T>> int[] getEnumTypeCounts(Collection<T> enumTypeList, Class<T> enumClass) {
-		T[] enumConstants = enumClass.getEnumConstants();
-		int[] counts = new int[enumConstants.length];
-		Arrays.fill(counts, 0);
-		
+	/** Given a list of enums, this returns the counts of those enum. */ 
+	public static<T extends Enum<T>> BucketCounterEnum<T> getEnumTypeCounts(Collection<T> enumTypeList, Class<T> enumClass) {		
+		BucketCounterEnum<T> enumCounts = new BucketCounterEnum<T>(enumClass);				
 		for (T enumType : enumTypeList) {
-			counts[enumType.ordinal()]++;
+			enumCounts.increment(enumType);			
 		}		
-		return counts;
+		return enumCounts;
 	}
 	
 	/** This linearly searches the aray for the integer value.  
