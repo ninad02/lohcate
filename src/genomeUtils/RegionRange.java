@@ -60,13 +60,19 @@ public class RegionRange {
 	
 	/** Sets the range. */
 	public void set(Chrom chrom, int rangeStart, int rangeEnd, boolean makeFinalized, int numSitesInterrogated) {
-		if (rangeEnd < rangeStart) throwErrorAndExit("ERROR: RegionRange.set(): Range end must follow range start!");		
+		if (rangeEnd < rangeStart) {
+			throwErrorAndExit("ERROR: RegionRange.set(): Range end must follow range start!\tStart:\t" + rangeStart + "\tEnd:\t" + rangeEnd);		
+		}
 		
 		mChrom = chrom;		
 		mRangeStart = rangeStart;
 		mRangeEnd   = rangeEnd;  // need to do this before extending the rnage
 		mRangeFinalized = makeFinalized;
 		mNumSitesInterrogated = numSitesInterrogated;
+	}
+	
+	public void set(RegionRange rhs) {
+		set(mChrom, mRangeStart, mRangeEnd, mRangeFinalized, mNumSitesInterrogated);
 	}
 	
 	/** Sets the range start. */

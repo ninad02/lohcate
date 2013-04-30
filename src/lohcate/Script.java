@@ -2,6 +2,7 @@ package lohcate;
 import genomeEnums.Chrom;
 import genomeEnums.Nuc;
 import genomeEnums.VariantLocation;
+import genomeUtils.ChromPositionTracker;
 import genomeUtils.GenotypeUtils;
 import genomeUtils.RegionRange;
 import genomeUtils.RegionRange.RegionRangeOverlap;
@@ -626,10 +627,11 @@ public class Script {
 	/** Given the segmented regions in one sample, this method merges the regions of one type (LOH, Amp, etc) 
 	 *  in the following manner.  LOH/Amp regions cannot be longer than maxLengthContiguousRegion long. 
 	 */
-	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraints(CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType, int maxBasePairsContiguousRegion) {
+	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraintsOld(CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType, int maxBasePairsContiguousRegion) {
 		
 		// Create an empty return object
-		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName); 				
+		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName);
+		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(ClusterType.Null, Chrom.c0, 0);
 		
 		// Go chromosome by chromosome
 		for (Chrom chrom : Chrom.Autosomes) {				
@@ -654,7 +656,7 @@ public class Script {
 							CompareUtils.throwErrorAndExit("ERROR: Must have same cluster type!\t" + currentRegion.mCopyNumberClusterType + "\t" + regionToExtend.mCopyNumberClusterType);
 						}
 						
-						int maxEndIndexInclusive = regionToExtend.getRangeStart() + maxBasePairsContiguousRegion - 1;						
+						int maxEndIndexInclusive = regionToExtend.getRangeEnd() + maxBasePairsContiguousRegion - 1;						
 						if (currentRegion.getRangeStart() <= maxEndIndexInclusive) {
 							regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
 							regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());
@@ -671,7 +673,60 @@ public class Script {
 		
 		return regionsInSampleMerged;
 	}
+	
+	// ========================================================================
+	/** Given the segmented regions in one sample, this method merges the regions of one type (LOH, Amp, etc) 
+	 *  in the following manner.  LOH/Amp regions cannot be longer than maxLengthContiguousRegion long. 
+	 */
+	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraints(CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType, int maxBasePairsContiguousRegion) {
+		
+		// Create an empty return object
+		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName);
+		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(ClusterType.Null, Chrom.c0, 0);
+		
+		// Go chromosome by chromosome
+		for (Chrom chrom : Chrom.Autosomes) {				
+			ArrayList<CopyNumberRegionRange> regionsInChromOriginal =       regionsInSample.mRegionsByChrom.get(chrom);
+			ArrayList<CopyNumberRegionRange> regionsInChromMerged   = regionsInSampleMerged.mRegionsByChrom.get(chrom);
+						
+			// We declare a stored region that can be extended.  Initialize to null for now
+			CopyNumberRegionRange regionToExtend = null;
+			
+			// Iterate through the regions for this chromosome
+			for (CopyNumberRegionRange currentRegion : regionsInChromOriginal) {
 
+				if (currentRegion.mCopyNumberClusterType == clusterType) {
+					// Check if there's a region already waiting for extension.  
+					// If not, create a new one (and a copy at that), and add to array
+					if (regionToExtend == null) {
+						regionToExtend = currentRegion.getCopy();
+						regionsInChromMerged.add(regionToExtend);  // add this to the new array
+						
+					} else {
+						if (currentRegion.mCopyNumberClusterType != regionToExtend.mCopyNumberClusterType) {
+							CompareUtils.throwErrorAndExit("ERROR: Must have same cluster type!\t" + currentRegion.mCopyNumberClusterType + "\t" + regionToExtend.mCopyNumberClusterType);
+						}
+						
+						regionTest.set(chrom, regionToExtend.getRangeEnd(), currentRegion.getRangeEnd(), true, 0);
+						//Clustering.fillRegionBasedOnVAFMaxLikelihood(regionTest, oneSampleData, metaData, events, targetEventType, fillRegion)
+						
+						int maxEndIndexInclusive = regionToExtend.getRangeEnd() + maxBasePairsContiguousRegion - 1;						
+						if (currentRegion.getRangeStart() <= maxEndIndexInclusive) {
+							regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
+							regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());
+						} else {
+							// The current region is out of bounds.  We simply set
+							// the current region as the new region to extend.
+							regionToExtend = currentRegion.getCopy();
+							regionsInChromMerged.add(regionToExtend);  // add this to the new array
+						}
+					}	
+				}
+			}		
+		}
+		
+		return regionsInSampleMerged;
+	}
 	
 	
 	// ========================================================================
@@ -712,7 +767,7 @@ public class Script {
 		// Have an array of regions for amplifications and LOH
 		CopyNumberRegionsByChromosome regionsByChrom = new CopyNumberRegionsByChromosome(oneSampleInfo.getSampleNameRoot());		 	
 		CopyNumberRegionRange currentRegion = null;
-		Chrom chromPreviousRow = null; // used to determine whether chrom has changed
+		ChromPositionTracker chromPosTrack = new ChromPositionTracker();		
 		
 		// We start at index 0 assuming no header and that the rows are sorted by chrom/position
 		int numSites = oneSampleInfo.getNumSites();
@@ -723,8 +778,6 @@ public class Script {
 			final int position = oneSiteInfo.getPosition();
 			ClusterType eventType = eventPerSite.get(row);
 			final int rsId = (oneSiteInfo.getRsID() < 0) ? 0 : oneSiteInfo.getRsID();
-					// (rsColumnValue.indexOf(NovelStr) >= 0 || rsColumnValue.indexOf(Utils.NAStr) >= 0) ? 0 : GenotypeUtils.getNumberFromRsId(rsColumnValue);
-			
 			
 			// Convert cnLOH cluster type to LOH
 			eventType = eventType.isLOH() ? ClusterType.LOH : eventType;
@@ -733,7 +786,7 @@ public class Script {
 			snvMap.registerSNV(chrom, position, rsId, Nuc.N, Nuc.N, true, true);
 			
 			// If the chromosome has changed, we set that we have no current region
-			if ((chrom != chromPreviousRow) && (currentRegion != null)) {
+			if (chromPosTrack.chromCrossedWithCurrentCoordinates(chrom, position) && (currentRegion != null)) {
 				currentRegion.makeFinalized();
 				currentRegion = null;
 			}
@@ -745,6 +798,9 @@ public class Script {
 					regionsByChrom.addRegion(chrom, currentRegion);
 				}
 			} else {
+				// Ensure we're on the same chrom
+				CompareUtils.ensureTrue(currentRegion.getChromosome() == chrom, "ERROR: Chromosomes different!");
+				
 				// Compare the position, make sure it's after the current range end
 				if (position < currentRegion.getRangeEnd()) {
 					CompareUtils.throwErrorAndExit("ERROR: segmentRegionsOneFile(): Rows not sorted!");					
@@ -752,11 +808,11 @@ public class Script {
 					System.out.println("WARNING: Duplicate coordinates: " + chrom + "\t" + position);
 					continue;  // We ignore duplicate positions
 				}
-				
+								
 				// Now we know the position is after the current range end				
-				if ((currentRegion.mCopyNumberClusterType == eventType) && 
-					(currentRegion.getChromosome() == chrom) &&
-					(!eventType.isLOH() || (eventType.isLOH() && (position - currentRegion.getRangeEnd() < REGION_SEGMENTATION_DIST_THRESHOLD))) ) {
+				if ((currentRegion.mCopyNumberClusterType == eventType) 
+					&& (position - currentRegion.getRangeEnd() < REGION_SEGMENTATION_DIST_THRESHOLD) 
+				 	) {
 					boolean result = currentRegion.extendRange(chrom, position);
 					if (!result) {
 						CompareUtils.throwErrorAndExit("ERROR: Could not extend range! " + currentRegion.toString() + "\t" + chrom + "\t" + position + "\t" + oneSampleInfo.getSampleNameRoot());
@@ -772,8 +828,6 @@ public class Script {
 					}
 				}
 			}
-			
-			chromPreviousRow = chrom;  // Save the chromosome of this row
 		}
 		
 		if (currentRegion != null) currentRegion.makeFinalized();
@@ -1482,6 +1536,7 @@ public class Script {
 		String regions          = "regions";
 		String browserTracks    = "browser_tracks";
 		String geneEnrichment   = "gene_enrichment";
+		String simulation       = "simulation";
 		
 		String taskClustering = "clustering";
 		String taskRegions = "regions";
@@ -1507,12 +1562,28 @@ public class Script {
 		
 		long sys_time_init = System.currentTimeMillis();			
 		
+		// ==================
+		// CLUSTERING
+		// ==================
 		if (taskName.equals(taskClustering)) {
+			
 			String allelicBiasFile = "AllelicBiasFile";
 			FlaggedOption allelicBias = new FlaggedOption(allelicBiasFile).setStringParser(JSAP.STRING_PARSER).setRequired(false)
 					.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("allelicBias").setUsageName(allelicBiasFile);
 			allelicBias.setHelp("Specify a file that has allelic biases");
 			ArgumentParserUtils.registerJSAPParameter(jsapTask, allelicBias);
+			
+			String simOutFileRootUsage = "SimulationOutputFilenameRoot";
+			FlaggedOption simOutFileRoot = new FlaggedOption(simOutFileRootUsage).setStringParser(JSAP.STRING_PARSER).setRequired(false)
+					.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("simOutputFileRoot").setUsageName(simOutFileRootUsage);
+			simOutFileRoot.setHelp("Specify the filename root for simulation/evaluation output");
+			ArgumentParserUtils.registerJSAPParameter(jsapTask, simOutFileRoot);		
+			
+			String simParamsUsage = "SimulationParameters";
+			FlaggedOption simParamsDef = new FlaggedOption(simParamsUsage).setStringParser(JSAP.STRING_PARSER).setRequired(false)
+					.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("simulation").setUsageName(simParamsUsage);
+			simParamsDef.setHelp("Specifies whether to run internal testing by simulation");
+			ArgumentParserUtils.registerJSAPParameter(jsapTask, simParamsDef);		
 			
 			ClusteringParams clusteringParams = ClusteringParams.GlobalClusteringParams;
 			clusteringParams.registerClusteringParameters(jsapTask);
@@ -1520,15 +1591,22 @@ public class Script {
 			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
 			String rootFolderName      = jsapResult.getString(rootFolderPath);
 			String allelicBiasFilename = jsapResult.getString(allelicBiasFile);
+			String simOutRootFilename  = jsapResult.getString(simOutFileRootUsage);
+			String simParamsString     = jsapResult.getString(simParamsUsage);
 			clusteringParams.configureParameters(jsapResult);
 			
 			if (rootFolderName == null) {
 				CompareUtils.ensureTrue(false, "ERROR: Must specify valid root folder name!");
 			}
-			
-			if (allelicBiasFilename == null) {
-				//clusteringParams.setIgnoreAllelicBias(true);
-			}
+					
+			LOHcateSimulator.LOHcateSimulatorParams simParams = null;
+			PrintStream simOutputStream = System.out;			
+			if (simParamsString != null) {				
+				ClusteringParams.GlobalClusteringParams.setIsSimulation(true);
+				simParams = new LOHcateSimulator.LOHcateSimulatorParams();
+				simParams.setParamsWithString(simParamsString);
+				simParams.printValues(System.out);		
+			}			
 			
 			//SeqPlatform platform = SeqPlatform.getPlatform(Integer.parseInt(args[2]));
 			Clustering.classifySites(rootFolderName + File.separator + nafTafInptus,
@@ -1537,8 +1615,12 @@ public class Script {
 									 rootFolderName + File.separator + vafPlots, 
 									 rootFolderName + File.separator + vafWaterfallPlots,
 									 rootFolderName + File.separator + copyNumPlots,
-					                 SeqPlatform.Illumina); //args[2] --> 0::Illumina, 1::SOLiD
-					                 
+									 rootFolderName + File.separator + simulation,
+					                 SeqPlatform.Illumina,
+					                 simParams,
+					                 simOutRootFilename); //args[2] --> 0::Illumina, 1::SOLiD
+			IOUtils.closePrintStream(simOutputStream);		                 
+			
 		} else if (taskName.equals(taskRegions)) {			
 			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
 			String rootFolderName = jsapResult.getString(rootFolderPath);

@@ -32,6 +32,10 @@ public enum ClusterType {
 		return (this == LOH);
 	}
 	
+	public boolean isSomaticEvent() {
+		return (this == LOH /*|| this == cnLOH*/ || this == GainSomatic);	
+	}
+	
 	/** Compare with lowercase to increase compatibility. */
 	public static ClusterType getClusterType(String clusterTypeName) {
 		for (ClusterType ct : values()) {

@@ -224,6 +224,15 @@ public class ArrayUtils {
 		for (int i = 0; i < theArray.length; i++) { sum += theArray[i]; }
 		return sum;
 	}
+	
+	/** Given a primitive array list, this sorts it. */
+	public static void sort(com.carrotsearch.hppc.DoubleArrayList theArray) { Arrays.sort(theArray.buffer, 0, theArray.size()); }
+	public static void sort(com.carrotsearch.hppc.IntArrayList theArray)    { Arrays.sort(theArray.buffer, 0, theArray.size()); }
+	public static void sort(com.carrotsearch.hppc.LongArrayList theArray)   { Arrays.sort(theArray.buffer, 0, theArray.size()); }
+	public static void sort(com.carrotsearch.hppc.ByteArrayList theArray)   { Arrays.sort(theArray.buffer, 0, theArray.size()); }
+	public static void sort(com.carrotsearch.hppc.ShortArrayList theArray)  { Arrays.sort(theArray.buffer, 0, theArray.size()); }
+	public static void sort(com.carrotsearch.hppc.FloatArrayList theArray)  { Arrays.sort(theArray.buffer, 0, theArray.size()); }
+
 
 	
 	/** Given an array of doubles, this returns the index of the maximum element.  If there
@@ -395,6 +404,34 @@ public class ArrayUtils {
 	}
 	
 	// ========================================================================
+	public static class ParallelArrayDoubleDynamic {
+		public DoubleArrayList[] mLists;
+		
+		public ParallelArrayDoubleDynamic() {
+			mLists = new DoubleArrayList[] { new DoubleArrayList(), new DoubleArrayList() } ;			
+		}
+		
+		public ParallelArrayDoubleDynamic(int numEstimatedElements) {
+			mLists = new DoubleArrayList[] { new DoubleArrayList(numEstimatedElements), new DoubleArrayList(numEstimatedElements) } ;
+		}
+		
+		public int add(double numX, double numY) {
+			mLists[0].add(numX);
+			mLists[1].add(numY);
+			return mLists[0].size();
+		}
+		
+		public double[][] toArrays() {
+			double[][] rV = new double[2][];
+			for (int i = 0; i < mLists.length; i++) {
+				rV[i] = mLists[i].toArray();
+			}
+			return rV;
+		}
+	}
+	
+	
+	// ========================================================================
 	// ===== INNER CLASS =====
 	// ========================================================================
 	
@@ -471,16 +508,18 @@ public class ArrayUtils {
 	/** Given a String list of double values in braces {}, this returns the list
 	 *  of doubles within those braces.  
 	 */
-	public static double[] getDoubleListFromStringForm(String listAsStr, boolean performSort) {	
+	public static DoubleArrayList getDoubleListFromStringForm(String listAsStr, boolean performSort) {	
 		listAsStr = stripBraces(listAsStr); 				
 		String components[] = listAsStr.split(",");
-		double[] rv = new double[components.length];
-		for (int i = 0; i < components.length; i++) {
-			rv[i] = Double.parseDouble(components[i].trim());
-		}
-		
-		if (performSort) { Arrays.sort(rv); }
-		return rv;
+		DoubleArrayList rV = new DoubleArrayList(components.length);
+		for (String component : components) {
+			component = component.trim();			
+			if (component.length() > 0) {				
+				rV.add(Double.parseDouble(component.trim()));				
+			}
+		}				
+		if (performSort) { ArrayUtils.sort(rV); }
+		return rV;
 	}
 
 	// ========================================================================
@@ -488,7 +527,7 @@ public class ArrayUtils {
 	 *  is of the form {3,2.6,9} (for example), this returns a list of lists represented
 	 *  by the string
 	 */
-	public static ArrayList<double[]> getListOfDoubleListsFromStringForm(String listAsStr, boolean performSortInEachList) {
+	public static ArrayList<DoubleArrayList> getListOfDoubleListsFromStringForm(String listAsStr, boolean performSortInEachList) {
 		char parenLeft = '(';
 		char parenRight = ')';
 		char separator = ';';
@@ -496,12 +535,12 @@ public class ArrayUtils {
 		listAsStr = listAsStr.replace(parenLeft, separator);
 		listAsStr = listAsStr.replace(parenRight, separator);		
 		String components[] = listAsStr.split("" + separator);
-		ArrayList<double[]> finalList = new ArrayList<double[]>(components.length);
+		ArrayList<DoubleArrayList> finalList = new ArrayList<DoubleArrayList>(components.length);
 				
 		for (int i = 0; i < components.length; i++) {
 			String item = components[i].trim();
-			if (item.equals("")) continue;
-			double[] subList = getDoubleListFromStringForm(components[i], performSortInEachList);
+			if (item.equals("")) continue;			
+			DoubleArrayList subList = getDoubleListFromStringForm(components[i], performSortInEachList);
 			finalList.add(subList);
 		}
 		return finalList;

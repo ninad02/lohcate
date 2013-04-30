@@ -22,6 +22,7 @@ import lohcateEnums.ClusterType;
 import org.apache.commons.math3.random.JDKRandomGenerator;
 import org.apache.commons.math3.random.RandomDataGenerator;
 
+import com.carrotsearch.hppc.DoubleArrayList;
 import com.carrotsearch.hppc.IntArrayList;
 import com.martiansoftware.jsap.JSAP;
 
@@ -47,31 +48,32 @@ public class LOHcateSimulator {
 		// ====================================================================
 		
 		protected InputParameterDouble[] mCoverageGenerated = new InputParameterDouble[] {
-			new InputParameterDouble(100.0, "CoverageGeneratedTumor", JSAP.NO_SHORTFLAG, "CoverageGeneratedTumor", JSAP.NO_DEFAULT),
-			new InputParameterDouble(100.0, "CoverageGeneratedNormal", JSAP.NO_SHORTFLAG, "CoverageGeneratedNormal", JSAP.NO_DEFAULT)
+			new InputParameterDouble(100.0, "CoverageGeneratedNormal", JSAP.NO_SHORTFLAG, "CoverageGeneratedNormal", JSAP.NO_DEFAULT),
+			new InputParameterDouble(100.0, "CoverageGeneratedTumor",  JSAP.NO_SHORTFLAG, "CoverageGeneratedTumor",  JSAP.NO_DEFAULT)
 		};				
 				
-		protected InputParameterDouble[] mCoverageExpected = new InputParameterDouble[] {
-				new InputParameterDouble(100.0, "CoverageExpectedTumor",  JSAP.NO_SHORTFLAG, "CoverageExpectedTumor", JSAP.NO_DEFAULT),
-				new InputParameterDouble(100.0, "CoverageExpectedNormal", JSAP.NO_SHORTFLAG, "CoverageExpectedNormal", JSAP.NO_DEFAULT)
+		protected InputParameterDouble[] mCoverageExpected = new InputParameterDouble[] {				
+			new InputParameterDouble(100.0, "CoverageExpectedNormal", JSAP.NO_SHORTFLAG, "CoverageExpectedNormal", JSAP.NO_DEFAULT),
+			new InputParameterDouble(100.0, "CoverageExpectedTumor",  JSAP.NO_SHORTFLAG, "CoverageExpectedTumor", JSAP.NO_DEFAULT)
 		};	
 		
-		protected InputParameterDouble mTumorPurity = new InputParameterDouble(0.40, "TumorPurity", JSAP.NO_SHORTFLAG, "TumorPurity", JSAP.NO_DEFAULT);		
 		protected InputParameterInteger mNumCNARegions = new InputParameterInteger(5, "NumCNARegions", JSAP.NO_SHORTFLAG, "NumCNARegions", JSAP.NO_DEFAULT);
-		
 		protected InputParameterInteger mNumIterations = new InputParameterInteger(1, "NumIterations", JSAP.NO_SHORTFLAG, "NumIterations", JSAP.NO_DEFAULT);
+		protected InputParameterDouble mTumorPurity = new InputParameterDouble(0.40, "TumorPurity", JSAP.NO_SHORTFLAG, "TumorPurity", JSAP.NO_DEFAULT);					
 		
 		public ArrayList<InputParameter<?>> mParams;
 		
 		// ====================================================================
 		public LOHcateSimulatorParams() {			
 			mParams = new ArrayList<InputParameter<?>>();
+			
+			mParams.add(mNumCNARegions);
+			mParams.add(mTumorPurity);
+			mParams.add(mNumIterations);
 			for (TissueType t : TissueType.values()) {
 				mParams.add(mCoverageGenerated[t.ordinal()]);
 				mParams.add(mCoverageExpected[t.ordinal()]);
 			}
-			mParams.add(mTumorPurity);
-			mParams.add(mNumCNARegions);
 			
 		}
 		
@@ -79,6 +81,24 @@ public class LOHcateSimulator {
 		public LOHcateSimulatorParams(String paramFilename) {
 			this();  // call other constructor
 			parseParamFileAndSet(paramFilename);
+		}
+		
+		// ====================================================================
+		public void setParamsWithString(String paramString) {
+			DoubleArrayList paramValues = ArrayUtils.getDoubleListFromStringForm(paramString, false);
+			
+			for (int i = 0; i < paramValues.size(); i++) {
+				double theParamValue = paramValues.get(i);
+				switch (i) {
+				case 0: mNumCNARegions.setValue((int) Math.round(theParamValue)); break;
+				case 1: mTumorPurity.setValue(theParamValue);                     break;
+				case 2: mNumIterations.setValue((int) Math.round(theParamValue)); break;
+				case 3: mCoverageGenerated[TissueType.Normal.ordinal()].setValue(theParamValue); break;
+				case 4: mCoverageExpected[TissueType.Normal.ordinal()].setValue(theParamValue);  break;
+				case 5: mCoverageGenerated[TissueType.Tumor.ordinal()].setValue(theParamValue);  break;
+				case 6: mCoverageExpected[TissueType.Tumor.ordinal()].setValue(theParamValue);   break;
+				}
+			}
 		}
 		
 		// ====================================================================

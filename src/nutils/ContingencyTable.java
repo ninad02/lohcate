@@ -122,6 +122,14 @@ public class ContingencyTable {
 	}
 	
 	// ============================================================================================
+	/** REturns the F-measure. */
+	public double getFMeasure() {
+		double precision = getPPV();
+		double recall    = getSensitivity();
+		return (2 * ((precision * recall) / (precision + recall)));
+	}
+	
+	// ============================================================================================
 	// Tests the contingency table
 	private static void TestTable() {
 		ContingencyTable ct = new ContingencyTable();

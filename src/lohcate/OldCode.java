@@ -765,6 +765,28 @@ public class OldCode {
 	
 	*
 	*/
+	
+	/*
+	if (isSimulation) {
+	for (int row = 0; row < oneSampleData.mInfoSites.size(); row++) {
+		ClusteringInputOneSite oneSiteInfo = oneSampleData.mInfoSites.get(row);		
+		final ClusterType event = isSimulation ? goldStandard.getEvent(row) : events.get(row);
+
+		CopyNumberRegionsByChromosome regionsForEvent = regionsInSamplePerEventType.get(event);
+		if (CompareUtils.isNotNull(regionsForEvent)) {
+			CopyNumberRegionRange region = regionsForEvent.getRegion(oneSiteInfo.getChrom(), oneSiteInfo.getPosition());
+			if (CompareUtils.isNotNull(region)) {
+				CompareUtils.ensureTrue(region.mCopyNumberClusterType == event, "ERROR: Internal region parsing error!");
+				if (region.spansOneSite()) {
+					events.set(row, ClusterType.HETGermline);
+				} else {
+					events.set(row, region.mCopyNumberClusterType);
+				}							
+			}
+		}
+	}
+	}
+	*/
 
 	
 	//Vv.vV implements our old window-based clustering method. ugly, isn't it?

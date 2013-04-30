@@ -62,7 +62,7 @@ public class ArgumentParserUtils {
 		
 		public void parseValue(String newValueStr) {
 			mActualValue = Integer.parseInt(newValueStr);
-		}
+		}		
 	}
 	
 	// ========================================================================
@@ -86,6 +86,18 @@ public class ArgumentParserUtils {
 		
 		public void parseValue(String newValueStr) {
 			mActualValue = Boolean.parseBoolean(newValueStr);
+		}
+	}
+	
+	// ========================================================================
+	public static class InputParameterString extends InputParameter<String> {
+
+		public InputParameterString(String defaultValue, String name, char flagShort, String flagLong, String usageName) {
+			super(defaultValue, name, flagShort, flagLong, usageName);
+		}
+		
+		public void parseValue(String newValueStr) {
+			mActualValue = newValueStr;
 		}
 	}
 	

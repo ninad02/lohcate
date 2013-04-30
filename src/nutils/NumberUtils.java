@@ -7,6 +7,9 @@ import java.util.Collection;
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.PoissonDistribution;
 
+import com.carrotsearch.hppc.DoubleArrayList;
+import com.carrotsearch.hppc.cursors.DoubleCursor;
+
 import cern.jet.random.Binomial;
 import cern.jet.random.engine.DRand;
 
@@ -421,9 +424,9 @@ public class NumberUtils {
 	// ========================================================================
 	private static void TestDoubleListFromString() {
 		String s = "{ 2.5, 3, 3.6, 4.17e-10, 1001 }";
-		double[] dArr = ArrayUtils.getDoubleListFromStringForm(s, true);
-		for (double d : dArr) {
-			System.out.print(d + " ");
+		DoubleArrayList dArr = ArrayUtils.getDoubleListFromStringForm(s, true);
+		for (DoubleCursor d : dArr) {
+			System.out.print(d.value + " ");
 		}
 		System.out.println("");
 	}
@@ -451,13 +454,13 @@ public class NumberUtils {
 		System.out.println(ArrayUtils.stripBraces(dd));
 		
 		String listAsStr = "({2.5,3,2.8};{1.1,1.6,0.5};{0.2,10.3,7.5})";
-		ArrayList<double[]> theList = ArrayUtils.getListOfDoubleListsFromStringForm(listAsStr, false);
-		for (double[] d : theList) {
-			ArrayUtils.printDoubleArray(d);
+		ArrayList<DoubleArrayList> theList = ArrayUtils.getListOfDoubleListsFromStringForm(listAsStr, false);
+		for (DoubleArrayList d : theList) {
+			System.out.println(d);
 		}
 		
 		for (int i = 0; i < 10000; i++) {
-			System.out.println(getRandomInteger(0, 1));
+		//	System.out.println(getRandomInteger(0, 1));
 		}
 	}
 	

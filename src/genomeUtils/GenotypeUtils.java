@@ -1,8 +1,13 @@
 package genomeUtils;
 
+import java.io.BufferedWriter;
+import java.util.Arrays;
 import java.util.Comparator;
 
+import org.apache.commons.math3.random.RandomDataGenerator;
+
 import nutils.CompareUtils;
+import nutils.IOUtils;
 import nutils.NumberUtils;
 import nutils.StringUtils;
 import genomeEnums.Chrom;
@@ -135,14 +140,6 @@ public class GenotypeUtils {
 	/** Given an rs number, this returns the rs# string form. */
 	public static String getRsIdFromNumber(int rsNum) { return "rs" + rsNum; }
 	
-	/**
-	 * @param args
-	 */
-	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-
-	}
-
 	/** @return -1, if no valid nucleotides are present in the string; or if valid nucleotides are present,
 	 *  the fraction of G/C nucleotides
 	 */
@@ -245,4 +242,56 @@ public class GenotypeUtils {
 		}
 	}
 
+	// ------------------------------------------------------------------------
+	public static double getPValuesImbalanceTissue(int coverageTotal, int coverageVariant) {
+		int maxRefOrVarCovg = Math.max(coverageVariant, coverageTotal - coverageVariant);
+		return nutils.NumberUtils.cumulativeProbabilitySuccess(coverageTotal, maxRefOrVarCovg, 0.5);
+	}
+
+	// ========================================================================
+	public static double calcSigPValueByPermutation(int readCountTotal, double significanceLevel, double[] pValueBuffer) {		
+		RandomDataGenerator randomGen = new RandomDataGenerator();
+		
+		int numIter = pValueBuffer.length;		
+		for (int iter = 0; iter < numIter; iter++) {			
+			int numReadsA = randomGen.nextBinomial(readCountTotal, 0.5); //(int) randomGen.nextPoisson(readCountHaplotype);
+			numReadsA = Math.min(numReadsA, readCountTotal);								
+			pValueBuffer[iter] = getPValuesImbalanceTissue(readCountTotal, numReadsA);
+		}
+		
+		Arrays.sort(pValueBuffer);
+		int indexOfSignificance = (int) (pValueBuffer.length * significanceLevel);
+		return pValueBuffer[indexOfSignificance];
+	}
+	
+	// ========================================================================
+	public static double[] PrecalculatePerSitePermutationThresholds() {
+		int numMaxTrials = 10000;
+		double[] rV = new double[numMaxTrials + 1];
+		
+		int numIter = 10000;
+		double[] buffer = new double[numIter];
+
+		for (int trialNum = 1; trialNum <= numMaxTrials; trialNum++) {
+			rV[trialNum] = calcSigPValueByPermutation(trialNum, 0.05, buffer);
+			System.out.println(trialNum + "\t" + rV[trialNum]);
+		}
+		
+		return rV;
+	}
+
+	// ========================================================================
+	public static void PrintPrecalculatedPermutationSiteThresholds() {
+		double[] sigPVals = PrecalculatePerSitePermutationThresholds();
+		BufferedWriter out = IOUtils.getBufferedWriter("CalcPermValues.txt");
+		for (int i = 0; i < sigPVals.length; i++) {		
+			IOUtils.writeToBufferedWriter(out, i + "\t" + sigPVals[i], true);			
+		}
+		IOUtils.closeBufferedWriter(out);
+	}
+	
+	// ========================================================================
+	public static void main(String[] args) {
+		PrintPrecalculatedPermutationSiteThresholds();
+	}
 }
