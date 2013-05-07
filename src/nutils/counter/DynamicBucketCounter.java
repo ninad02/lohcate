@@ -253,6 +253,21 @@ public class DynamicBucketCounter {
 	}
 	
 	// ========================================================================
+	public String toString() {
+		StringBuilder sb = new StringBuilder(1024);
+		int numElements = mArray.size();		
+		for (int i = 0; i < numElements; i++) {
+			if (i > 0) {
+				sb.append(',');
+			}
+			sb.append(getKeyAtIndex(i));
+			sb.append(':');
+			sb.append(getCountAtIndex(i));
+		}
+		return sb.toString();
+	}
+	
+	// ========================================================================
 	public static void main(String[] args) {
 		TestDynamicBucketCounter();
 	}

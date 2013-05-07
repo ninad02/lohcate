@@ -4,6 +4,8 @@ import genomeUtils.RegionSimulator;
 import genomeUtils.SiteList;
 
 import java.util.ArrayList;
+
+import nutils.RangeDouble;
 import lohcateEnums.SeqPlatform;
 
 /**
@@ -43,6 +45,18 @@ public class ClusteringInputOneSample extends SiteList<ClusteringInputOneSite> i
 		super.clear();
 		
 		mSampleNameRoot = "";
+	}
+	
+	// ========================================================================
+	/** Indices inclusive. */
+	public int getNumHetSitesInRangeByIndex(int indexStart, int indexEnd, RangeDouble hetVAFRange) {
+		int numHetSites = 0;
+		for (int index = indexStart; index <= indexEnd; index++) {			
+			if (hetVAFRange.inRangeLowerExclusive(mInfoSites.get(index).calcVAFNormal())) {
+				++numHetSites;
+			}			
+		}
+		return numHetSites;
 	}
 	
 	// ========================================================================

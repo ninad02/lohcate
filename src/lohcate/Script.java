@@ -16,6 +16,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.ListIterator;
 
 import nutils.ArgumentParserUtils;
@@ -71,6 +72,8 @@ public class Script {
 	
 	public static final boolean EliminateExtremeGCSites = true;
 	public static final boolean EliminateHighDensitySNVs = true;
+	
+	public static final PrintStream LogOutput = IOUtils.getPrintStream("LOHcate.Log." + ((new Date()).toString()).replace(' ', '_').replace(':', '-') + ".txt");
 	
 	/*
 	0 1   refName              chr1
@@ -1425,7 +1428,7 @@ public class Script {
 						int resultIndex = Collections.binarySearch(genes, dummyGene);
 						if (resultIndex < 0) {  
 							// we haven't seen this gene before
-							resultIndex = -(resultIndex + 1);  // calculate the proper insertion point 							 
+							resultIndex = ArrayUtils.getInsertPoint(resultIndex);  // calculate the proper insertion point 							 
 							genes.add(resultIndex, new Gene(geneName, chrom));							
 						}
 						Gene currentGene = genes.get(resultIndex);
@@ -1451,6 +1454,7 @@ public class Script {
 						double vafTumor = Double.parseDouble(components[ColCuratedTSV_VafTumor]);
 						if ((clusterType == ClusterType.LOH) && (vafTumor > 0.5)) {
 							currentGene.mCountLOHreferenceLost++;
+							currentGene.addPatientIfNotAlreadyAdded_LOHRefLost(file.getName(), position);
 						}										
 						currentGene.addPatientIfNotAlreadyAdded(file.getName(), clusterType);
 					}
@@ -1470,7 +1474,8 @@ public class Script {
 				
 				ClusterType.GainSomatic.name(),
 				ClusterType.LOH.name(), 
-				ClusterType.LOH.name() + "_refLost", 
+				ClusterType.LOH.name() + "_refLost",
+				ClusterType.LOH.name() + "_refLost_Positions", 
 				ClusterType.HETGermline.name(),
 				ClusterType.HETSomatic.name(),
 				

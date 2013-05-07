@@ -11,6 +11,7 @@ import nutils.ArrayUtils;
 import nutils.EnumMapSafe;
 import nutils.counter.BucketCounterCore;
 import nutils.counter.BucketCounterEnum;
+import nutils.counter.DynamicBucketCounter;
 
 import lohcateEnums.ClusterType;
 import lohcateEnums.MutationType;
@@ -28,13 +29,16 @@ public class Gene implements Comparable<Gene> {
 	
 	public String mLabel;
 	public Chrom mChrom;
-	public EnumMapSafe<ClusterType, ArrayList<String>> mPatients;  	
+	public EnumMapSafe<ClusterType, ArrayList<String>> mPatients; 
+	public ArrayList<String> mPatientsWithRefLost;
 	
 	public BucketCounterEnum<MutationType> mMutationTypeCounts;	
 	public BucketCounterEnum<ClusterType> mClusterTypeCounts;	
 	public BucketCounterEnum<VariantLocation> mVariantLocationCounts;
 	public int mCountLOHreferenceLost;
 	public int mMinBasePairPosition, mMaxBasePairPosition;
+	
+	DynamicBucketCounter mVariantAlleleCounts;
 	
 	public Gene(String name, Chrom chrom) {		
 		mLabel = name;
@@ -45,6 +49,8 @@ public class Gene implements Comparable<Gene> {
 		mClusterTypeCounts     = new BucketCounterEnum<ClusterType>(ClusterType.class);				
 		mVariantLocationCounts = new BucketCounterEnum<VariantLocation>(VariantLocation.class);  // stores hit counts for germline, somatic
 		clearCounts();
+		
+		mVariantAlleleCounts = new DynamicBucketCounter();
 				
 		mMinBasePairPosition = Integer.MAX_VALUE;
 		mMaxBasePairPosition = Integer.MIN_VALUE;
@@ -59,6 +65,13 @@ public class Gene implements Comparable<Gene> {
 	
 	private void initializePatients() {
 		mPatients = ArrayUtils.createEnumMapOfArrayLists(ClusterType.class, String.class);
+		mPatientsWithRefLost = new ArrayList<String>();
+	}
+	
+	/** Adds a patient to the reference-lost list in the case of LOH. */
+	public boolean addPatientIfNotAlreadyAdded_LOHRefLost(String patientName, int position) {
+		mVariantAlleleCounts.incrementCount(position);
+		return ArrayUtils.checkInListAndInsertIfMissing(mPatientsWithRefLost, patientName);
 	}
 	
 	/** Returns true if the patient was already existing for the clustertype, false otherwise. */
@@ -112,19 +125,20 @@ public class Gene implements Comparable<Gene> {
 		  
 		  .append(delim).append(getCount(ClusterType.GainSomatic))
 		  .append(delim).append(getCount(ClusterType.LOH))
-		  .append(delim).append(mCountLOHreferenceLost)
+		  .append(delim).append(mPatientsWithRefLost.size())
+		  .append(delim).append(mVariantAlleleCounts.toString())
 		  .append(delim).append(getCount(ClusterType.HETGermline))
 		  .append(delim).append(getCount(ClusterType.HETSomatic))
 		  
 		  .append(delim).append(Utils.log(getCount(ClusterType.GainSomatic)))
 		  .append(delim).append(Utils.log(getCount(ClusterType.LOH)))
-		  .append(delim).append(Utils.log(mCountLOHreferenceLost))
+		  .append(delim).append(Utils.log(mPatientsWithRefLost.size()))
 		  .append(delim).append(Utils.log(getCount(ClusterType.HETGermline)))
 		  .append(delim).append(Utils.log(getCount(ClusterType.HETSomatic)))
 		  
 		  .append(delim).append(getDensityClusterType(ClusterType.GainSomatic))
 		  .append(delim).append(getDensityClusterType(ClusterType.LOH))
-		  .append(delim).append(mCountLOHreferenceLost / (float) getRangeLength())
+		  .append(delim).append(mPatientsWithRefLost.size() / (float) getRangeLength())
 		  .append(delim).append(getDensityClusterType(ClusterType.HETGermline))
 		  .append(delim).append(getDensityClusterType(ClusterType.HETSomatic))
 		  

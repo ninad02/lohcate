@@ -60,7 +60,7 @@ public class BucketCounterEnum<E extends Enum<E>> extends BucketCounterCore {
 		
 	// ========================================================================
 	// A private static enum used for unit testing purposes
-	private static enum Alphabet {
+	protected static enum Alphabet {
 		A, B, C, D;
 	}
 	
