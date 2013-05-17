@@ -31,6 +31,7 @@ import nutils.ArgumentParserUtils.InputParameterDouble;
 import nutils.ArgumentParserUtils.InputParameterInteger;
 import nutils.ArrayUtils;
 import nutils.CompareUtils;
+import nutils.ControlFlagBool;
 import nutils.IOUtils;
 import nutils.NumberUtils;
 import nutils.StringUtils;
@@ -219,8 +220,8 @@ public class LOHcateSimulator {
 	// ========================================================================
 	private ArrayList<CopyNumberRegionRange> deduceRegions(LOHcateSimulatorParams simParams, ClusteringInputOneSample oneSampleData) {
 
-		boolean specifyRandomSeed = true;
-		SeqReadSimulator readSimulator = specifyRandomSeed ? new SeqReadSimulator(Integer.SIZE) : new SeqReadSimulator();
+		ControlFlagBool specifyRandomSeed = new ControlFlagBool(true);
+		SeqReadSimulator readSimulator = specifyRandomSeed.getValue() ? new SeqReadSimulator(Integer.SIZE) : new SeqReadSimulator();
 		
 		ArrayList<CopyNumberRegionRange> cnRegions = new ArrayList<CopyNumberRegionRange>(simParams.getNumCNARegions());
 		
@@ -314,7 +315,7 @@ public class LOHcateSimulator {
 			}
 		}
 		
-		boolean allowHemizygousGenotype = true;
+		ControlFlagBool allowHemizygousGenotype = new ControlFlagBool(true);
 		
 		// Now go through the relevant region
 		for (int row = indexStart; row <= indexEnd; row++) {
@@ -366,11 +367,11 @@ public class LOHcateSimulator {
 			
 			seqSim.calculateReadsTissue(iosos.getTissueInfo(TissueType.Normal), simParams.getCoverageGenerated(TissueType.Normal), 
 					copyNumber[TissueType.Normal.mCode][Phase.p0.mCode], copyNumber[TissueType.Normal.mCode][Phase.p1.mCode], 
-					genotype, referenceAllele, allowHemizygousGenotype, isBiAllelicChangeNormal, null, readAdjuster);
+					genotype, referenceAllele, allowHemizygousGenotype.getValue(), isBiAllelicChangeNormal, null, readAdjuster);
 			
 			seqSim.calculateReadsTissue(iosos.getTissueInfo(TissueType.Tumor), simParams.getCoverageGenerated(TissueType.Tumor), 
 					copyNumber[TissueType.Tumor.mCode][Phase.p0.mCode], copyNumber[TissueType.Tumor.mCode][Phase.p1.mCode], 
-					genotype, referenceAllele, allowHemizygousGenotype, isBiAllelicChangeTumor, goldStandard, readAdjuster);
+					genotype, referenceAllele, allowHemizygousGenotype.getValue(), isBiAllelicChangeTumor, goldStandard, readAdjuster);
 			
 			
 			// Finally, register the read counts

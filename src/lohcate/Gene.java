@@ -103,6 +103,8 @@ public class Gene implements Comparable<Gene> {
 	
 	public int getRangeLength() { return (mMaxBasePairPosition - mMinBasePairPosition + 1); }
 	
+	public String getName() { return mLabel; }
+	
 	public float getDensityVariantLocation(VariantLocation varLoc) {
 		return (float) getCount(varLoc) / (float) getRangeLength();
 	}

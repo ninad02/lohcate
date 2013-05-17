@@ -6,6 +6,7 @@ import genomeUtils.ChromPositionTracker;
 import genomeUtils.ElementPlaneSplit;
 import genomeUtils.GenomeConstants;
 import genomeUtils.GenotypeUtils;
+import genomeUtils.MaxPositionsOnChromosome;
 import genomeUtils.ObjectWalkerTracker;
 import genomeUtils.RegionRange;
 import genomeUtils.SNVMap;
@@ -21,6 +22,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.ListIterator;
 
+import kMeans.Cluster;
 import kMeans.DataPoint;
 import kMeans.JCA;
 
@@ -294,7 +296,7 @@ public class Clustering {
 			return null;
 		}
 		
-		if (eventTest == ClusterType.Null) {
+		if (eventTruth == ClusterType.GainGermline && eventTest == ClusterType.Null) {
 			return Boolean.FALSE;
 		}
 
@@ -323,7 +325,7 @@ public class Clustering {
 		if (CompareUtils.isNull(eventTest))  return null;
 		if (CompareUtils.isNull(eventTruth)) return null;
 		
-		if (eventTest == ClusterType.Null) return Boolean.FALSE;
+		if (eventTruth == ClusterType.GainGermline && eventTest == ClusterType.Null) return Boolean.FALSE;
 				
 		counter.increment(eventTruth, eventTest);
 		return Boolean.TRUE;
@@ -400,25 +402,28 @@ public class Clustering {
 		
 		EnumMapSafe<ClusterType, ContingencyTable> eventTablesTotal = ContingencyTable.ClassFactory.newEnumMap(ClusterType.class);
 		BucketCounterEnumMatrix<ClusterType> countBreakdownPerEventTotal = new BucketCounterEnumMatrix<>(ClusterType.class);
-						
+		MaxPositionsOnChromosome maxPosOnChrom = new MaxPositionsOnChromosome();				
+		
 		int fileIndex = 0;		
 		for (File file : validFiles) {			
 			String filename = file.getName();
 			String sampleNameRoot = filename.substring(0, file.getName().indexOf(Script.GermlineSuffix));  	
 			String extension = filename.substring(filename.lastIndexOf(StringUtils.DotStr), filename.length());
 			System.out.println("Processing (" + ++fileIndex + " / " + validFiles.size() + "): " + file.getName());				
-			classifySitesOneSample(file, sampleNameRoot, extension, fileIndex, allelicBiasTable, eventCounts, eventCoordinates, eventTablesTotal, countBreakdownPerEventTotal, simulatorParams, simOutputStream, sitesClassifiedDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir, platform);
+			classifySitesOneSample(file, sampleNameRoot, extension, fileIndex, allelicBiasTable, eventCounts, eventCoordinates, eventTablesTotal, countBreakdownPerEventTotal, simulatorParams, simOutputStream, maxPosOnChrom, sitesClassifiedDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir, platform);
 		}
 				
 		// Write out the stats
 		printContingencyTableInfo("SIMALL", simOutputStream, 0, eventTablesTotal, countBreakdownPerEventTotal);
 
 		// Close the print stream
-		IOUtils.closePrintStream(simOutputStream);
+		if (CompareUtils.isNotNull(simulatorParams)) {
+			IOUtils.closePrintStream(simOutputStream);
+		}
 		
 		// Now plot the LOH recurrence across samples
 		ClusteringPlotting.plotRecurrenceGenomeWide(eventCounts, copyNumberPlotDir);
-		ClusteringPlotting.plotEventsByCoordinateAcrossSamples(eventCoordinates, copyNumberPlotDir);
+		ClusteringPlotting.plotEventsByCoordinateAcrossSamples(eventCoordinates, maxPosOnChrom, validFiles.size(), copyNumberPlotDir);
 	}
 	
 	// ========================================================================
@@ -439,6 +444,7 @@ public class Clustering {
 		// We do two iterations.  The first iteration will be based on 							
 		int mostLikelyList = 0;		
 		boolean isLinearFromRegression = false;
+		boolean isLinearFromKMeans = false;
 		
 		if (!region.spansOneSite()) {
 			String listOfListOfMeansStr = constrctListofListOfMeans();
@@ -462,13 +468,35 @@ public class Clustering {
 				}
 				System.out.printf("R:\t%12s\t%d\t%d\t%d\t%g\t%g\n", targetEventType, region.getChromosome().ordinal(), indexStart, indexEnd, simpReg.getRSquare(), simpReg.getSumSquaredErrors()); 
 				isLinearFromRegression = (simpReg.getSumSquaredErrors() < 0.01);
-			}								
+				
+				// Now do k-means clustering
+				if (!isLinearFromRegression) {
+					double multiplier = 100.0;
+					ArrayList<DataPoint> kMeansPoints = new ArrayList<DataPoint>(vafTumorsSorted.size());
+					for (int i = 0; i < vafTumorsSorted.size(); i++) {
+						double vafTumorAtSite = vafTumorsSorted.get(i);					
+						vafTumorAtSite = NumberUtils.roundToNearest5((int) Math.round(vafTumorAtSite * multiplier)) / multiplier;
+						DataPoint dp = new DataPoint(vafTumorAtSite, 0, "");
+						kMeansPoints.add(dp);
+					}
+					JCA kMeansClusterer = new JCA(2, 100, kMeansPoints);
+					kMeansClusterer.startAnalysis();
+					Cluster c1 = kMeansClusterer.getCluster(0);
+					Cluster c2 = kMeansClusterer.getCluster(1);
+					double normSumSqC1 = c1.getSumSqr() / c1.getNumDataPoints();
+					double normSumSqC2 = c2.getSumSqr() / c2.getNumDataPoints();
+					System.out.printf("\tSS:\t%g\t%g\n", normSumSqC1, normSumSqC2);
+					double thresh = 0.042;
+					isLinearFromKMeans = (normSumSqC1 >= thresh) && (normSumSqC2 >= thresh);
+				}
+			}
+						
 		} 
 		
 		// Go through VAFs
-		boolean resetToHetGermline = (mostLikelyList == 0) || isLinearFromRegression;
+		boolean resetToHetGermline = (mostLikelyList == 0) || isLinearFromRegression || isLinearFromKMeans;
 
-		if (fillRegion) {
+		if (fillRegion && (events != null)) {
 			fillRegion(events, indexStart, indexEnd, resetToHetGermline, targetEventType, oneSampleData, metaData);
 		}
 		
@@ -499,11 +527,61 @@ public class Clustering {
 	}
 	
 	// ========================================================================
+	public static boolean combineTwoRegions(CopyNumberRegionRange regionPrev, CopyNumberRegionRange regionCurr, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
+		
+		// Check that we have the same chromosome
+		if (regionPrev.getChromosome() != regionCurr.getChromosome()) {
+			return false;
+		}
+		
+		// Test that they have teh same event type
+		if (regionPrev.mCopyNumberClusterType != regionCurr.mCopyNumberClusterType) {
+			return false;
+		}
+		
+		int indexRegionPrevStart = oneSampleData.getIndex(regionPrev.getChromosome(), regionPrev.getRangeStart()); 
+		CompareUtils.ensureTrue(indexRegionPrevStart >= 0, "ERROR: Starting index must be > 0");
+		int indexRegionPrevEnd   = oneSampleData.getIndex(regionPrev.getChromosome(), regionPrev.getRangeEnd());
+		CompareUtils.ensureTrue(indexRegionPrevStart >= indexRegionPrevStart, "ERROR: Ending index must be >= starting index!");
+		
+
+		int indexRegionCurrStart = oneSampleData.getIndex(regionCurr.getChromosome(), regionCurr.getRangeStart()); 
+		CompareUtils.ensureTrue(indexRegionCurrStart >= 0, "ERROR: Starting index must be > 0");
+		int indexRegionCurrEnd   = oneSampleData.getIndex(regionCurr.getChromosome(), regionCurr.getRangeEnd());
+		CompareUtils.ensureTrue(indexRegionCurrStart >= indexRegionCurrStart, "ERROR: Ending index must be >= starting index!");
+
+		int numHetSitesMid = oneSampleData.getNumHetSitesInRangeByIndex(indexRegionPrevEnd + 1, indexRegionCurrStart - 1, metaData.mVAFNormalHetRange);
+		PrimitiveWrapper.WDouble probFromMaxLikelihood = new PrimitiveWrapper.WDouble(0);
+		CopyNumberRegionRange midRange = new CopyNumberRegionRange(regionPrev);
+		
+		// Check how many het sites there are between regions.  If there are none, we can
+		// treat as if the regions are adjacent.		
+		if (numHetSitesMid == 0) {
+			return true;
+			
+		} else {
+			int midRegionStartPos = oneSampleData.getSiteAtIndex(regionPrev.getChromosome(), indexRegionPrevEnd   + 1).getPosition();
+			int midRegionEndPos   = oneSampleData.getSiteAtIndex(regionPrev.getChromosome(), indexRegionCurrStart - 1).getPosition();
+			int numHetSitesThreshold = 6;
+			
+			if (numHetSitesMid < numHetSitesThreshold) {
+				midRegionStartPos = regionPrev.getRangeStart();
+				midRegionEndPos   = regionCurr.getRangeEnd();
+			}
+			
+			midRange.set(regionPrev.getChromosome(), midRegionStartPos, midRegionEndPos, false, indexRegionCurrStart - indexRegionPrevEnd - 1);
+			boolean isEventRegion = fillRegionBasedOnVAFMaxLikelihood(midRange, oneSampleData, metaData, null, regionPrev.mCopyNumberClusterType, probFromMaxLikelihood, false);
+			return isEventRegion;
+		}
+	}
+
+	
+	// ========================================================================
 	private static String constrctListofListOfMeans() {
 		StringBuilder sb = new StringBuilder(1024);
-		sb.append("({0.5}");		
-		sb.append(";{0.3333,0.6667}");
+		sb.append("({0.5}");
 		sb.append(";{0.4,0.6}");
+		sb.append(";{0.3333,0.6667}");		
 		sb.append(";{0.3,0.7}");
 		sb.append(";{0.2,0.8}");		
 		sb.append(";{0.1,0.9}");
@@ -523,6 +601,7 @@ public class Clustering {
 			EnumMapSafe<ClusterType, ContingencyTable> eventTablesTotal,
 			BucketCounterEnumMatrix<ClusterType> countBreakdownPerEventTotal,
 			LOHcateSimulatorParams simulatorParams, PrintStream simOutputStream,
+			MaxPositionsOnChromosome maxPosOnChrom,
 			String sitesClassifiedDir, String vafComparisonPlotDir, String vafWaterfallPlotDir, String copyNumberPlotDir, 
 			SeqPlatform platform) {
 		
@@ -600,7 +679,7 @@ public class Clustering {
 //				int[] midRegionEnd   = new int[numMidPossibilities];
 				
 				for (ClusterType eventType : ClusterType.AmpLOHcnLOH) {
-					CopyNumberRegionsByChromosome regionsInOneSampleMerged = Script.mergeRegionsWithConstraints(regionsByChrom, eventType, Script.REGION_SEGMENTATION_DIST_THRESHOLD);
+					CopyNumberRegionsByChromosome regionsInOneSampleMerged = Script.mergeRegionsWithConstraints(regionsByChrom, eventType, Script.REGION_SEGMENTATION_DIST_THRESHOLD, oneSampleData, metaData);
 					//regionsInOneSampleMerged.removeSingletonRegions();
 					regionsInSamplePerEventType.put(eventType, regionsInOneSampleMerged);
 					//regionsInOneSampleMerged.print(System.out, StringUtils.FileExtensionTSV.mDelimiter);
@@ -613,8 +692,9 @@ public class Clustering {
 							fillRegionBasedOnVAFMaxLikelihood(region, oneSampleData, metaData, events, eventType, probFromMaxLikelihood, true);							
 							//System.out.println("CURR\t" + region.toString());
 							
+							boolean fillMid = false;
 							// Fill in the gap between regions if it exists
-							if (regionPrev != null) {
+							if (regionPrev != null && fillMid) {
 								int indexEndPrev   = oneSampleData.getIndex(regionPrev.getChromosome(), regionPrev.getRangeEnd());
 								int indexStartCurr = oneSampleData.getIndex(    region.getChromosome(),     region.getRangeStart());
 								
@@ -655,7 +735,7 @@ public class Clustering {
 										int midRegionEndPos   = region.getRangeEnd(); //;
 										midRange.set(chrom, midRegionStartPos, midRegionEndPos, false, indexStartCurr - indexEndPrev - 1);
 										boolean result = fillRegionBasedOnVAFMaxLikelihood(midRange, oneSampleData, metaData, events, eventType, probFromMaxLikelihood, false);
-										if (!result) {											
+										if (result) {											
 											fillRegionBasedOnVAFMaxLikelihood(midRange, oneSampleData, metaData, events, eventType, probFromMaxLikelihood, true);
 										}
 											//System.out.println("MID\t" + midRange.toString());										
@@ -681,9 +761,7 @@ public class Clustering {
 			// Do the post-processing
 			chromPosTracker.clear();
 			
-			DoubleArrayList chromBoundaryXValue = new DoubleArrayList();
-			DoubleArrayList chromBoundaryYValue = new DoubleArrayList();
-			
+			ParallelArrayDoubleDynamic chromBoundaryXY = new ParallelArrayDoubleDynamic();			
 			
 			int startingRowGermlineOrSomaticOrAll = 0;  // 0 because header line has been stripped away
 			int numSites = oneSampleData.getNumSites();
@@ -700,17 +778,19 @@ public class Clustering {
 				}
 								
 				ClusterType eventTruth = goldStandard.getEvent(row);
-				classifySites_addToContingencyTables(eventType, eventTruth, eventTables);
-				classifySites_addToContingencyTables(eventType, eventTruth, eventTablesTotal);
-				classifySites_addToEventCountTables(eventTruth, eventType, testCounts);				
-				classifySites_addToEventCountTables(eventTruth, eventType, countBreakdownPerEventTotal);
+				if (metaData.mVAFNormalHetRange.inRangeLowerExclusive(oneSiteInfo.calcVAFNormal())) {
+					classifySites_addToContingencyTables(eventType, eventTruth, eventTables);
+					classifySites_addToContingencyTables(eventType, eventTruth, eventTablesTotal);
+					classifySites_addToEventCountTables(eventTruth, eventType, testCounts);				
+					classifySites_addToEventCountTables(eventTruth, eventType, countBreakdownPerEventTotal);
+				}
 
 				
 				boolean chromCrossed = chromPosTracker.chromCrossedWithCurrentCoordinates(oneSiteInfo.getChrom(), oneSiteInfo.getPosition());						
 				for (double d = 0; chromCrossed && (d <= 5.0); d += 0.02) {
-					chromBoundaryXValue.add(chromPosTracker.getPositionGenomeWide());
-					chromBoundaryYValue.add(d);
+					chromBoundaryXY.add(chromPosTracker.getPositionGenomeWide(), d);
 				}
+				maxPosOnChrom.registerPosition(oneSiteInfo.getChrom(), chromPosTracker.getPositionGenomeWide());
 				
 				if (eventType.isSomaticEvent() || (eventType == ClusterType.GainGermline)) {
 					eventsByCoordinate.get(eventType).add(chromPosTracker.getPositionGenomeWide(), sampleIndex);
@@ -726,7 +806,7 @@ public class Clustering {
 			}									
 
 			// Now let's create the datasets needed to
-			double[][] boundaryArrays = ArrayUtils.combineTwoDynamicArraysIntoOneStatic(chromBoundaryXValue, chromBoundaryYValue);
+			double[][] boundaryArrays = chromBoundaryXY.toArrays();
 			DefaultXYDataset xyDatasetVAFPlot             = classifySitesHelper_createAndFillXYData(clusterCoordinates, null);
 			DefaultXYDataset xyDatasetWaterfallPlotTumor  = classifySitesHelper_createAndFillXYData(waterfallPlotTumor,  boundaryArrays);
 			DefaultXYDataset xyDatasetWaterfallPlotNormal = classifySitesHelper_createAndFillXYData(waterfallPlotNormal, boundaryArrays);

@@ -9,12 +9,17 @@ package nutils;
  */
 public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements Comparable<T> {
 		
+	protected static final byte DefaultValue = 0;
+	
 	//=========================================================================
 	/** Provides a wrapper for a primitive int value that can be changed.  Useful
 	 *  when you want to have a changeable integer within a container. */
 	public static class WInteger extends PrimitiveWrapper<WInteger> {
+		public static final NullaryClassFactory<WInteger> ClassFactory = new NullaryClassFactory<WInteger>(WInteger.class);
+		
 		public int mInt;
 		public WInteger(int i) { mInt = i; }
+		public WInteger()      { this(DefaultValue); }
 		
 		public int compareTo(WInteger rhs) {
 			return Integer.compare(mInt, rhs.mInt);

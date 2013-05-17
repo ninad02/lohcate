@@ -1,6 +1,7 @@
 package lohcate.clustering;
 
 import genomeEnums.Chrom;
+import genomeUtils.MaxPositionsOnChromosome;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -24,6 +25,9 @@ import nutils.counter.DynamicBucketCounter;
 
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.JFreeChart;
+import org.jfree.chart.axis.NumberTickUnit;
+import org.jfree.chart.axis.TickUnit;
+import org.jfree.chart.axis.TickUnits;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
@@ -75,13 +79,28 @@ public class ClusteringPlotting {
 	}
 	
 	// ========================================================================
-	public static<E extends Enum<E>> void plotEventsByCoordinateAcrossSamples(EnumMapSafe<E, ParallelArrayDoubleDynamic> eventsByCoordinate, String outDir) {
+	public static<E extends Enum<E>> void plotEventsByCoordinateAcrossSamples(EnumMapSafe<E, ParallelArrayDoubleDynamic> eventsByCoordinate, MaxPositionsOnChromosome maxPosByChrom, int numSamples, String outDir) {
 		DefaultXYDataset xyDataset = new DefaultXYDataset();
 		
-		Set<E> enumKeys = eventsByCoordinate.keySet();
+		Set<E> enumKeys = eventsByCoordinate.keySet();		
 		for (E enumKey : enumKeys) {			
-			xyDataset.addSeries(enumKey.toString(), eventsByCoordinate.get(enumKey).toArrays());
+			double[][] eventsXY = eventsByCoordinate.get(enumKey).toArrays();
+			xyDataset.addSeries(enumKey.toString(), eventsXY);
 		}
+		
+		ParallelArrayDoubleDynamic chromBoundaryXY = new ParallelArrayDoubleDynamic();
+		double incr = numSamples / 200.0;
+		System.out.println("HEE");
+		System.out.println(Chrom.Autosomes);
+		System.out.println("HEE2");
+		for (Chrom chrom : Chrom.Autosomes) {
+			long maxPos = maxPosByChrom.getMaxPositionForChrom(chrom);
+			System.out.println("MaxPos:\t" + chrom + "\t" + maxPos);
+			for (double yCoordinate = 0; yCoordinate <= numSamples; yCoordinate += incr) {
+				chromBoundaryXY.add(maxPos, yCoordinate);
+			}			
+		}
+		xyDataset.addSeries("Boundary", chromBoundaryXY.toArrays());
 		
 		String xAxisLabel = "Position";
 		String yAxisLabel = "Sample ID with Event";
@@ -109,9 +128,13 @@ public class ClusteringPlotting {
 		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 20);
 		xyPlot.getRangeAxis().setLabelFont(rangeAxisLabelFont);		
 		xyPlot.getRangeAxis().setTickLabelFont(rangeAxisTickFont);
+		TickUnit tickUnit =  new NumberTickUnit(1.0);
+		TickUnits tickUnits = new TickUnits();
+		tickUnits.add(tickUnit);		
+		xyPlot.getRangeAxis().setStandardTickUnits(tickUnits);
 		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
 		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);	
-		GraphUtils.saveChartAsPNG(outDir + File.separator + "HeapMap.AllEvents.AllSamples", theChart, 2400, 800);
+		GraphUtils.saveChartAsPNG(outDir + File.separator + "HeapMap.AllEvents.AllSamples", theChart, 2400, 1000);
 
 
 	}
@@ -315,7 +338,7 @@ public class ClusteringPlotting {
 		case GainGermline: return ColorPastel.Violet;
 		case GainSomatic:  return ColorPastel.Dark_Red;
 		case LOH:          return ColorPastel.RGB_Blue;
-		case cnLOH:        return ColorPastel.CMYK_Yellow;
+		case cnLOH:        return ColorPastel.Dark_Yellow;
 		case HETGermline:  return ColorPastel.Gray_60;
 		case HETSomatic:   return ColorPastel.Red_Orange;
 		case Noise:        return ColorPastel.Dark_Pea_Green;

@@ -38,6 +38,7 @@ import com.martiansoftware.jsap.StringParser;
 
 import lohcate.clustering.Clustering;
 import lohcate.clustering.ClusteringInputOneSample;
+import lohcate.clustering.ClusteringInputOneSampleMetaData;
 import lohcate.clustering.ClusteringInputOneSite;
 import lohcate.clustering.ClusteringParams;
 import lohcate.clustering.ClusteringPlotting;
@@ -241,7 +242,7 @@ public class Script {
 			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = regionsInSamplesPerEventType.get(clusterType);	
 			
 			for (CopyNumberRegionsByChromosome regionsInOneSample : regionsInSamples) {
-				CopyNumberRegionsByChromosome regionsInOneSampleMerged = mergeRegionsWithConstraints(regionsInOneSample, clusterType, maxBasePairsContiguousRegion.get(clusterType));
+				CopyNumberRegionsByChromosome regionsInOneSampleMerged = mergeRegionsWithConstraintsOld(regionsInOneSample, clusterType, maxBasePairsContiguousRegion.get(clusterType));
 				regionsInOneSampleMerged.removeSingletonRegions();
 				regionsInSamplesForOneClusterType.add(regionsInOneSampleMerged);
 				printSegmentedRegionsToFile(outDir, regionsInOneSampleMerged, clusterType, snvMap);
@@ -681,7 +682,7 @@ public class Script {
 	/** Given the segmented regions in one sample, this method merges the regions of one type (LOH, Amp, etc) 
 	 *  in the following manner.  LOH/Amp regions cannot be longer than maxLengthContiguousRegion long. 
 	 */
-	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraints(CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType, int maxBasePairsContiguousRegion) {
+	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraints(CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType, int maxBasePairsContiguousRegion, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
 		
 		// Create an empty return object
 		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName);
@@ -710,11 +711,10 @@ public class Script {
 							CompareUtils.throwErrorAndExit("ERROR: Must have same cluster type!\t" + currentRegion.mCopyNumberClusterType + "\t" + regionToExtend.mCopyNumberClusterType);
 						}
 						
-						regionTest.set(chrom, regionToExtend.getRangeEnd(), currentRegion.getRangeEnd(), true, 0);
-						//Clustering.fillRegionBasedOnVAFMaxLikelihood(regionTest, oneSampleData, metaData, events, targetEventType, fillRegion)
+						boolean shouldCombine = Clustering.combineTwoRegions(regionToExtend, currentRegion, oneSampleData, metaData);					
 						
 						int maxEndIndexInclusive = regionToExtend.getRangeEnd() + maxBasePairsContiguousRegion - 1;						
-						if (currentRegion.getRangeStart() <= maxEndIndexInclusive) {
+						if (shouldCombine /* currentRegion.getRangeStart() <= maxEndIndexInclusive */) {
 							regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
 							regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());
 						} else {
@@ -783,7 +783,7 @@ public class Script {
 			final int rsId = (oneSiteInfo.getRsID() < 0) ? 0 : oneSiteInfo.getRsID();
 			
 			// Convert cnLOH cluster type to LOH
-			eventType = eventType.isLOH() ? ClusterType.LOH : eventType;
+			//eventType = eventType.isLOH() ? ClusterType.LOH : eventType;
 			
 			// Register the site in the map
 			snvMap.registerSNV(chrom, position, rsId, Nuc.N, Nuc.N, true, true);
@@ -814,7 +814,7 @@ public class Script {
 								
 				// Now we know the position is after the current range end				
 				if ((currentRegion.mCopyNumberClusterType == eventType) 
-					&& (position - currentRegion.getRangeEnd() < REGION_SEGMENTATION_DIST_THRESHOLD) 
+					//&& (position - currentRegion.getRangeEnd() < REGION_SEGMENTATION_DIST_THRESHOLD * 1000) 
 				 	) {
 					boolean result = currentRegion.extendRange(chrom, position);
 					if (!result) {
@@ -1513,18 +1513,24 @@ public class Script {
 		}
 		IOUtils.closeBufferedWriter(out);
 		
+		String eventsByPatientPerGeneFilename = outDir + File.separator + "eventsByPatientPerGene" + StringUtils.FileExtensionTSV.mExtension;
+		BufferedWriter outBreakdown = IOUtils.getBufferedWriter(eventsByPatientPerGeneFilename);
+				
 		// Now write out individual gene outputs
 		for (Gene gene : genes) {
 			// Write samples for each gene out as well
 			ArrayList<String> patientsAllClusters = new ArrayList<String>();
 			for (ClusterType ct : ClusterType.values()) {
 				if ((ct == ClusterType.Noise) || (ct == ClusterType.Null)) continue;
-				patientsAllClusters.add(ct.name());
-				patientsAllClusters.addAll(gene.getPatientsForClusterType(ct));
+				
+				ArrayList<String> patientsForEvent = gene.getPatientsForClusterType(ct);
+				for (String patientForEvent : patientsForEvent) {
+					String outString = gene.getName() + "\t" + ct.name() + "\t" + patientForEvent;
+					IOUtils.writeToBufferedWriter(outBreakdown, outString, true);
+				}
 			}
-			String geneOutFilename = outDir + File.separator + gene.mLabel + ".samples.txt";
-			IOUtils.writeOutputFile(geneOutFilename, patientsAllClusters);				
 		}
+		IOUtils.closeBufferedWriter(outBreakdown);
 	}
 	
 	
