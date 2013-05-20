@@ -16,8 +16,8 @@ public enum ClusterType {
 	public static final ClusterType[] AmpLOHHetG = new ClusterType[] { GainSomatic, LOH, HETGermline };
 	public static final ClusterType[] AmpLOH = new ClusterType[]     { GainSomatic, LOH };
 	public static final ClusterType[] OnlyLOH = new ClusterType[]    { LOH };
-	// TODO public static final ClusterType[] AmpLOHcnLOH = new ClusterType[] { GainSomatic, LOH, cnLOH };
-	public static final ClusterType[] AmpLOHcnLOH = new ClusterType[] { GainSomatic, cnLOH, LOH };
+	public static final ClusterType[] AmpLOHcnLOH = new ClusterType[] { GainSomatic, LOH, cnLOH };
+	//public static final ClusterType[] AmpLOHcnLOH = new ClusterType[] { GainSomatic, cnLOH, LOH };
 	
 	//public static int getNumAberrantClusterTypes() { return 2; }
 	
@@ -33,11 +33,15 @@ public enum ClusterType {
 		return (this == LOH);
 	}
 	
-	public boolean isSomaticEvent() {
-		return (this == LOH 
+	public boolean isSomaticCopyNumberEvent() {
+		return (   this == LOH 
 				|| this == cnLOH 
 				|| this == GainSomatic
 				);	
+	}
+	
+	public boolean isCopyNumberChangeGermlineOrSomatic() {
+		return (isSomaticCopyNumberEvent() || (this == GainGermline)); 
 	}
 	
 	/** Compare with lowercase to increase compatibility. */

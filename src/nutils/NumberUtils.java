@@ -6,6 +6,7 @@ import java.util.Collection;
 
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.PoissonDistribution;
+import org.apache.commons.math3.stat.Frequency;
 
 import com.carrotsearch.hppc.DoubleArrayList;
 import com.carrotsearch.hppc.cursors.DoubleCursor;
@@ -134,6 +135,11 @@ public class NumberUtils {
 	// ========================================================================
 	public static final int roundToNearest5(int num) {
 		return (int) (Math.round(num / 5.0) * 5);
+	}
+	
+	// ========================================================================
+	public static double getCumProbInterval(Frequency freqDist, int center, int leeway) {
+		return freqDist.getCumPct(center + leeway) - freqDist.getCumPct(center - leeway);
 	}
 
 	// ========================================================================

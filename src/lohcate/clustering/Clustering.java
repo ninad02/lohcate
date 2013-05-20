@@ -38,6 +38,7 @@ import lohcateEnums.SeqPlatform;
 import nutils.ArrayUtils;
 import nutils.ArrayUtils.ParallelArrayDouble;
 import nutils.ArrayUtils.ParallelArrayDoubleDynamic;
+import nutils.Cast;
 import nutils.CompareUtils;
 import nutils.ContingencyTable;
 import nutils.EnumMapSafe;
@@ -57,6 +58,7 @@ import nutils.math.PoissonDistributionList;
 import org.apache.commons.math3.distribution.PoissonDistribution;
 import org.apache.commons.math3.genetics.PermutationChromosome;
 import org.apache.commons.math3.random.RandomGenerator;
+import org.apache.commons.math3.stat.Frequency;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.jfree.data.xy.DefaultXYDataset;
@@ -445,6 +447,7 @@ public class Clustering {
 		int mostLikelyList = 0;		
 		boolean isLinearFromRegression = false;
 		boolean isLinearFromKMeans = false;
+		boolean noDenserPeaks = false;
 		
 		if (!region.spansOneSite()) {
 			String listOfListOfMeansStr = constrctListofListOfMeans();
@@ -467,7 +470,27 @@ public class Clustering {
 					simpReg.addData(i + 1, vafTumorsSorted.get(i));
 				}
 				System.out.printf("R:\t%12s\t%d\t%d\t%d\t%g\t%g\n", targetEventType, region.getChromosome().ordinal(), indexStart, indexEnd, simpReg.getRSquare(), simpReg.getSumSquaredErrors()); 
-				isLinearFromRegression = (simpReg.getSumSquaredErrors() < 0.01);
+				//TODO isLinearFromRegression = (simpReg.getSumSquaredErrors() < 0.01);
+				
+				// Now test via density
+				Frequency freqDist = new Frequency();
+				double multiplierFreq = 100.0;
+				for (int i = 0; i < vafTumorsSorted.size(); i++) {
+					int vafTumorMultiplied = Cast.toInt( Math.round(vafTumorsSorted.get(i) * multiplierFreq) );
+					freqDist.addValue(vafTumorMultiplied);
+				}
+				DoubleArrayList mostLikelyMeans = listOfListOfMeans.get(mostLikelyList);
+				int mean0 = Cast.toInt(Math.round(mostLikelyMeans.get(0) * multiplierFreq));
+				int mean1 = Cast.toInt(Math.round(mostLikelyMeans.get(1) * multiplierFreq));
+				int leeway = 4;
+				
+				double probMean0  = NumberUtils.getCumProbInterval(freqDist, mean0, leeway); 						
+				double probMean1  = NumberUtils.getCumProbInterval(freqDist, mean1, leeway);
+				double probCenter = NumberUtils.getCumProbInterval(freqDist, 50, leeway);
+				boolean denserPeaks = (probMean0 > probCenter) && (probMean1 > probCenter);
+				System.out.printf("\tFREQ: %d\t%d\t%g\t%g\t%g\n", mean0, mean1, probMean0, probMean1, probCenter);
+				noDenserPeaks = !denserPeaks;
+				
 				
 				// Now do k-means clustering
 				if (!isLinearFromRegression) {
@@ -475,7 +498,7 @@ public class Clustering {
 					ArrayList<DataPoint> kMeansPoints = new ArrayList<DataPoint>(vafTumorsSorted.size());
 					for (int i = 0; i < vafTumorsSorted.size(); i++) {
 						double vafTumorAtSite = vafTumorsSorted.get(i);					
-						vafTumorAtSite = NumberUtils.roundToNearest5((int) Math.round(vafTumorAtSite * multiplier)) / multiplier;
+						vafTumorAtSite = NumberUtils.roundToNearest5(Cast.toInt(Math.round(vafTumorAtSite * multiplier))) / multiplier;
 						DataPoint dp = new DataPoint(vafTumorAtSite, 0, "");
 						kMeansPoints.add(dp);
 					}
@@ -487,14 +510,14 @@ public class Clustering {
 					double normSumSqC2 = c2.getSumSqr() / c2.getNumDataPoints();
 					System.out.printf("\tSS:\t%g\t%g\n", normSumSqC1, normSumSqC2);
 					double thresh = 0.042;
-					isLinearFromKMeans = (normSumSqC1 >= thresh) && (normSumSqC2 >= thresh);
+					//TODO isLinearFromKMeans = (normSumSqC1 >= thresh) && (normSumSqC2 >= thresh);
 				}
 			}
 						
 		} 
 		
 		// Go through VAFs
-		boolean resetToHetGermline = (mostLikelyList == 0) || isLinearFromRegression || isLinearFromKMeans;
+		boolean resetToHetGermline = (mostLikelyList == 0) || isLinearFromRegression || isLinearFromKMeans || noDenserPeaks;
 
 		if (fillRegion && (events != null)) {
 			fillRegion(events, indexStart, indexEnd, resetToHetGermline, targetEventType, oneSampleData, metaData);
@@ -580,10 +603,13 @@ public class Clustering {
 	private static String constrctListofListOfMeans() {
 		StringBuilder sb = new StringBuilder(1024);
 		sb.append("({0.5}");
+		//sb.append(";{0.45,0.55}");
 		sb.append(";{0.4,0.6}");
 		sb.append(";{0.3333,0.6667}");		
 		sb.append(";{0.3,0.7}");
-		sb.append(";{0.2,0.8}");		
+		sb.append(";{0.25,0.75}");
+		sb.append(";{0.2,0.8}");
+		sb.append(";{0.15,0.85}");		
 		sb.append(";{0.1,0.9}");
 		sb.append(";{0.05,0.95}");
 		sb.append(";{0.005,0.995}");
@@ -792,7 +818,7 @@ public class Clustering {
 				}
 				maxPosOnChrom.registerPosition(oneSiteInfo.getChrom(), chromPosTracker.getPositionGenomeWide());
 				
-				if (eventType.isSomaticEvent() || (eventType == ClusterType.GainGermline)) {
+				if (eventType.isSomaticCopyNumberEvent() || (eventType == ClusterType.GainGermline)) {
 					eventsByCoordinate.get(eventType).add(chromPosTracker.getPositionGenomeWide(), sampleIndex);
 				}
 

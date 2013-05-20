@@ -724,6 +724,13 @@ public class Script {
 							regionsInChromMerged.add(regionToExtend);  // add this to the new array
 						}
 					}	
+				} else {
+					if (clusterType.isCopyNumberChangeGermlineOrSomatic() && currentRegion.mCopyNumberClusterType.isCopyNumberChangeGermlineOrSomatic()) {
+						// We know that we have a copy number change event that does not match the targeted 
+						// event type (by virtue of the if-else chain) , and so we do not allow extension 
+						// from a previous region of the targeted event type.
+						regionToExtend = null;
+					}
 				}
 			}		
 		}
