@@ -29,12 +29,15 @@ import kMeans.JCA;
 import lohcate.AllelicBiasTable;
 import lohcate.CopyNumberRegionRange;
 import lohcate.CopyNumberRegionsByChromosome;
+import lohcate.LOHcate;
+import lohcate.LOHcate.SubdirsDefault;
 import lohcate.LOHcateSimulator;
 import lohcate.Script;
 import lohcate.LOHcateSimulator.LOHcateSimulatorParams;
 import lohcateEnums.ClusterType;
 import lohcateEnums.SeqPlatform;
 
+import nutils.ArgumentParserUtils.InputParameterInteger;
 import nutils.ArrayUtils;
 import nutils.ArrayUtils.ParallelArrayDouble;
 import nutils.ArrayUtils.ParallelArrayDoubleDynamic;
@@ -67,6 +70,7 @@ import org.jfree.data.xy.XYSeries;
 import com.carrotsearch.hppc.DoubleArrayList;
 import com.carrotsearch.hppc.IntArrayList;
 import com.carrotsearch.hppc.cursors.DoubleCursor;
+import com.martiansoftware.jsap.JSAP;
 import com.sun.org.apache.xerces.internal.dom.ElementDefinitionImpl;
 
 import nutils.NumberUtils;
@@ -118,12 +122,13 @@ public class Clustering {
 	}
 	
 	// ========================================================================
-	private static void classifySitesHelper_MakeSubDirs(String outDir, String vafComparisonPlotDir, String vafWaterfallPlotDir, String copyNumberPlotDir, String simulationOutputDir) {
-		IOUtils.createDirectoryPath(outDir, false);
-		IOUtils.createDirectoryPath(vafComparisonPlotDir, false);
-		IOUtils.createDirectoryPath(vafWaterfallPlotDir, false);
-		IOUtils.createDirectoryPath(copyNumberPlotDir, false);
-		IOUtils.createDirectoryPath(simulationOutputDir, false);
+	private static void classifySitesHelper_MakeSubDirs(LOHcate.Subdirs lohcateDirs) {
+		IOUtils.createDirectoryPath(lohcateDirs.getSubDirPath(SubdirsDefault.SitesClassified), false);
+		IOUtils.createDirectoryPath(lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_2D), false);
+		IOUtils.createDirectoryPath(lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_GenomeWide), false);
+		IOUtils.createDirectoryPath(lohcateDirs.getSubDirPath(SubdirsDefault.Plots_CopyNumber), false);
+		IOUtils.createDirectoryPath(lohcateDirs.getSubDirPath(SubdirsDefault.Plots_Recurrence), false);
+		IOUtils.createDirectoryPath(lohcateDirs.getSubDirPath(SubdirsDefault.Simulation), false);
 	}
 	
 	// ========================================================================
@@ -298,7 +303,7 @@ public class Clustering {
 			return null;
 		}
 		
-		if (eventTruth == ClusterType.GainGermline && eventTest == ClusterType.Null) {
+		if (eventTruth == ClusterType.GainGermline && eventTest == ClusterType.Ignored) {
 			return Boolean.FALSE;
 		}
 
@@ -327,7 +332,7 @@ public class Clustering {
 		if (CompareUtils.isNull(eventTest))  return null;
 		if (CompareUtils.isNull(eventTruth)) return null;
 		
-		if (eventTruth == ClusterType.GainGermline && eventTest == ClusterType.Null) return Boolean.FALSE;
+		if (eventTruth == ClusterType.GainGermline && eventTest == ClusterType.Ignored) return Boolean.FALSE;
 				
 		counter.increment(eventTruth, eventTest);
 		return Boolean.TRUE;
@@ -357,8 +362,8 @@ public class Clustering {
 	 * @param inDir naf-taf-inputs
 	 * @param opt 0::Illumina, 1::SOLiD
 	 */
-	public static void classifySites(String inDir, String allelicBiasInFile, String sitesClassifiedDir, String vafComparisonPlotDir, String vafWaterfallPlotDir, String copyNumberPlotDir, String simulationOutputDir, SeqPlatform platform, LOHcateSimulator.LOHcateSimulatorParams simulatorParams, String simOutRootFilename) {
-		File[] files = (new File(inDir)).listFiles();
+	public static void classifySites(LOHcate.Subdirs lohcateDirs, String allelicBiasInFile, SeqPlatform platform, LOHcateSimulator.LOHcateSimulatorParams simulatorParams, String simOutRootFilename) {
+		File[] files = (new File(lohcateDirs.getSubDirPath(SubdirsDefault.VAFInputsNormalTumor))).listFiles();
 		
 		// Get the list of valid files
 		ArrayList<File> validFiles = new ArrayList<File>(files.length);		
@@ -388,9 +393,9 @@ public class Clustering {
 		}
 		
 		// Create output directory
-		classifySitesHelper_MakeSubDirs(sitesClassifiedDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir, simulationOutputDir);
-			
-		PrintStream simOutputStream = CompareUtils.isNull(simulatorParams) ? System.out : IOUtils.getPrintStream(simulationOutputDir + File.separator + simOutRootFilename + ".sim.txt");	
+		classifySitesHelper_MakeSubDirs(lohcateDirs);
+					
+		PrintStream simOutputStream = CompareUtils.isNull(simulatorParams) ? System.out : IOUtils.getPrintStream(lohcateDirs.getSubDirPath(SubdirsDefault.Simulation) + File.separator + simOutRootFilename + ".sim.txt");	
 		System.out.println(simOutRootFilename);
 		
 		// Create counters for all events
@@ -412,7 +417,7 @@ public class Clustering {
 			String sampleNameRoot = filename.substring(0, file.getName().indexOf(Script.GermlineSuffix));  	
 			String extension = filename.substring(filename.lastIndexOf(StringUtils.DotStr), filename.length());
 			System.out.println("Processing (" + ++fileIndex + " / " + validFiles.size() + "): " + file.getName());				
-			classifySitesOneSample(file, sampleNameRoot, extension, fileIndex, allelicBiasTable, eventCounts, eventCoordinates, eventTablesTotal, countBreakdownPerEventTotal, simulatorParams, simOutputStream, maxPosOnChrom, sitesClassifiedDir, vafComparisonPlotDir, vafWaterfallPlotDir, copyNumberPlotDir, platform);
+			classifySitesOneSample(file, sampleNameRoot, extension, fileIndex, allelicBiasTable, eventCounts, eventCoordinates, eventTablesTotal, countBreakdownPerEventTotal, simulatorParams, simOutputStream, maxPosOnChrom, lohcateDirs, platform);
 		}
 				
 		// Write out the stats
@@ -424,8 +429,8 @@ public class Clustering {
 		}
 		
 		// Now plot the LOH recurrence across samples
-		ClusteringPlotting.plotRecurrenceGenomeWide(eventCounts, copyNumberPlotDir);
-		ClusteringPlotting.plotEventsByCoordinateAcrossSamples(eventCoordinates, maxPosOnChrom, validFiles.size(), copyNumberPlotDir);
+		ClusteringPlotting.plotRecurrenceGenomeWide(eventCounts, lohcateDirs.getSubDirPath(SubdirsDefault.Plots_Recurrence));
+		ClusteringPlotting.plotEventsByCoordinateAcrossSamples(eventCoordinates, maxPosOnChrom, validFiles.size(), lohcateDirs.getSubDirPath(SubdirsDefault.Plots_Recurrence));
 	}
 	
 	// ========================================================================
@@ -469,8 +474,11 @@ public class Clustering {
 				for (int i = 0; i < vafTumorsSorted.size(); i++) {					
 					simpReg.addData(i + 1, vafTumorsSorted.get(i));
 				}
-				System.out.printf("R:\t%12s\t%d\t%d\t%d\t%g\t%g\n", targetEventType, region.getChromosome().ordinal(), indexStart, indexEnd, simpReg.getRSquare(), simpReg.getSumSquaredErrors()); 
-				//TODO isLinearFromRegression = (simpReg.getSumSquaredErrors() < 0.01);
+				System.out.printf("R:\t%12s\t%d\t%d\t%d\t%g\t%g\n", targetEventType, region.getChromosome().ordinal(), indexStart, indexEnd, simpReg.getRSquare(), simpReg.getSumSquaredErrors()); 		
+				if (targetEventType == ClusterType.cnLOH) {
+					//TODO isLinearFromRegression = (simpReg.getSumSquaredErrors() < 0.01);
+					//isLinearFromRegression = (simpReg.getSumSquaredErrors() < 0.01);
+				}
 				
 				// Now test via density
 				Frequency freqDist = new Frequency();
@@ -540,7 +548,7 @@ public class Clustering {
 					events.set(row, ClusterType.HETGermline);
 				}
 			} else {
-				if (event == ClusterType.HETGermline || event == ClusterType.Noise || event == ClusterType.Null) {
+				if (event == ClusterType.HETGermline || event == ClusterType.Noise || event == ClusterType.Ignored) {
 					if (metaData.mVAFNormalHetRange.inRangeLowerExclusive(oneSampleData.getSiteAtIndex(row).calcVAFNormal())) {
 						events.set(row, targetEventType);
 					}
@@ -585,14 +593,15 @@ public class Clustering {
 		} else {
 			int midRegionStartPos = oneSampleData.getSiteAtIndex(regionPrev.getChromosome(), indexRegionPrevEnd   + 1).getPosition();
 			int midRegionEndPos   = oneSampleData.getSiteAtIndex(regionPrev.getChromosome(), indexRegionCurrStart - 1).getPosition();
-			int numHetSitesThreshold = 6;
+			InputParameterInteger numHetSitesThreshold = new InputParameterInteger(6, "", JSAP.NO_SHORTFLAG, "", "");
 			
-			if (numHetSitesMid < numHetSitesThreshold) {
+			if (numHetSitesMid < numHetSitesThreshold.getValue()) {
 				midRegionStartPos = regionPrev.getRangeStart();
 				midRegionEndPos   = regionCurr.getRangeEnd();
 			}
-			
+							
 			midRange.set(regionPrev.getChromosome(), midRegionStartPos, midRegionEndPos, false, indexRegionCurrStart - indexRegionPrevEnd - 1);
+			CompareUtils.ensureTrue(!midRange.spansOneSite(), "Must always span more than one site!");
 			boolean isEventRegion = fillRegionBasedOnVAFMaxLikelihood(midRange, oneSampleData, metaData, null, regionPrev.mCopyNumberClusterType, probFromMaxLikelihood, false);
 			return isEventRegion;
 		}
@@ -628,7 +637,8 @@ public class Clustering {
 			BucketCounterEnumMatrix<ClusterType> countBreakdownPerEventTotal,
 			LOHcateSimulatorParams simulatorParams, PrintStream simOutputStream,
 			MaxPositionsOnChromosome maxPosOnChrom,
-			String sitesClassifiedDir, String vafComparisonPlotDir, String vafWaterfallPlotDir, String copyNumberPlotDir, 
+			LOHcate.Subdirs lohcateDirs,
+			//String sitesClassifiedDir, String vafComparisonPlotDir, String vafWaterfallPlotDir, String copyNumberPlotDir, 
 			SeqPlatform platform) {
 		
 		StringUtils.FileExtensionAndDelimiter fileExtDelim = StringUtils.FileExtensionTSV;	
@@ -649,14 +659,14 @@ public class Clustering {
 		
 		// Initialize output file
 		String outFilename = sampleNameRoot + ".withCopyNum" + sampleFilenameExtension;
-		String outFilenameFullPath = sitesClassifiedDir + File.separator + outFilename;
+		String outFilenameFullPath = lohcateDirs.getSubDirPath(SubdirsDefault.SitesClassified) + File.separator + outFilename;
 		PrintWriter out = new PrintWriter(IOUtils.getBufferedWriter(outFilenameFullPath));
 		out.println(headerStr);
 		
 		// Initialize output file for simulation
 		boolean isSimulation = simulatorParams != null;
 		String outSimFilename = sampleNameRoot + ".simStats" + sampleFilenameExtension;
-		String outSimFilenameFullPath = sitesClassifiedDir + File.separator + outSimFilename;
+		String outSimFilenameFullPath = lohcateDirs.getSubDirPath(SubdirsDefault.SitesClassified) + File.separator + outSimFilename;
 		PrintWriter outSim = isSimulation ? new PrintWriter(IOUtils.getBufferedWriter(outSimFilenameFullPath)) : null;
 		
 		// Initialize tables for simulation-evaluation tallying
@@ -838,10 +848,10 @@ public class Clustering {
 			DefaultXYDataset xyDatasetWaterfallPlotNormal = classifySitesHelper_createAndFillXYData(waterfallPlotNormal, boundaryArrays);
 			DefaultXYDataset xyDatasetCopyNumber          = classifySitesHelper_createAndFillXYData(copyNumPlot, boundaryArrays);
 
-			ClusteringPlotting.plotVAFComparison(xyDatasetVAFPlot,            vafComparisonPlotDir + File.separator + sampleNameRoot + ".VAFComparison", sampleNameRoot);
-			ClusteringPlotting.plotVAFGenomeWide(xyDatasetWaterfallPlotTumor,  vafWaterfallPlotDir + File.separator + sampleNameRoot + ".VAF_GenomeWide_Tumor",  sampleNameRoot, true);				
-			ClusteringPlotting.plotVAFGenomeWide(xyDatasetWaterfallPlotNormal, vafWaterfallPlotDir + File.separator + sampleNameRoot + ".VAF_GenomeWide_Normal", sampleNameRoot, false);
-			ClusteringPlotting.plotCopyNumGenomeWide(xyDatasetCopyNumber,        copyNumberPlotDir + File.separator + sampleNameRoot + ".CopyNumber_GenomeWide", sampleNameRoot);				
+			ClusteringPlotting.plotVAFComparison(xyDatasetVAFPlot,             lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_2D)         + File.separator + sampleNameRoot + ".VAFComparison", sampleNameRoot);
+			ClusteringPlotting.plotVAFGenomeWide(xyDatasetWaterfallPlotTumor,  lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_GenomeWide) + File.separator + sampleNameRoot + ".VAF_GenomeWide_Tumor",  sampleNameRoot, true);				
+			ClusteringPlotting.plotVAFGenomeWide(xyDatasetWaterfallPlotNormal, lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_GenomeWide) + File.separator + sampleNameRoot + ".VAF_GenomeWide_Normal", sampleNameRoot, false);
+			ClusteringPlotting.plotCopyNumGenomeWide(xyDatasetCopyNumber,      lohcateDirs.getSubDirPath(SubdirsDefault.Plots_CopyNumber)     + File.separator + sampleNameRoot + ".CopyNumber_GenomeWide", sampleNameRoot);				
 		}
 		out.close();
 				
@@ -1129,7 +1139,7 @@ public class Clustering {
 				
 				// New gene listed.  Thus, set a new row of first gene			
 				rowOfFirstInstanceOfGene = row;				
-				geneRegion = new CopyNumberRegionRange(ClusterType.Null, oneSiteInfo.getChrom(), row);
+				geneRegion = new CopyNumberRegionRange(ClusterType.Ignored, oneSiteInfo.getChrom(), row);
 				geneRegion.mCopyNumber = GenomeConstants.DefaultDiploidCopyNumber;
 				metaData.mGeneRegions.addRegion(geneRegion);				
 				if (metaData.mIsSomaticSite[row]) {
@@ -1322,10 +1332,12 @@ public class Clustering {
 			int indexChromEnd = oneSampleInfo.getIndexChromEnd(chrom);
 			CompareUtils.ensureTrue(indexChromEnd >= 0, "ERROR: Chromosome must have last position!");
 						
-			CopyNumberRegionRange range = new CopyNumberRegionRange(ClusterType.Null, chrom, oneSampleInfo.getSiteAtIndex(indexChromStart).getPosition(), oneSampleInfo.getSiteAtIndex(indexChromEnd).getPosition());
+			CopyNumberRegionRange range = new CopyNumberRegionRange(ClusterType.Ignored, chrom, oneSampleInfo.getSiteAtIndex(indexChromStart).getPosition(), oneSampleInfo.getSiteAtIndex(indexChromEnd).getPosition());
 			int indexOfMostLikelyList = determineCopyGainVAFMaxLikelihood(oneSampleInfo, metaData, range, listOfListOfMeans, TissueType.Normal, probFromMaxLikelihood);
 			
-			metaData.mChromHasGermlineGain[chrom.ordinal()] = (indexOfMostLikelyList > 0);					
+			
+			metaData.mChromHasGermlineGain[chrom.ordinal()] = (indexOfMostLikelyList > 0);
+			//metaData.mChromHasGermlineGain[chrom.ordinal()] = fillRegionBasedOnVAFMaxLikelihood(range, oneSampleInfo, metaData, null, ClusterType.GainGermline, probFromMaxLikelihood, false);
 			//System.out.printf("GermProb\tchr%d\t%g\t%g\t%b\n", chrom.ordinal(), prob[0], prob[1], metaData.mChromHasGermlineGain[chrom.ordinal()]);
 		}
 	}
@@ -1411,7 +1423,7 @@ public class Clustering {
 		//DBScanFaster dbscanner = new DBScanFaster(points, HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
 					
 		ClusteringResults<ClusterType> clusterResults = new ClusteringResults<ClusterType>(sites.getNumSites());
-		clusterResults.initializeResults(sites.getNumSites(), ClusterType.Null);
+		clusterResults.initializeResults(sites.getNumSites(), ClusterType.Ignored);
 		
 		// ----------------------- Scan the lower plane
 		DBScanFaster dbscannerLowerPlane = new DBScanFaster(pointsLowerPlane, Clustering.HET_BALL_EPS, Clustering.HET_BALL_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
@@ -1433,7 +1445,7 @@ public class Clustering {
 			} else {			
 				isNonHetPoint[i] = (clusterAssignmentsLowerPlane[i] != clusterIDofHetBall); 
 				if (isNonHetPoint[i]) {
-					clusterResults.setClassification(indexInMainList, ClusterType.Null, clusterAssignmentsLowerPlane[i]);
+					clusterResults.setClassification(indexInMainList, ClusterType.Ignored, clusterAssignmentsLowerPlane[i]);
 					//nonHetPoints.add(pointsLowerPlane.get(i));				
 				} else {
 					clusterResults.setClassification(indexInMainList, ClusterType.HETGermline, clusterIDofHetBall);					
@@ -1486,7 +1498,7 @@ public class Clustering {
 			} else {
 				if (ForcePointsOnDiagonalAsNull) {
 					if (pointOnDiagonal(pointsUpperPlane.get(ind), ClusterDiagonalLeeway) && isCopyNumInDiploidRange(copyNum)) {						
-						clusterResults.setClassification(indexIntoOriginalRows, ClusterType.Null, clusterAssignmentsUpperPlane[ind]);
+						clusterResults.setClassification(indexIntoOriginalRows, ClusterType.Ignored, clusterAssignmentsUpperPlane[ind]);
 					}
 				}
 				
@@ -1533,13 +1545,13 @@ public class Clustering {
 						eventAtSite = ClusterType.HETSomatic;
 					} else if (vafTumor <= hetBoundaryLower) {
 						// Normal: AA, Tumor: AA [Thus homozygous reference in both, no events]
-						eventAtSite = ClusterType.Null;
+						eventAtSite = ClusterType.Ignored;
 					} else if (vafTumor > hetBoundaryUpper) {
 						// Normal: AA, Tumor: BB or CC [made by: AA -> AB or AC (somatic het mutation) -> B or C (LOH, loss of A)]
 						eventAtSite = ClusterType.LOH;
 					} else {
 						// Normal: AA, Tumor: AB [made by: AA -> AB (somatic het mutation)
-						eventAtSite = ClusterType.Null;
+						eventAtSite = ClusterType.Ignored;
 					}					
 				} else if (RangeDouble.inRangeLowerExclusive(vafNormal, vafNormalRange.getBoundUpper(), Script.MaxVariantAlleleFrequency)) {
 					// We are above the upper frame boundary
@@ -1552,10 +1564,10 @@ public class Clustering {
 						// Normal: BB, Tumor: BB or CC (ambiguous until we know exact variant for tumor)
 						// TODO - Leave as Null for now, but will need to change later to resolve the
 						// ambiguity mentioned above
-						eventAtSite = ClusterType.Null;
+						eventAtSite = ClusterType.Ignored;
 					} else {
 						// Normal: BB, Tumor: AB or CB [made by: BB -> AB (reverse somatic het mutation) or BB -> CB (somatic het mutation)
-						eventAtSite = ClusterType.Null;
+						eventAtSite = ClusterType.Ignored;
 					}
 				} else {
 					CompareUtils.throwErrorAndExit("ERROR: Contradiction - variant allele frequency cannot be in and out of bounds simultanteously!" + vafNormal);

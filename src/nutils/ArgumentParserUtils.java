@@ -10,6 +10,10 @@ import com.martiansoftware.jsap.Switch;
 
 public class ArgumentParserUtils {
 
+	public static final char  NoShortFlag = JSAP.NO_SHORTFLAG;
+	public static final String NoLongFlag = JSAP.NO_LONGFLAG;
+	public static final String NoUsageName = "";
+	
 	// ========================================================================
 	public static abstract class InputParameter<T> {
 		protected char   mFlagShort;
@@ -82,6 +86,10 @@ public class ArgumentParserUtils {
 		
 		public InputParameterBoolean(Boolean defaultValue, String name, char flagShort, String flagLong, String usageName) {
 			super(defaultValue, name, flagShort, flagLong, usageName);
+		}
+		
+		public InputParameterBoolean(Boolean defaultValue, String name) {
+			super(defaultValue, name, NoShortFlag, NoLongFlag, NoUsageName);
 		}
 		
 		public void parseValue(String newValueStr) {

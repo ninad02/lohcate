@@ -26,6 +26,7 @@ public class ControlFlagBool {
 		mFlag = Boolean.valueOf(value);
 	}
 
+	// ========================================================================
 	/**
 	 * @param args
 	 */

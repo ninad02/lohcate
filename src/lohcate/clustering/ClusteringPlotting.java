@@ -16,7 +16,10 @@ import java.util.Set;
 import lohcateEnums.ClusterType;
 import lohcateEnums.ColorPastel;
 import nutils.ArrayUtils;
+import nutils.ArgumentParserUtils.InputParameterBoolean;
 import nutils.ArrayUtils.ParallelArrayDoubleDynamic;
+import nutils.ArgumentParserUtils;
+import nutils.ControlFlagBool;
 import nutils.EnumMapSafe;
 import nutils.GraphUtils;
 import nutils.PrimitiveWrapper;
@@ -87,12 +90,9 @@ public class ClusteringPlotting {
 			double[][] eventsXY = eventsByCoordinate.get(enumKey).toArrays();
 			xyDataset.addSeries(enumKey.toString(), eventsXY);
 		}
-		
+		 
 		ParallelArrayDoubleDynamic chromBoundaryXY = new ParallelArrayDoubleDynamic();
 		double incr = numSamples / 200.0;
-		System.out.println("HEE");
-		System.out.println(Chrom.Autosomes);
-		System.out.println("HEE2");
 		for (Chrom chrom : Chrom.Autosomes) {
 			long maxPos = maxPosByChrom.getMaxPositionForChrom(chrom);
 			System.out.println("MaxPos:\t" + chrom + "\t" + maxPos);
@@ -311,29 +311,31 @@ public class ClusteringPlotting {
 
 	// ========================================================================
 	static void setSeriesPaintPerCluster(XYItemRenderer itemRenderer) {
-		boolean allGray = false;
-		boolean makeNonEventsInvisible = false;
+		
+		ControlFlagBool allGray                = new ControlFlagBool(false);
+		ControlFlagBool makeNonEventsInvisible = new ControlFlagBool(false);
 			
-		if (allGray) {
+		if (allGray.getValue()) {
 			for (ClusterType eventType : ClusterType.values()) {
 				itemRenderer.setSeriesPaint(eventType.ordinal(), ColorPastel.Gray_50.getColor());
 			}
-			if (makeNonEventsInvisible) {
+			if (makeNonEventsInvisible.getValue()) {
 				itemRenderer.setSeriesPaint(ClusterType.HETGermline.ordinal(), ColorPastel.Gray_15.getColor());
 				itemRenderer.setSeriesPaint(ClusterType.HETSomatic.ordinal(),  ColorPastel.Gray_15.getColor());
 				itemRenderer.setSeriesPaint(ClusterType.Noise.ordinal(),       ColorPastel.Gray_15.getColor());
-				itemRenderer.setSeriesPaint(ClusterType.Null.ordinal(),        ColorPastel.Gray_15.getColor());
+				itemRenderer.setSeriesPaint(ClusterType.Ignored.ordinal(),        ColorPastel.Gray_15.getColor());
 			}
 		} else {
 			for (ClusterType eventType : ClusterType.values()) {
 				itemRenderer.setSeriesPaint(eventType.ordinal(), getColorForEvent(eventType).getColor());
 			}
 		}
-		itemRenderer.setSeriesPaint(ClusterType.Null.ordinal() + 1, ColorPastel.Black.getColor());
+		itemRenderer.setSeriesPaint(ClusterType.values().length, ColorPastel.Black.getColor());
 	}
 
 	// ========================================================================
 	public static ColorPastel getColorForEvent(ClusterType eventType) {
+		System.out.println("EV:\t" + eventType);
 		switch(eventType) {
 		case GainGermline: return ColorPastel.Violet;
 		case GainSomatic:  return ColorPastel.Dark_Red;
@@ -342,7 +344,7 @@ public class ClusteringPlotting {
 		case HETGermline:  return ColorPastel.Gray_60;
 		case HETSomatic:   return ColorPastel.Red_Orange;
 		case Noise:        return ColorPastel.Dark_Pea_Green;
-		case Null:         return ColorPastel.Gray_30;	
+		case Ignored:      return ColorPastel.Gray_30;			
 		default:           return null;
 		}
 	}

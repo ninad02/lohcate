@@ -171,7 +171,7 @@ public class LOHcateSimulator {
 		public void setNumSites(int numSites) {
 			clear();
 			mSomaticEvents.ensureCapacity(numSites);
-			ArrayUtils.addToCollection(mSomaticEvents, ClusterType.Null, numSites, true);
+			ArrayUtils.addToCollection(mSomaticEvents, ClusterType.Ignored, numSites, true);
 		}
 		
 		public void setEventAtSite(int siteIndex, ClusterType eventType) { mSomaticEvents.set(siteIndex, eventType); }
@@ -328,7 +328,7 @@ public class LOHcateSimulator {
 			
 			Genotype genotypeEnum = deduceGenotype(infoOneSite.calcVAFNormal());
 			GenotypeUtils.defineGenotypeAlleles(genotypeEnum, referenceAllele, variantAlleleNormal, genotype);
-			ClusterType eventTypeToAssign = (genotypeEnum == Genotype.EnumHeterozygous ? ClusterType.HETGermline : ClusterType.Null);			
+			ClusterType eventTypeToAssign = (genotypeEnum == Genotype.EnumHeterozygous ? ClusterType.HETGermline : ClusterType.Ignored);			
 			
 			//if (ParametersHATS.GlobalParams.shouldLog()) { SequenceLogger.debugPrint(infoOneSite.getPosition() + "\t" + refAllele); }
 //			if (ParametersHATS.GlobalParams.shouldLog()) {

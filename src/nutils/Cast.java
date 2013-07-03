@@ -15,6 +15,9 @@ public class Cast {
 	public static long toLong(double d) { return Math.round(d); }
 	public static long toLong(float  f) { return Math.round(f); }
 	
+	public static float toFloat(double d) { return (float) d; }
+	public static float toFloat(long l)   { return (float) l; }
+	
 	public static<T, S extends T> T upcast(S source)   { return (T) source; }
 	public static<S, T extends S> T downcast(S source) { return (T) source; }
 

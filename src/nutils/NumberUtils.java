@@ -3,6 +3,7 @@ package nutils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Random;
 
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.PoissonDistribution;
@@ -15,9 +16,9 @@ import cern.jet.random.Binomial;
 import cern.jet.random.engine.DRand;
 
 public class NumberUtils {
-
 	
 	private static Binomial BinomialDistGlobalInstance = new Binomial(100, 0.5, new DRand());
+	public static Random RandomGen = new Random();
 	
 	// ========================================================================
 	public static final double Log10OfZero = -50;
@@ -43,17 +44,22 @@ public class NumberUtils {
 		}
 	}
 
+	// ========================================================================
+	// RANDOM FUNCTIONS
 	// ========================================================================	
-	public static boolean getRandomBit() {
-		return (Math.random() < 0.50);
-	}
+	public static void setSeed(long seed) { RandomGen.setSeed(seed); }
 	
+	// ========================================================================	
+	public static boolean getRandomBit() { return RandomGen.nextBoolean(); }
+
+	// ========================================================================	
 	public static int getRandomInteger(int minValue, int maxValue) {
-		return ((int) (Math.random() * ((long) maxValue - (long) minValue + 1))) + minValue;
+		return ((int) (RandomGen.nextDouble() * ((long) maxValue - (long) minValue + 1))) + minValue;
 	}
-	
+
+	// ========================================================================	
 	public static long getRandomLong(long minValue, long maxValue) {
-		return ((long) (Math.random() * (maxValue - minValue + 1))) + minValue;
+		return ((long) (RandomGen.nextDouble() * (maxValue - minValue + 1))) + minValue;
 	}
 
 

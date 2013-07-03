@@ -36,6 +36,7 @@ import com.martiansoftware.jsap.JSAP;
 import com.martiansoftware.jsap.JSAPResult;
 import com.martiansoftware.jsap.StringParser;
 
+import lohcate.LOHcate.SubdirsDefault;
 import lohcate.clustering.Clustering;
 import lohcate.clustering.ClusteringInputOneSample;
 import lohcate.clustering.ClusteringInputOneSampleMetaData;
@@ -635,7 +636,7 @@ public class Script {
 		
 		// Create an empty return object
 		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName);
-		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(ClusterType.Null, Chrom.c0, 0);
+		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(ClusterType.Ignored, Chrom.c0, 0);
 		
 		// Go chromosome by chromosome
 		for (Chrom chrom : Chrom.Autosomes) {				
@@ -686,7 +687,7 @@ public class Script {
 		
 		// Create an empty return object
 		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName);
-		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(ClusterType.Null, Chrom.c0, 0);
+		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(ClusterType.Ignored, Chrom.c0, 0);
 		
 		// Go chromosome by chromosome
 		for (Chrom chrom : Chrom.Autosomes) {				
@@ -713,7 +714,7 @@ public class Script {
 						
 						boolean shouldCombine = Clustering.combineTwoRegions(regionToExtend, currentRegion, oneSampleData, metaData);					
 						
-						int maxEndIndexInclusive = regionToExtend.getRangeEnd() + maxBasePairsContiguousRegion - 1;						
+						//int maxEndIndexInclusive = regionToExtend.getRangeEnd() + maxBasePairsContiguousRegion - 1;						
 						if (shouldCombine /* currentRegion.getRangeStart() <= maxEndIndexInclusive */) {
 							regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
 							regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());
@@ -850,10 +851,11 @@ public class Script {
 	// ========================================================================
 	private static boolean segmentRegionsOneFile_isValidCluster(ClusterType clusterType) {
 		return (clusterType != ClusterType.Noise && 
-				clusterType != ClusterType.Null  && 
+				clusterType != ClusterType.Ignored  && 
 				clusterType != ClusterType.HETSomatic);
 	}
-	
+
+	// ========================================================================
 	/** Given an "original" list of regions and an "added" list of regions, this
 	 *  takes the union of the regions.  If there are overlaps, the regions
 	 *  are broken into component pieces in which the overlapping sections 
@@ -1528,7 +1530,7 @@ public class Script {
 			// Write samples for each gene out as well
 			ArrayList<String> patientsAllClusters = new ArrayList<String>();
 			for (ClusterType ct : ClusterType.values()) {
-				if ((ct == ClusterType.Noise) || (ct == ClusterType.Null)) continue;
+				if ((ct == ClusterType.Noise) || (ct == ClusterType.Ignored)) continue;
 				
 				ArrayList<String> patientsForEvent = gene.getPatientsForClusterType(ct);
 				for (String patientForEvent : patientsForEvent) {
@@ -1545,17 +1547,7 @@ public class Script {
 	// ENTRY POINT
 	// ========================================================================
 	public static void main(String[] args) {
-		
-		String nafTafInptus     = "naf_taf_inputs";
-		String classifiedSites  = "sites_classified";
-		String vafPlots         = "vafPlots";
-		String vafWaterfallPlots = "vafWaterfallPlots";
-		String copyNumPlots     = "copyNumPlots";
-		String regions          = "regions";
-		String browserTracks    = "browser_tracks";
-		String geneEnrichment   = "gene_enrichment";
-		String simulation       = "simulation";
-		
+				
 		String taskClustering = "clustering";
 		String taskRegions = "regions";
 		String taskGenes = "genes";
@@ -1616,7 +1608,9 @@ public class Script {
 			if (rootFolderName == null) {
 				CompareUtils.ensureTrue(false, "ERROR: Must specify valid root folder name!");
 			}
-					
+			
+			LOHcate.Subdirs subdirs = new LOHcate.Subdirs(rootFolderName);
+			
 			LOHcateSimulator.LOHcateSimulatorParams simParams = null;
 			PrintStream simOutputStream = System.out;			
 			if (simParamsString != null) {				
@@ -1627,33 +1621,31 @@ public class Script {
 			}			
 			
 			//SeqPlatform platform = SeqPlatform.getPlatform(Integer.parseInt(args[2]));
-			Clustering.classifySites(rootFolderName + File.separator + nafTafInptus,
+			Clustering.classifySites(subdirs,				
 									 allelicBiasFilename,
-									 rootFolderName + File.separator + classifiedSites, 
-									 rootFolderName + File.separator + vafPlots, 
-									 rootFolderName + File.separator + vafWaterfallPlots,
-									 rootFolderName + File.separator + copyNumPlots,
-									 rootFolderName + File.separator + simulation,
 					                 SeqPlatform.Illumina,
 					                 simParams,
 					                 simOutRootFilename); //args[2] --> 0::Illumina, 1::SOLiD
 			IOUtils.closePrintStream(simOutputStream);		                 
 			
+			getGeneEnrichment(subdirs.getSubDirPath(SubdirsDefault.SitesClassified), subdirs.getSubDirPath(SubdirsDefault.GeneEnrichment));
+			
 		} else if (taskName.equals(taskRegions)) {			
 			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
 			String rootFolderName = jsapResult.getString(rootFolderPath);
+			LOHcate.Subdirs subdirs = new LOHcate.Subdirs(rootFolderName);
 			
 			System.out.println("Task: Segmentation of regions...");
-			segmentRegionsAllFiles(rootFolderName + File.separator + classifiedSites, 
-								   rootFolderName + File.separator + regions,
-								   rootFolderName + File.separator + browserTracks);
-			
+			segmentRegionsAllFiles(subdirs.getSubDirPath(SubdirsDefault.SitesClassified),
+								   subdirs.getSubDirPath(SubdirsDefault.Regions),
+								   subdirs.getSubDirPath(SubdirsDefault.BrowserTracks));
+								
 		} else if (taskName.equals(taskGenes)) {
 			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
 			String rootFolderName = jsapResult.getString(rootFolderPath);
+			LOHcate.Subdirs subdirs = new LOHcate.Subdirs(rootFolderName);
 			
-			getGeneEnrichment(rootFolderName + File.separator + classifiedSites, 
-							  rootFolderName + File.separator + geneEnrichment);			
+			getGeneEnrichment(subdirs.getSubDirPath(SubdirsDefault.SitesClassified), subdirs.getSubDirPath(SubdirsDefault.GeneEnrichment));
 		}
 		
 		/*

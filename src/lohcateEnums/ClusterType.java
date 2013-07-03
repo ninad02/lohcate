@@ -10,8 +10,9 @@ public enum ClusterType {
 	HETGermline,
 	
 	HETSomatic,
+	//Homozygous,
 	Noise,
-	Null;
+	Ignored;
 		
 	public static final ClusterType[] AmpLOHHetG = new ClusterType[] { GainSomatic, LOH, HETGermline };
 	public static final ClusterType[] AmpLOH = new ClusterType[]     { GainSomatic, LOH };
