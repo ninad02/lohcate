@@ -6,7 +6,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.ListIterator;
 
-import lohcateEnums.ClusterType;
+import lohcateEnums.EventType;
 import nutils.ArrayUtils;
 import nutils.EnumMapSafe;
 
@@ -79,7 +79,7 @@ public class CopyNumberRegionsByChromosome {
 		for (Chrom chrom : Chrom.values()) {
 			for (CopyNumberRegionRange cnrr : mRegionsByChrom.get(chrom)) {
 				sb.setLength(0);
-				sb.append(cnrr.mCopyNumberClusterType);
+				sb.append(cnrr.mCopyNumberEventType);
 				sb.append(delimiter).append(cnrr.mRecurrenceScore);
 				sb.append(delimiter).append(cnrr.toString());
 				sb.append(delimiter).append(cnrr.getChromosome().ordinal());
@@ -87,8 +87,8 @@ public class CopyNumberRegionsByChromosome {
 				sb.append(delimiter).append(cnrr.getRangeEnd());
 				sb.append(delimiter).append(cnrr.getRangeLength());
 				
-				double densityClusterType =        ((double) cnrr.mClusterTypeCounts.getCount(cnrr.mCopyNumberClusterType) / (double) cnrr.getRangeLength());
-				double densityClusterHetGermline = ((double) cnrr.mClusterTypeCounts.getCount(ClusterType.HETGermline)     / (double) cnrr.getRangeLength());
+				double densityClusterType =        ((double) cnrr.mClusterTypeCounts.getCount(cnrr.mCopyNumberEventType) / (double) cnrr.getRangeLength());
+				double densityClusterHetGermline = ((double) cnrr.mClusterTypeCounts.getCount(EventType.HETGermline)     / (double) cnrr.getRangeLength());
 				sb.append(delimiter).append(densityClusterType);
 				sb.append(delimiter).append(densityClusterHetGermline);
 				

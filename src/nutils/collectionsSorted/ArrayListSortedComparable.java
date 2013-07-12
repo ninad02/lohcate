@@ -1,16 +1,8 @@
 package nutils.collectionsSorted;
 
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.NoSuchElementException;
-import java.util.RandomAccess;
 
 public class ArrayListSortedComparable<E extends Comparable<E>> extends ArrayListSortedAbstract<E> {
 	

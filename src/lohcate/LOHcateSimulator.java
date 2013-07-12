@@ -17,7 +17,7 @@ import java.util.Arrays;
 import lohcate.clustering.AlleleFractionStatsForSample;
 import lohcate.clustering.ClusteringInputOneSample;
 import lohcate.clustering.ClusteringInputOneSite;
-import lohcateEnums.ClusterType;
+import lohcateEnums.EventType;
 
 import org.apache.commons.math3.random.JDKRandomGenerator;
 import org.apache.commons.math3.random.RandomDataGenerator;
@@ -159,10 +159,10 @@ public class LOHcateSimulator {
 	// ========================================================================
 	public static class LOHcateSimulatorGoldStandard implements SeqReadSimulator.SeqReadSimulationGoldStandard {
 		
-		ArrayList<ClusterType> mSomaticEvents;
+		ArrayList<EventType> mSomaticEvents;
 		
 		public LOHcateSimulatorGoldStandard(int numSites) {
-			mSomaticEvents = new ArrayList<ClusterType>(numSites);
+			mSomaticEvents = new ArrayList<EventType>(numSites);
 			setNumSites(numSites);
 		}
 		
@@ -171,16 +171,16 @@ public class LOHcateSimulator {
 		public void setNumSites(int numSites) {
 			clear();
 			mSomaticEvents.ensureCapacity(numSites);
-			ArrayUtils.addToCollection(mSomaticEvents, ClusterType.Ignored, numSites, true);
+			ArrayUtils.addToCollection(mSomaticEvents, EventType.Ignored, numSites, true);
 		}
 		
-		public void setEventAtSite(int siteIndex, ClusterType eventType) { mSomaticEvents.set(siteIndex, eventType); }
+		public void setEventAtSite(int siteIndex, EventType eventType) { mSomaticEvents.set(siteIndex, eventType); }
 		
 		public void clear() {
 			mSomaticEvents.clear();
 		}
 		
-		public ClusterType getEvent(int index) { return mSomaticEvents.get(index); }
+		public EventType getEvent(int index) { return mSomaticEvents.get(index); }
 	}
 
 	// ========================================================================
@@ -234,8 +234,8 @@ public class LOHcateSimulator {
 			int regionLength = (int) readSimulator.getRandomDataGenerator().nextExponential(meanLengthCNARegion);
 			//SequenceLogger.outputPrintln("Region Length: " + regionLength);
 			// Get random event type
-			int randomEventIndex = NumberUtils.getRandomInteger(0, ClusterType.AmpLOHcnLOH.length - 1);
-			CopyNumberRegionRange newCNRegion = new CopyNumberRegionRange(ClusterType.AmpLOHcnLOH[randomEventIndex], Chrom.c0, 0);
+			int randomEventIndex = NumberUtils.getRandomInteger(0, EventType.AmpLOHcnLOH.length - 1);
+			CopyNumberRegionRange newCNRegion = new CopyNumberRegionRange(EventType.AmpLOHcnLOH[randomEventIndex], Chrom.c0, 0);
 			
 			RegionSimulator.generateRegion(regionLength, newCNRegion, cnRegions, oneSampleData);
 			chromsUsed[newCNRegion.getChromosome().ordinal()] = true;  // Set this this chromosome was used
@@ -253,7 +253,7 @@ public class LOHcateSimulator {
 					int indexChromEnd = oneSampleData.getIndexChromEnd(germlineGainChrom);
 					if (indexChromEnd - indexChromStart > 1) {
 						CopyNumberRegionRange newCNRegion = 
-								new CopyNumberRegionRange(ClusterType.GainGermline, germlineGainChrom, 
+								new CopyNumberRegionRange(EventType.GainGermline, germlineGainChrom, 
 										oneSampleData.getSiteAtIndex(germlineGainChrom, indexChromStart).getPosition(),
 										oneSampleData.getSiteAtIndex(germlineGainChrom, indexChromEnd).getPosition());
 						cnRegions.add(newCNRegion);
@@ -269,7 +269,7 @@ public class LOHcateSimulator {
 		// Go through the regions and assign 
 		//Print out the regions
 		for (CopyNumberRegionRange region : cnRegions) {
-			System.out.println(region + "\t" + region.mCopyNumberClusterType);
+			System.out.println(region + "\t" + region.mCopyNumberEventType);
 		}
 		
 		// Generate the filename and the outstream		
@@ -328,7 +328,7 @@ public class LOHcateSimulator {
 			
 			Genotype genotypeEnum = deduceGenotype(infoOneSite.calcVAFNormal());
 			GenotypeUtils.defineGenotypeAlleles(genotypeEnum, referenceAllele, variantAlleleNormal, genotype);
-			ClusterType eventTypeToAssign = (genotypeEnum == Genotype.EnumHeterozygous ? ClusterType.HETGermline : ClusterType.Ignored);			
+			EventType eventTypeToAssign = (genotypeEnum == Genotype.EnumHeterozygous ? EventType.HETGermline : EventType.Ignored);			
 			
 			//if (ParametersHATS.GlobalParams.shouldLog()) { SequenceLogger.debugPrint(infoOneSite.getPosition() + "\t" + refAllele); }
 //			if (ParametersHATS.GlobalParams.shouldLog()) {
@@ -344,22 +344,22 @@ public class LOHcateSimulator {
 			if (cnRegion == null) {
 				// Do nothing, we're just using as a placeholder.
 			
-			} else if (cnRegion.mCopyNumberClusterType == ClusterType.GainGermline) {
+			} else if (cnRegion.mCopyNumberEventType == EventType.GainGermline) {
 				copyNumber[TissueType.Normal.mCode][phaseToChange.mCode] = ++(copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode]);
-				eventTypeToAssign = ClusterType.GainGermline;
+				eventTypeToAssign = EventType.GainGermline;
 						
-			} else if (cnRegion.mCopyNumberClusterType == ClusterType.GainSomatic) {
+			} else if (cnRegion.mCopyNumberEventType == EventType.GainSomatic) {
 				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getPurity());				
-				eventTypeToAssign = ClusterType.GainSomatic;
+				eventTypeToAssign = EventType.GainSomatic;
 				
-			} else if (cnRegion.mCopyNumberClusterType == ClusterType.LOH) {				
+			} else if (cnRegion.mCopyNumberEventType == EventType.LOH) {				
 				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(0, simParams.getPurity());				
-				eventTypeToAssign = ClusterType.LOH;
+				eventTypeToAssign = EventType.LOH;
 				
-			} else if (cnRegion.mCopyNumberClusterType == ClusterType.cnLOH) {
+			} else if (cnRegion.mCopyNumberEventType == EventType.cnLOH) {
 				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getPurity());
 				copyNumber[TissueType.Tumor.mCode][otherPhase.mCode]    = GenotypeUtils.adjustHaploidCopyNumber(0,                                        simParams.getPurity());
-				eventTypeToAssign = ClusterType.cnLOH;
+				eventTypeToAssign = EventType.cnLOH;
 			}
 			
 			// Finally do the gold standard assignment

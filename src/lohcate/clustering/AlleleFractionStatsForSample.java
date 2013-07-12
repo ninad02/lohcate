@@ -2,7 +2,6 @@ package lohcate.clustering;
 
 import genomeUtils.SiteList;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 
 import lohcateEnums.SeqPlatform;

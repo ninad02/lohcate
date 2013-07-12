@@ -2,7 +2,7 @@ package lohcateEnums;
 
 import java.util.ArrayList;
 
-public enum ClusterType {
+public enum EventType {
 	GainGermline,	
 	GainSomatic,
 	LOH,	
@@ -14,10 +14,10 @@ public enum ClusterType {
 	Noise,
 	Ignored;
 		
-	public static final ClusterType[] AmpLOHHetG = new ClusterType[] { GainSomatic, LOH, HETGermline };
-	public static final ClusterType[] AmpLOH = new ClusterType[]     { GainSomatic, LOH };
-	public static final ClusterType[] OnlyLOH = new ClusterType[]    { LOH };
-	public static final ClusterType[] AmpLOHcnLOH = new ClusterType[] { GainSomatic, LOH, cnLOH };
+	public static final EventType[] AmpLOHHetG = new EventType[] { GainSomatic, LOH, HETGermline };
+	public static final EventType[] AmpLOH = new EventType[]     { GainSomatic, LOH };
+	public static final EventType[] OnlyLOH = new EventType[]    { LOH };
+	public static final EventType[] AmpLOHcnLOH = new EventType[] { GainSomatic, LOH, cnLOH };
 	//public static final ClusterType[] AmpLOHcnLOH = new ClusterType[] { GainSomatic, cnLOH, LOH };
 	
 	//public static int getNumAberrantClusterTypes() { return 2; }
@@ -25,7 +25,7 @@ public enum ClusterType {
 	public static int getNumClusterTypes() { return values().length; }
 	
 	
-	public static ClusterType getClusterType(int code) {
+	public static EventType getClusterType(int code) {
 		return (code >= values().length) ? null : values()[code];
 	}
 	
@@ -46,8 +46,8 @@ public enum ClusterType {
 	}
 	
 	/** Compare with lowercase to increase compatibility. */
-	public static ClusterType getClusterType(String clusterTypeName) {
-		for (ClusterType ct : values()) {
+	public static EventType getClusterType(String clusterTypeName) {
+		for (EventType ct : values()) {
 			if (ct.name().equalsIgnoreCase(clusterTypeName)) {
 				return ct;
 			}

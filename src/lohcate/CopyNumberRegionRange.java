@@ -2,7 +2,7 @@ package lohcate;
 import genomeEnums.Chrom;
 import genomeUtils.GenomeConstants;
 import genomeUtils.RegionRange;
-import lohcateEnums.ClusterType;
+import lohcateEnums.EventType;
 import nutils.counter.BucketCounterEnum;
 
 
@@ -11,31 +11,31 @@ import nutils.counter.BucketCounterEnum;
  *  regions into three such objects based on the clustering type (Dup, LOH, HET)
  */
 public class CopyNumberRegionRange extends RegionRange {
-	public ClusterType mCopyNumberClusterType;
+	public EventType mCopyNumberEventType;
 	public float mRecurrenceScore;
 	public double mCopyNumber;
-	protected BucketCounterEnum<ClusterType> mClusterTypeCounts;
+	protected BucketCounterEnum<EventType> mClusterTypeCounts;
 	
-	public CopyNumberRegionRange(ClusterType eventType, Chrom chrom, int regionStart) {
+	public CopyNumberRegionRange(EventType eventType, Chrom chrom, int regionStart) {
 		super(chrom, regionStart);
 		constructorCommon(eventType);
 	}		
 	
-	public CopyNumberRegionRange(ClusterType eventType, Chrom chrom, int regionStart, int regionEnd) {
+	public CopyNumberRegionRange(EventType eventType, Chrom chrom, int regionStart, int regionEnd) {
 		super(chrom, regionStart, regionEnd);
 		constructorCommon(eventType);
 	}
 	
-	private void constructorCommon(ClusterType eventType) {
-		mCopyNumberClusterType = eventType;
+	private void constructorCommon(EventType eventType) {
+		mCopyNumberEventType = eventType;
 		mRecurrenceScore = 1.0f;
 		mCopyNumber = GenomeConstants.DefaultDiploidCopyNumber;
-		mClusterTypeCounts = new BucketCounterEnum<ClusterType>(ClusterType.class);				
+		mClusterTypeCounts = new BucketCounterEnum<EventType>(EventType.class);				
 	}
 	
 	public CopyNumberRegionRange(CopyNumberRegionRange rhs) {
 		super(rhs);
-		mCopyNumberClusterType = rhs.mCopyNumberClusterType;
+		mCopyNumberEventType = rhs.mCopyNumberEventType;
 		mRecurrenceScore       = rhs.mRecurrenceScore;
 		mCopyNumber            = rhs.mCopyNumber;
 		mClusterTypeCounts     = rhs.mClusterTypeCounts.getCopy();

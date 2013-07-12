@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Set;
 
-import lohcateEnums.ClusterType;
+import lohcateEnums.EventType;
 import lohcateEnums.ColorPastel;
 import nutils.ArrayUtils;
 import nutils.ArgumentParserUtils.InputParameterBoolean;
@@ -141,7 +141,7 @@ public class ClusteringPlotting {
 
 	// ========================================================================
 	/** Plots the event recurrence genome-wide. */
-	public static void plotRecurrenceGenomeWideByEvent(EnumMapSafe<Chrom, DynamicBucketCounter> eventCount, String outDir, ClusterType eventType) {
+	public static void plotRecurrenceGenomeWideByEvent(EnumMapSafe<Chrom, DynamicBucketCounter> eventCount, String outDir, EventType eventType) {
 		DoubleArrayList positionsGenomeWideAllSamples = new DoubleArrayList();
 		DoubleArrayList lohCountAllSamples            = new DoubleArrayList();
 		double lastPositionOnPrevChrom = 0;
@@ -183,8 +183,8 @@ public class ClusteringPlotting {
 	}
 	
 	// ========================================================================
-	public static void plotRecurrenceGenomeWide(EnumMapSafe<ClusterType, EnumMapSafe<Chrom, DynamicBucketCounter>> eventCounts, String outDir) {
-		for (ClusterType event : ClusterType.values()) {
+	public static void plotRecurrenceGenomeWide(EnumMapSafe<EventType, EnumMapSafe<Chrom, DynamicBucketCounter>> eventCounts, String outDir) {
+		for (EventType event : EventType.values()) {
 			plotRecurrenceGenomeWideByEvent(eventCounts.get(event), outDir, event);
 		}
 	}
@@ -316,25 +316,25 @@ public class ClusteringPlotting {
 		ControlFlagBool makeNonEventsInvisible = new ControlFlagBool(false);
 			
 		if (allGray.getValue()) {
-			for (ClusterType eventType : ClusterType.values()) {
+			for (EventType eventType : EventType.values()) {
 				itemRenderer.setSeriesPaint(eventType.ordinal(), ColorPastel.Gray_50.getColor());
 			}
 			if (makeNonEventsInvisible.getValue()) {
-				itemRenderer.setSeriesPaint(ClusterType.HETGermline.ordinal(), ColorPastel.Gray_15.getColor());
-				itemRenderer.setSeriesPaint(ClusterType.HETSomatic.ordinal(),  ColorPastel.Gray_15.getColor());
-				itemRenderer.setSeriesPaint(ClusterType.Noise.ordinal(),       ColorPastel.Gray_15.getColor());
-				itemRenderer.setSeriesPaint(ClusterType.Ignored.ordinal(),        ColorPastel.Gray_15.getColor());
+				itemRenderer.setSeriesPaint(EventType.HETGermline.ordinal(), ColorPastel.Gray_15.getColor());
+				itemRenderer.setSeriesPaint(EventType.HETSomatic.ordinal(),  ColorPastel.Gray_15.getColor());
+				itemRenderer.setSeriesPaint(EventType.Noise.ordinal(),       ColorPastel.Gray_15.getColor());
+				itemRenderer.setSeriesPaint(EventType.Ignored.ordinal(),        ColorPastel.Gray_15.getColor());
 			}
 		} else {
-			for (ClusterType eventType : ClusterType.values()) {
+			for (EventType eventType : EventType.values()) {
 				itemRenderer.setSeriesPaint(eventType.ordinal(), getColorForEvent(eventType).getColor());
 			}
 		}
-		itemRenderer.setSeriesPaint(ClusterType.values().length, ColorPastel.Black.getColor());
+		itemRenderer.setSeriesPaint(EventType.values().length, ColorPastel.Black.getColor());
 	}
 
 	// ========================================================================
-	public static ColorPastel getColorForEvent(ClusterType eventType) {
+	public static ColorPastel getColorForEvent(EventType eventType) {
 		System.out.println("EV:\t" + eventType);
 		switch(eventType) {
 		case GainGermline: return ColorPastel.Violet;

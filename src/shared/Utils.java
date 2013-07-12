@@ -8,7 +8,7 @@ import java.util.Collection;
 import nutils.NumberUtils;
 
 
-import lohcateEnums.ClusterType;
+import lohcateEnums.EventType;
 
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes

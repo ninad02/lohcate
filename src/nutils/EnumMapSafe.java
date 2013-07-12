@@ -36,6 +36,7 @@ public class EnumMapSafe<K extends Enum<K>, V> extends EnumMap<K, V> {
 	}
 	
 	// ========================================================================
+	@Deprecated	
 	public V get(Object o) throws UnsupportedOperationException {
 		((new Exception("ERROR: Unsupported EnumMapSafe operation: get(Object)!"))).printStackTrace();
 		System.exit(-1);

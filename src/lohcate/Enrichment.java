@@ -480,7 +480,7 @@ public class Enrichment {
 				for (int row = 1; row < load.length; row++) { //iterate through genes
 					String[] columns = load[row].split(StringUtils.TabStr);
 					
-					if (columns[4].equals(Script.MissingGeneNameValue)) { //avoid "." gene name
+					if (columns[4].equals(Regions.MissingGeneNameValue)) { //avoid "." gene name
 						if (ArrayUtils.linearSearch(blacklist, row)==-1 && Float.parseFloat(columns[baseColOfClusterTypes]) > temp_max) {
 							temp_max = Float.parseFloat(columns[baseColOfClusterTypes]);
 							temp_max_ind = row;

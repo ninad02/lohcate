@@ -1,7 +1,6 @@
 package lohcate.clustering;
 
 import java.util.Comparator;
-import java.util.GregorianCalendar;
 
 /**
  * An interface that represents a point.  This allows for any class to represent a 

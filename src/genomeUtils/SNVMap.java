@@ -13,7 +13,9 @@ import java.util.Iterator;
 
 import nutils.ArrayUtils;
 import nutils.CompareUtils;
+import nutils.EnumMapSafe;
 import nutils.IOUtils;
+import nutils.NullaryClassFactory;
 import nutils.StringUtils;
 
 
@@ -31,37 +33,36 @@ public class SNVMap {
 	public static final int IndexAlleleBoth = 2;
 	public static final int NumAllelesInCallSet = 2;
 	
-	ArrayList<LongArrayList> mSNVsByPosition;
-	ArrayList<LongArrayList> mSNVsByRsId;	
+	EnumMapSafe<Chrom, LongArrayList> mSNVsByPosition;
+	EnumMapSafe<Chrom, LongArrayList> mSNVsByRsId;	
 	
 	public static final int DefaultRsId = 0;
 	public static final boolean DefaultStrand = true;
 	
 	public SNVMap() {
-		mSNVsByPosition = new ArrayList<LongArrayList>();
-		mSNVsByRsId     = new ArrayList<LongArrayList>();	
+		mSNVsByPosition = new EnumMapSafe<Chrom, LongArrayList>(Chrom.class);				
+		mSNVsByRsId     = new EnumMapSafe<Chrom, LongArrayList>(Chrom.class);	
 		
 		for (Chrom chrom : Chrom.values()) {
-			mSNVsByPosition.add(new LongArrayList());
-			mSNVsByRsId.add(new LongArrayList());
+			mSNVsByPosition.put(chrom, new LongArrayList());					
+			mSNVsByRsId.put(chrom, new LongArrayList());
 		}
 	}
 	
 	public static boolean isMissingAllele(char allele) { return Nuc.isValid(allele); }			
 	
 	public void printMe(boolean orderedByPosition, String outFilename) {
-		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);
-		ArrayList<LongArrayList> tableToPrint = orderedByPosition ? mSNVsByPosition : mSNVsByRsId;
-		printMe(tableToPrint, out, orderedByPosition);
+		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);		
+		printMe((orderedByPosition ? mSNVsByPosition : mSNVsByRsId), out, orderedByPosition);
 		IOUtils.closeBufferedWriter(out);
 	}
 	
-	private static void printMe(ArrayList<LongArrayList> tableToPrint, BufferedWriter out, boolean orderedByPosition) {
+	private static void printMe(EnumMapSafe<Chrom, LongArrayList> tableToPrint, BufferedWriter out, boolean orderedByPosition) {
 		Nuc[] nucs = new Nuc[NumAllelesInCallSet];
 		StringBuilder sb = new StringBuilder(2048);
 		int novelCounter = 0;
 		for (Chrom chrom : Chrom.values()) {
-			LongArrayList listOfSites = tableToPrint.get(chrom.ordinal());
+			LongArrayList listOfSites = tableToPrint.get(chrom);
 			for (int i = 0; i < listOfSites.size(); i++) {
 				long compactUnit = listOfSites.get(i);
 				sb.setLength(0);
@@ -102,7 +103,7 @@ public class SNVMap {
 		if (!uniqueOnly || (resultIndex < 0)) {
 			int insertionIndex = (resultIndex < 0) ? -(resultIndex + 1) : resultIndex;
 			long compactUnit = compactSNPInfo(position, rsId, nuc1, nuc2, false);
-			mSNVsByPosition.get(chrom.ordinal()).insert(insertionIndex, compactUnit);
+			mSNVsByPosition.get(chrom).insert(insertionIndex, compactUnit);
 			return Boolean.TRUE;
 		} else {
 			return Boolean.FALSE;
@@ -186,7 +187,7 @@ public class SNVMap {
 	// in question as well as whether the array should be ordered by position (true)
 	// or rsId.
 	private LongArrayList getArrayForChrom(Chrom chrom, boolean orderedByPosition) {
-		return (orderedByPosition ? mSNVsByPosition.get(chrom.ordinal()) : mSNVsByRsId.get(chrom.ordinal()));				
+		return (orderedByPosition ? mSNVsByPosition.get(chrom) : mSNVsByRsId.get(chrom));				
 	}
 	
 	// ========================================================================
@@ -639,7 +640,7 @@ public class SNVMap {
 			for (int trial = 0; trial < numTrials; trial++) {
 				int rsID = NumberUtils.getRandomInteger(0, 67108863);
 				int position = NumberUtils.getRandomInteger(0, 2147483647);
-				boolean strand = NumberUtils.getRandomBit();
+				//boolean strand = NumberUtils.getRandomBit();
 
 				assignedNucs[0] = Nuc.getAllele(NumberUtils.getRandomInteger(Nuc.A.getCode(), Nuc.N.getCode()));
 				assignedNucs[1] = Nuc.getAllele(NumberUtils.getRandomInteger(Nuc.A.getCode(), Nuc.N.getCode()));

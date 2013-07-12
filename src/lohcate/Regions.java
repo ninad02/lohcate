@@ -43,7 +43,7 @@ import lohcate.clustering.ClusteringInputOneSampleMetaData;
 import lohcate.clustering.ClusteringInputOneSite;
 import lohcate.clustering.ClusteringParams;
 import lohcate.clustering.ClusteringPlotting;
-import lohcateEnums.ClusterType;
+import lohcateEnums.EventType;
 import lohcateEnums.ColorPastel;
 import lohcateEnums.MutationType;
 import lohcateEnums.SeqPlatform;
@@ -58,7 +58,7 @@ import lohcateEnums.SeqPlatform;
  * @author Ninad Dewal, Siddharth G. Reddy
  *
  */
-public class Script {
+public class Regions {
 	
 	public static final int DefaultDiploidCopyNumber = 2;
 	
@@ -151,8 +151,8 @@ public class Script {
 				rows.set(rowIndex, null);
 			} else {
 				// Do some light GC filtering
-				Chrom chrom = Chrom.getChrom(    StringUtils.extractNthColumnValue(row, Script.Col_NAFTAFInput_Chrom,               StringUtils.FileExtensionTSV.mDelimiter));
-				int position = Integer.parseInt( StringUtils.extractNthColumnValue(row, Script.Col_NAFTAFInput_Position,            StringUtils.FileExtensionTSV.mDelimiter));
+				Chrom chrom = Chrom.getChrom(    StringUtils.extractNthColumnValue(row, Regions.Col_NAFTAFInput_Chrom,               StringUtils.FileExtensionTSV.mDelimiter));
+				int position = Integer.parseInt( StringUtils.extractNthColumnValue(row, Regions.Col_NAFTAFInput_Position,            StringUtils.FileExtensionTSV.mDelimiter));
 				String gcString =                StringUtils.extractNthColumnValue(row,        Col_NAFTAFInput_FlankingStringTumor, StringUtils.FileExtensionTSV.mDelimiter);
 				
 				int posDiff = position - windowPositionStart;
@@ -231,15 +231,15 @@ public class Script {
 		
 		// Now we have all the contiguous regions from all the samples.  Find the regions of the cluster type		
 		// Declare the maximum stretch of a region for a particular cluster type
-		EnumMapSafe<ClusterType, Integer> maxBasePairsContiguousRegion = ArrayUtils.createEnumMap(ClusterType.class, Integer.MAX_VALUE);
-		maxBasePairsContiguousRegion.put(ClusterType.GainSomatic, REGION_SEGMENTATION_DIST_THRESHOLD);
-		maxBasePairsContiguousRegion.put(ClusterType.cnLOH,       REGION_SEGMENTATION_DIST_THRESHOLD);
-		maxBasePairsContiguousRegion.put(ClusterType.LOH,         REGION_SEGMENTATION_DIST_THRESHOLD);
+		EnumMapSafe<EventType, Integer> maxBasePairsContiguousRegion = ArrayUtils.createEnumMap(EventType.class, Integer.MAX_VALUE);
+		maxBasePairsContiguousRegion.put(EventType.GainSomatic, REGION_SEGMENTATION_DIST_THRESHOLD);
+		maxBasePairsContiguousRegion.put(EventType.cnLOH,       REGION_SEGMENTATION_DIST_THRESHOLD);
+		maxBasePairsContiguousRegion.put(EventType.LOH,         REGION_SEGMENTATION_DIST_THRESHOLD);
 		
-		EnumMapSafe<ClusterType, ArrayList<CopyNumberRegionsByChromosome>> regionsInSamplesPerEventType =
-				ArrayUtils.createEnumMapOfArrayLists(ClusterType.class, CopyNumberRegionsByChromosome.class);
+		EnumMapSafe<EventType, ArrayList<CopyNumberRegionsByChromosome>> regionsInSamplesPerEventType =
+				ArrayUtils.createEnumMapOfArrayLists(EventType.class, CopyNumberRegionsByChromosome.class);
 		
-		for (ClusterType clusterType : ClusterType.AmpLOHHetG) { 						
+		for (EventType clusterType : EventType.AmpLOHHetG) { 						
 			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = regionsInSamplesPerEventType.get(clusterType);	
 			
 			for (CopyNumberRegionsByChromosome regionsInOneSample : regionsInSamples) {
@@ -253,10 +253,10 @@ public class Script {
 		PrintStream out = IOUtils.getPrintStream(outDir + File.separator + "testOut.txt");
 		
 		// Now we want to determine the recurrent regions
-		EnumMapSafe<ClusterType, CopyNumberRegionsByChromosome> regionsRecurrentPerEventType = 
-				new EnumMapSafe<ClusterType, CopyNumberRegionsByChromosome>(ClusterType.class);	
+		EnumMapSafe<EventType, CopyNumberRegionsByChromosome> regionsRecurrentPerEventType = 
+				new EnumMapSafe<EventType, CopyNumberRegionsByChromosome>(EventType.class);	
 		
-		for (ClusterType clusterType : ClusterType.AmpLOHHetG) { 					
+		for (EventType clusterType : EventType.AmpLOHHetG) { 					
 			CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType = determineRecurrentRegions(regionsInSamplesPerEventType.get(clusterType), clusterType);
 			regionsRecurrentPerEventType.put(clusterType, recurrentRegionsForOneClusterType);
 			recurrentRegionsForOneClusterType.print(out, fileExtDelim.mDelimiter);
@@ -267,7 +267,7 @@ public class Script {
 		System.out.println("Scoring regions...");
 		// Now, we need to go through the recurrent regions and score them, based on the 
 		// contents of the individual samples that make up the recurrent regions.
-		for (ClusterType clusterType : ClusterType.AmpLOHHetG) {
+		for (EventType clusterType : EventType.AmpLOHHetG) {
 			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = regionsInSamplesPerEventType.get(clusterType);
 			CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType = regionsRecurrentPerEventType.get(clusterType);			
 			
@@ -279,7 +279,7 @@ public class Script {
 
 		System.out.println("Generating Browser tracks...");
 		// Generatebrowser tracks
-		for (ClusterType clusterType : ClusterType.OnlyLOH) {
+		for (EventType clusterType : EventType.OnlyLOH) {
 			//ClusterType clusterType = ClusterType.OnlyLOH[clusterIndex];
 			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = regionsInSamplesPerEventType.get(clusterType);
 			CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType = regionsRecurrentPerEventType.get(clusterType);
@@ -292,7 +292,7 @@ public class Script {
 	
 	// ========================================================================
 	/** Plots a genome wide recurrence plot. */
-	public static void plotRecurrence(CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType, String outDir, ClusterType eventType) {
+	public static void plotRecurrence(CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType, String outDir, EventType eventType) {
 		
 		EnumMapSafe<Chrom, DynamicBucketCounter> eventCount = DynamicBucketCounter.ClassFactory.newEnumMap(Chrom.class);
 		
@@ -353,7 +353,7 @@ public class Script {
 				
 				final Chrom chrom  = Chrom.getChrom                       (StringUtils.extractNthColumnValue(line, ColCuratedTSV_Chrom,    StringUtils.TabStr));					
 				final int position = Integer.parseInt                     (StringUtils.extractNthColumnValue(line, ColCuratedTSV_Position, StringUtils.TabStr));
-				final ClusterType clusterType = ClusterType.getClusterType(StringUtils.extractNthColumnValue(line, ColCuratedTSV_Cluster,  StringUtils.TabStr));
+				final EventType clusterType = EventType.getClusterType(StringUtils.extractNthColumnValue(line, ColCuratedTSV_Cluster,  StringUtils.TabStr));
 				
 				if ((prevChrom == null) || (chrom != prevChrom)) {
 					regionsInChr =                regionsGenomeWide.mRegionsByChrom.get(chrom);
@@ -447,7 +447,7 @@ public class Script {
 	 *  for each intersecting region the recurrence score across samples.
 	 *   
 	 */
-	public static CopyNumberRegionsByChromosome determineRecurrentRegions(ArrayList<CopyNumberRegionsByChromosome> regionsInSamples, ClusterType clusterType) {
+	public static CopyNumberRegionsByChromosome determineRecurrentRegions(ArrayList<CopyNumberRegionsByChromosome> regionsInSamples, EventType clusterType) {
 		
 		// Test for a null parameter
 		if (regionsInSamples.isEmpty()) return null;
@@ -465,14 +465,14 @@ public class Script {
 
 	// ========================================================================
 	/** Given the merged segmented regions in one sample, this method prints the regions to file. */
-	public static void printSegmentedRegionsToFile(String outDir, CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType) {
+	public static void printSegmentedRegionsToFile(String outDir, CopyNumberRegionsByChromosome regionsInSample, EventType clusterType) {
 				
 		String outFilename = outDir + File.separator + "Regions.GISTIC." + clusterType.name() + "." + regionsInSample.mSampleName + ".txt";
 		StringBuilder sb = new StringBuilder(2048);
 		String delim = StringUtils.FileExtensionTSV.mDelimiter;
 		
 		
-		double copyNumBase = (clusterType == ClusterType.GainSomatic) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);		
+		double copyNumBase = (clusterType == EventType.GainSomatic) ? 2.5 : (clusterType == EventType.LOH ? 1.5 : 2.0);		
 //		double log2RatioGisticCol = log2Ratio - 1.0;
 //		double log2CopyNumGistic = log2CopyNum - 1.0;
 		
@@ -507,15 +507,37 @@ public class Script {
 	}
 	
 	
-	public static void printSegmentedRegionsToFile(String outDir, CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType, SNVMap snvMap) {
+	// ========================================================================
+	// Printing JISTIC relevant output
+	// ========================================================================
+	public static void printSegmentedRegionsToFile_GISTIC(
+			BufferedWriter outputWriter, 
+			CopyNumberRegionsByChromosome regionsInSample, 
+			ArrayList<EventType> events, 
+			ClusteringInputOneSample oneSampleInfo, 
+			ClusteringInputOneSampleMetaData metaData, 
+			SNVMap snvMap) {
+		
+		
+		
+		StringBuilder sb = new StringBuilder(2048);
+		String delim = StringUtils.FileExtensionTSV.mDelimiter;
+		CopyNumberRegionRange dummyRange = new CopyNumberRegionRange(EventType.HETGermline, Chrom.c0, 0);
+		
+		
+	}
+	
+	
+	
+	public static void printSegmentedRegionsToFile(String outDir, CopyNumberRegionsByChromosome regionsInSample, EventType clusterType, SNVMap snvMap) {
 		
 		String outFilename = outDir + File.separator + "Regions.GISTIC." + clusterType.name() + "." + regionsInSample.mSampleName + ".txt";
 		StringBuilder sb = new StringBuilder(2048);
 		String delim = StringUtils.FileExtensionTSV.mDelimiter;
-		CopyNumberRegionRange dummyRange = new CopyNumberRegionRange(ClusterType.HETGermline, Chrom.c0, 0);		
+		CopyNumberRegionRange dummyRange = new CopyNumberRegionRange(EventType.HETGermline, Chrom.c0, 0);		
 		double dummyRangeCopyNumberBase = 2.0;
 		
-		double copyNumBase = (clusterType == ClusterType.GainSomatic) ? 2.5 : (clusterType == ClusterType.LOH ? 1.5 : 2.0);		
+		double copyNumBase = (clusterType == EventType.GainSomatic) ? 2.5 : (clusterType == EventType.LOH ? 1.5 : 2.0);		
 //		double log2RatioGisticCol = log2Ratio - 1.0;
 //		double log2CopyNumGistic = log2CopyNum - 1.0;
 		
@@ -531,6 +553,7 @@ public class Script {
 			int indexInMap = 0;
 			boolean dummyRangeValid = false;
 						
+			// First scan and see if we have any regions preceding the first chromosomal position in the map
 			while (regionsInChromIter.hasNext()) {
 				currentRegion = regionsInChromIter.next();
 				if (currentRegion.afterRange(chrom, snvMap.getPosition(chrom, indexInMap))) {
@@ -632,11 +655,11 @@ public class Script {
 	/** Given the segmented regions in one sample, this method merges the regions of one type (LOH, Amp, etc) 
 	 *  in the following manner.  LOH/Amp regions cannot be longer than maxLengthContiguousRegion long. 
 	 */
-	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraintsOld(CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType, int maxBasePairsContiguousRegion) {
+	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraintsOld(CopyNumberRegionsByChromosome regionsInSample, EventType clusterType, int maxBasePairsContiguousRegion) {
 		
 		// Create an empty return object
 		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName);
-		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(ClusterType.Ignored, Chrom.c0, 0);
+		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(EventType.Ignored, Chrom.c0, 0);
 		
 		// Go chromosome by chromosome
 		for (Chrom chrom : Chrom.Autosomes) {				
@@ -649,7 +672,7 @@ public class Script {
 			// Iterate through the regions for this chromosome
 			for (CopyNumberRegionRange currentRegion : regionsInChromOriginal) {
 
-				if (currentRegion.mCopyNumberClusterType == clusterType) {
+				if (currentRegion.mCopyNumberEventType == clusterType) {
 					// Check if there's a region already waiting for extension.  
 					// If not, create a new one (and a copy at that), and add to array
 					if (regionToExtend == null) {
@@ -657,8 +680,8 @@ public class Script {
 						regionsInChromMerged.add(regionToExtend);  // add this to the new array
 						
 					} else {
-						if (currentRegion.mCopyNumberClusterType != regionToExtend.mCopyNumberClusterType) {
-							CompareUtils.throwErrorAndExit("ERROR: Must have same cluster type!\t" + currentRegion.mCopyNumberClusterType + "\t" + regionToExtend.mCopyNumberClusterType);
+						if (currentRegion.mCopyNumberEventType != regionToExtend.mCopyNumberEventType) {
+							CompareUtils.throwErrorAndExit("ERROR: Must have same cluster type!\t" + currentRegion.mCopyNumberEventType + "\t" + regionToExtend.mCopyNumberEventType);
 						}
 						
 						int maxEndIndexInclusive = regionToExtend.getRangeEnd() + maxBasePairsContiguousRegion - 1;						
@@ -683,11 +706,11 @@ public class Script {
 	/** Given the segmented regions in one sample, this method merges the regions of one type (LOH, Amp, etc) 
 	 *  in the following manner.  LOH/Amp regions cannot be longer than maxLengthContiguousRegion long. 
 	 */
-	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraints(CopyNumberRegionsByChromosome regionsInSample, ClusterType clusterType, int maxBasePairsContiguousRegion, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
+	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraints(CopyNumberRegionsByChromosome regionsInSample, EventType eventType, int maxBasePairsContiguousRegion, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
 		
 		// Create an empty return object
 		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName);
-		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(ClusterType.Ignored, Chrom.c0, 0);
+		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(EventType.Ignored, Chrom.c0, 0);
 		
 		// Go chromosome by chromosome
 		for (Chrom chrom : Chrom.Autosomes) {				
@@ -700,7 +723,7 @@ public class Script {
 			// Iterate through the regions for this chromosome
 			for (CopyNumberRegionRange currentRegion : regionsInChromOriginal) {
 
-				if (currentRegion.mCopyNumberClusterType == clusterType) {
+				if (currentRegion.mCopyNumberEventType == eventType) {
 					// Check if there's a region already waiting for extension.  
 					// If not, create a new one (and a copy at that), and add to array
 					if (regionToExtend == null) {
@@ -708,8 +731,8 @@ public class Script {
 						regionsInChromMerged.add(regionToExtend);  // add this to the new array
 						
 					} else {
-						if (currentRegion.mCopyNumberClusterType != regionToExtend.mCopyNumberClusterType) {
-							CompareUtils.throwErrorAndExit("ERROR: Must have same cluster type!\t" + currentRegion.mCopyNumberClusterType + "\t" + regionToExtend.mCopyNumberClusterType);
+						if (currentRegion.mCopyNumberEventType != regionToExtend.mCopyNumberEventType) {
+							CompareUtils.throwErrorAndExit("ERROR: Must have same cluster type!\t" + currentRegion.mCopyNumberEventType + "\t" + regionToExtend.mCopyNumberEventType);
 						}
 						
 						boolean shouldCombine = Clustering.combineTwoRegions(regionToExtend, currentRegion, oneSampleData, metaData);					
@@ -726,7 +749,7 @@ public class Script {
 						}
 					}	
 				} else {
-					if (clusterType.isCopyNumberChangeGermlineOrSomatic() && currentRegion.mCopyNumberClusterType.isCopyNumberChangeGermlineOrSomatic()) {
+					if (eventType.isCopyNumberChangeGermlineOrSomatic() && currentRegion.mCopyNumberEventType.isCopyNumberChangeGermlineOrSomatic()) {
 						// We know that we have a copy number change event that does not match the targeted 
 						// event type (by virtue of the if-else chain) , and so we do not allow extension 
 						// from a previous region of the targeted event type.
@@ -759,9 +782,9 @@ public class Script {
 		Collections.sort(allLines, LineComparatorTab);	
 		
 		// Read the event results
-		ArrayList<ClusterType> events = new ArrayList<ClusterType>(allLines.size());
+		ArrayList<EventType> events = new ArrayList<EventType>(allLines.size());
 		for (String line : allLines) {
-			ClusterType event = ClusterType.getClusterType(StringUtils.extractNthColumnValue(line, Script.ColCuratedTSV_Cluster, fileExtAndDelim.mDelimiter));
+			EventType event = EventType.getClusterType(StringUtils.extractNthColumnValue(line, Regions.ColCuratedTSV_Cluster, fileExtAndDelim.mDelimiter));
 			CompareUtils.ensureTrue(CompareUtils.isNotNull(event), "ERROR: segmentRegionsOneFile(): Event is not a valid enumerated event type!");
 			events.add(event);
 		}
@@ -774,7 +797,7 @@ public class Script {
 	}
 	
 	// ========================================================================
-	public static CopyNumberRegionsByChromosome segmentRegionsOneSample(ClusteringInputOneSample oneSampleInfo, ArrayList<ClusterType> eventPerSite, String outDir, SNVMap snvMap) {
+	public static CopyNumberRegionsByChromosome segmentRegionsOneSample(ClusteringInputOneSample oneSampleInfo, ArrayList<EventType> eventPerSite, String outDir, SNVMap snvMap) {
 		// Have an array of regions for amplifications and LOH
 		CopyNumberRegionsByChromosome regionsByChrom = new CopyNumberRegionsByChromosome(oneSampleInfo.getSampleNameRoot());		 	
 		CopyNumberRegionRange currentRegion = null;
@@ -787,14 +810,16 @@ public class Script {
 			
 			final Chrom chrom  = oneSiteInfo.getChrom();									
 			final int position = oneSiteInfo.getPosition();
-			ClusterType eventType = eventPerSite.get(row);
+			EventType eventType = eventPerSite.get(row);
 			final int rsId = (oneSiteInfo.getRsID() < 0) ? 0 : oneSiteInfo.getRsID();
 			
 			// Convert cnLOH cluster type to LOH
 			//eventType = eventType.isLOH() ? ClusterType.LOH : eventType;
 			
 			// Register the site in the map
-			snvMap.registerSNV(chrom, position, rsId, Nuc.N, Nuc.N, true, true);
+			if (CompareUtils.isNotNull(snvMap)) {
+				snvMap.registerSNV(chrom, position, rsId, Nuc.N, Nuc.N, true, true);
+			}
 			
 			// If the chromosome has changed, we set that we have no current region
 			if (chromPosTrack.chromCrossedWithCurrentCoordinates(chrom, position) && (currentRegion != null)) {
@@ -804,7 +829,7 @@ public class Script {
 			
 			// Now determine whether we create or extend regions
 			if (currentRegion == null) {
-				if (segmentRegionsOneFile_isValidCluster(eventType)) {
+				if (segmentRegionsOneFile_isValidEvent(eventType)) {
 					currentRegion = new CopyNumberRegionRange(eventType, chrom, position);
 					regionsByChrom.addRegion(chrom, currentRegion);
 				}
@@ -821,7 +846,7 @@ public class Script {
 				}
 								
 				// Now we know the position is after the current range end				
-				if ((currentRegion.mCopyNumberClusterType == eventType) 
+				if ((currentRegion.mCopyNumberEventType == eventType) 
 					//&& (position - currentRegion.getRangeEnd() < REGION_SEGMENTATION_DIST_THRESHOLD * 1000) 
 				 	) {
 					boolean result = currentRegion.extendRange(chrom, position);
@@ -832,7 +857,7 @@ public class Script {
 					// The cluster types are different, or the chrom didn't match, 
 					// or the position was too far away.  Create a new region and add it
 					// if it is not null or it is not noise.					
-					if (segmentRegionsOneFile_isValidCluster(eventType)) {
+					if (segmentRegionsOneFile_isValidEvent(eventType)) {
 						currentRegion.makeFinalized();
 						currentRegion = new CopyNumberRegionRange(eventType, chrom, position);
 						regionsByChrom.addRegion(chrom, currentRegion);
@@ -849,10 +874,10 @@ public class Script {
 	}
 	
 	// ========================================================================
-	private static boolean segmentRegionsOneFile_isValidCluster(ClusterType clusterType) {
-		return (clusterType != ClusterType.Noise && 
-				clusterType != ClusterType.Ignored  && 
-				clusterType != ClusterType.HETSomatic);
+	private static boolean segmentRegionsOneFile_isValidEvent(EventType eventType) {
+		return (eventType != EventType.Noise && 
+				eventType != EventType.Ignored  && 
+				eventType != EventType.HETSomatic);
 	}
 
 	// ========================================================================
@@ -888,10 +913,9 @@ public class Script {
 	 *  be modified, then he/she should pass in a copy.
 	 */
 	public static CopyNumberRegionsByChromosome
-		takeUnionAndBreakDownIntersectingRegions(CopyNumberRegionsByChromosome regionsTarget, CopyNumberRegionsByChromosome regionsSource, final ClusterType clusterType) {
+		takeUnionAndBreakDownIntersectingRegions(CopyNumberRegionsByChromosome regionsTarget, CopyNumberRegionsByChromosome regionsSource, final EventType clusterType) {
 		
 		// First iterate over the chromosomes
-		// for (int chromIndex = 1; chromIndex < regionsTarget.mRegionsByChrom.size(); chromIndex++) {
 		for (Chrom chrom : Chrom.Autosomes) {
 			ArrayList<CopyNumberRegionRange> regionsChrTarget = regionsTarget.mRegionsByChrom.get(chrom);
 			ArrayList<CopyNumberRegionRange> regionsChrSource = regionsSource.mRegionsByChrom.get(chrom);
@@ -902,7 +926,7 @@ public class Script {
 	}
 	
 	public static ArrayList<CopyNumberRegionRange>
-		takeUnionAndBreakDownIntersectingRegions(ArrayList<CopyNumberRegionRange> regionsTarget, ArrayList<CopyNumberRegionRange> regionsSource, final ClusterType clusterType) {		
+		takeUnionAndBreakDownIntersectingRegions(ArrayList<CopyNumberRegionRange> regionsTarget, ArrayList<CopyNumberRegionRange> regionsSource, final EventType clusterType) {		
 		
 		// Make a pseudo-shallow array copy so we don't alter the caller's master copy 
 		regionsSource = new ArrayList<CopyNumberRegionRange>(regionsSource);  
@@ -917,11 +941,11 @@ public class Script {
 			CopyNumberRegionRange regionSource = regionsSource.get(indexSource);
 
 			// Check and make sure that we are using the correct cluster type
-			if (regionTarget.mCopyNumberClusterType != clusterType) {
+			if (regionTarget.mCopyNumberEventType != clusterType) {
 				regionsTarget.remove(indexTarget);
 				//indexTarget++;
 				continue;
-			} else if (regionSource.mCopyNumberClusterType != clusterType) {
+			} else if (regionSource.mCopyNumberEventType != clusterType) {
 				regionsSource.remove(indexSource);
 				//indexSource++;
 				continue;
@@ -1009,7 +1033,7 @@ public class Script {
 		// were already traversed, or they already exist in the original array.  However, we need to remove
 		// elements that may not match the cluster type desired
 		while (indexTarget < regionsTarget.size()) {
-			if (regionsTarget.get(indexTarget).mCopyNumberClusterType != clusterType) {
+			if (regionsTarget.get(indexTarget).mCopyNumberEventType != clusterType) {
 				regionsTarget.remove(indexTarget);
 			} else {
 				indexTarget++;
@@ -1019,7 +1043,7 @@ public class Script {
 		// We only need to add elements (actually, their copies) if more still exist in the source array. 
 		for (; indexSource < regionsSource.size(); indexSource++) {
 			CopyNumberRegionRange regionSource = regionsSource.get(indexSource);
-			if (regionSource.mCopyNumberClusterType == clusterType) {
+			if (regionSource.mCopyNumberEventType == clusterType) {
 				regionsTarget.add(regionSource.getCopy());
 			}
 		}
@@ -1078,7 +1102,7 @@ public class Script {
 	}
 
 	// ========================================================================
-	private static void getBrowserTracksHelper_Helper_findMinMaxPositionsAcrossSamplesPerChromosome(int[] minPerChrom, int[] maxPerChrom, ArrayList<File> sampleFiles, ClusterType clusterType) {
+	private static void getBrowserTracksHelper_Helper_findMinMaxPositionsAcrossSamplesPerChromosome(int[] minPerChrom, int[] maxPerChrom, ArrayList<File> sampleFiles, EventType clusterType) {
 		Arrays.fill(minPerChrom, Integer.MAX_VALUE);
 		Arrays.fill(maxPerChrom, Integer.MIN_VALUE);
 		
@@ -1092,7 +1116,7 @@ public class Script {
 				
 				final Chrom chrom  = Chrom.getChrom  (StringUtils.extractNthColumnValue(line, ColCuratedTSV_Chrom,    StringUtils.TabStr));					
 				final int position = Integer.parseInt(StringUtils.extractNthColumnValue(line, ColCuratedTSV_Position, StringUtils.TabStr));
-				final ClusterType clusterTypeForSite = ClusterType.getClusterType(StringUtils.extractNthColumnValue(line, ColCuratedTSV_Cluster,      StringUtils.TabStr));
+				final EventType clusterTypeForSite = EventType.getClusterType(StringUtils.extractNthColumnValue(line, ColCuratedTSV_Cluster,      StringUtils.TabStr));
 
 				if (clusterTypeForSite == clusterType) {
 					// Set min, max indices across samples for this chromosome
@@ -1108,7 +1132,7 @@ public class Script {
 	public static void genBrowserTracks(ArrayList<CopyNumberRegionsByChromosome> samplesWithRegions, 
 										ArrayList<File> sampleFiles, 
 										CopyNumberRegionsByChromosome recurrentRegionsForOneClusterType,
-										ClusterType clusterType, String outDir) {		
+										EventType clusterType, String outDir) {		
 
 		// First, we want to find the minimum and maximum positions of sites across samples for each chromosome
 		int numChromArrayElements = Chrom.values().length;		
@@ -1173,7 +1197,7 @@ public class Script {
 
 				final Chrom chrom  = Chrom.getChrom                       (StringUtils.extractNthColumnValue(line, ColCuratedTSV_Chrom,    StringUtils.TabStr));					
 				final int position = Integer.parseInt                     (StringUtils.extractNthColumnValue(line, ColCuratedTSV_Position, StringUtils.TabStr));
-				final ClusterType clusterTypeForSite = ClusterType.getClusterType(StringUtils.extractNthColumnValue(line, ColCuratedTSV_Cluster,      StringUtils.TabStr));
+				final EventType clusterTypeForSite = EventType.getClusterType(StringUtils.extractNthColumnValue(line, ColCuratedTSV_Cluster,      StringUtils.TabStr));
 				final MutationType mutationType = MutationType.getSNVType                  (StringUtils.extractNthColumnValue(line, ColCuratedTSV_MutationType, StringUtils.TabStr));
 				final double vafNormal = Double.parseDouble(StringUtils.extractNthColumnValue(line, ColCuratedTSV_VafNormal, StringUtils.TabStr));
 				final VariantLocation varLoc = Clustering.isVariantInGermline(vafNormal) ? VariantLocation.Germline : VariantLocation.Somatic;
@@ -1197,7 +1221,7 @@ public class Script {
 						theColorMutationType = ColorPastel.Blue;
 					}
 					
-				} else if  (clusterTypeForSite == ClusterType.HETGermline) {					
+				} else if  (clusterTypeForSite == EventType.HETGermline) {					
 					//score = 300; //used with grayscale BEDs (historical artifact)
 					
 					if (mutationType != null) {
@@ -1207,7 +1231,7 @@ public class Script {
 						default: break;
 						}
 					}
-				} else if (clusterTypeForSite == ClusterType.HETSomatic) {
+				} else if (clusterTypeForSite == EventType.HETSomatic) {
 					addSite = true;
 					theColorMutationType = ColorPastel.Darker_Blue_Violet;
 				}
@@ -1331,7 +1355,7 @@ public class Script {
 	
 	// ========================================================================
 	// Convenience function to write the manifest file
-	private static void writeManifestFile(String outDir, ClusterType clusterType, int[][] eventCount, 
+	private static void writeManifestFile(String outDir, EventType clusterType, int[][] eventCount, 
 										  ArrayList<CopyNumberRegionsByChromosome> samplesWithRegions,
 										  String recurrenceNameRoot) {
 		
@@ -1378,7 +1402,7 @@ public class Script {
 
 	// ========================================================================
 	// Convenience function for constructing an output filename string
-	private static String constructGenBrowserTrackFilenamePerSampleAndCluster(String sampleName, ClusterType clusterType, Chrom chrom) {
+	private static String constructGenBrowserTrackFilenamePerSampleAndCluster(String sampleName, EventType clusterType, Chrom chrom) {
 		return clusterType.name() + StringUtils.DotStr + ChromPrefix + chrom.ordinal() + StringUtils.DotStr 
 				                  + sampleName + GenBrowserTrack + StringUtils.FileExtensionTSV.mExtension;
 	}
@@ -1397,7 +1421,7 @@ public class Script {
 		StringUtils.FileExtensionAndDelimiter fileExtDelim = StringUtils.FileTextTabDelim; 
 				
 		StringBuilder sb = new StringBuilder(4096);
-		BucketCounterEnum<ClusterType> clusterTypeCountsGene = new BucketCounterEnum<ClusterType>(ClusterType.class);
+		BucketCounterEnum<EventType> clusterTypeCountsGene = new BucketCounterEnum<EventType>(EventType.class);
 		
 		// A list of genes that we will keep binary sorted for efficieny purposes
 		ArrayList<Gene> genes = new ArrayList<Gene>(); 
@@ -1457,11 +1481,11 @@ public class Script {
 								Clustering.isVariantInGermline(Double.parseDouble(components[ColCuratedTSV_VafNormal])) ? VariantLocation.Germline : VariantLocation.Somatic; 						
 						currentGene.incrementCount(variantLocation);
 																
-						ClusterType clusterType = ClusterType.getClusterType(components[ColCuratedTSV_Cluster]);
+						EventType clusterType = EventType.getClusterType(components[ColCuratedTSV_Cluster]);
 						if (clusterType == null) { CompareUtils.throwErrorAndExit("ERROR: Invalid cluster type: " + components[ColCuratedTSV_Cluster]); }
 						currentGene.incrementCount(clusterType);  // increment LOH/DUP/&c. count
 						double vafTumor = Double.parseDouble(components[ColCuratedTSV_VafTumor]);
-						if ((clusterType == ClusterType.LOH) && (vafTumor > 0.5)) {
+						if ((clusterType == EventType.LOH) && (vafTumor > 0.5)) {
 							currentGene.mCountLOHreferenceLost++;
 							currentGene.addPatientIfNotAlreadyAdded_LOHRefLost(file.getName(), position);
 						}										
@@ -1481,29 +1505,29 @@ public class Script {
 				VariantLocation.Germline.toLowerCase(), 
 				VariantLocation.Somatic.toLowerCase(),
 				
-				ClusterType.GainSomatic.name(),
-				ClusterType.LOH.name(), 
-				ClusterType.LOH.name() + "_refLost",
-				ClusterType.LOH.name() + "_refLost_Positions", 
-				ClusterType.HETGermline.name(),
-				ClusterType.HETSomatic.name(),
+				EventType.GainSomatic.name(),
+				EventType.LOH.name(), 
+				EventType.LOH.name() + "_refLost",
+				EventType.LOH.name() + "_refLost_Positions", 
+				EventType.HETGermline.name(),
+				EventType.HETSomatic.name(),
 				
-				ClusterType.GainSomatic.name() + logStr,
-				ClusterType.LOH.name() + logStr, 
-				ClusterType.LOH.name() + "_refLost" + logStr, 
-				ClusterType.HETGermline.name() + logStr,
-				ClusterType.HETSomatic.name() + logStr,
+				EventType.GainSomatic.name() + logStr,
+				EventType.LOH.name() + logStr, 
+				EventType.LOH.name() + "_refLost" + logStr, 
+				EventType.HETGermline.name() + logStr,
+				EventType.HETSomatic.name() + logStr,
 				
-				ClusterType.GainSomatic.name()              + densityStr,
-				ClusterType.LOH.name()              + densityStr, 
-				ClusterType.LOH.name() + "_refLost" + densityStr, 
-				ClusterType.HETGermline.name()      + densityStr,
-				ClusterType.HETSomatic.name()       + densityStr,
+				EventType.GainSomatic.name()              + densityStr,
+				EventType.LOH.name()              + densityStr, 
+				EventType.LOH.name() + "_refLost" + densityStr, 
+				EventType.HETGermline.name()      + densityStr,
+				EventType.HETSomatic.name()       + densityStr,
 				
-				ClusterType.GainSomatic.name()         + recurrenceStr, 
-				ClusterType.LOH.name()         + recurrenceStr, 
-				ClusterType.HETGermline.name() + recurrenceStr,
-				ClusterType.HETSomatic.name()  + recurrenceStr
+				EventType.GainSomatic.name()         + recurrenceStr, 
+				EventType.LOH.name()         + recurrenceStr, 
+				EventType.HETGermline.name() + recurrenceStr,
+				EventType.HETSomatic.name()  + recurrenceStr
 		};
 		String headerStr = StringUtils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();
 
@@ -1529,8 +1553,8 @@ public class Script {
 		for (Gene gene : genes) {
 			// Write samples for each gene out as well
 			ArrayList<String> patientsAllClusters = new ArrayList<String>();
-			for (ClusterType ct : ClusterType.values()) {
-				if ((ct == ClusterType.Noise) || (ct == ClusterType.Ignored)) continue;
+			for (EventType ct : EventType.values()) {
+				if ((ct == EventType.Noise) || (ct == EventType.Ignored)) continue;
 				
 				ArrayList<String> patientsForEvent = gene.getPatientsForClusterType(ct);
 				for (String patientForEvent : patientsForEvent) {
@@ -1548,141 +1572,7 @@ public class Script {
 	// ========================================================================
 	public static void main(String[] args) {
 				
-		String taskClustering = "clustering";
-		String taskRegions = "regions";
-		String taskGenes = "genes";
-				
-		String[] argsMajor = (args.length > 0) ? (new String[] { args[0], args[1] }) : (new String[] { " " });
-		JSAP jsapTask = new JSAP();
-		
-		String lohcateTask = "TaskName";
-		FlaggedOption task = new FlaggedOption(lohcateTask).setStringParser(JSAP.STRING_PARSER).setRequired(true)
-				.setShortFlag('t').setLongFlag("task").setUsageName(lohcateTask);
-		task.setHelp("Indicate which task LOHcate should perform: {" + taskClustering + ", " + taskRegions + ", " + taskGenes + "}");
-		ArgumentParserUtils.registerJSAPParameter(jsapTask, task);
-		
-		String rootFolderPath = "RootFolderPath";
-		FlaggedOption rootFolder = new FlaggedOption(rootFolderPath).setStringParser(JSAP.STRING_PARSER).setRequired(true)
-				.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("root").setUsageName(rootFolderPath);
-		rootFolder.setHelp("Indicate the root directory of the data");
-		ArgumentParserUtils.registerJSAPParameter(jsapTask, rootFolder);
-		
-		JSAPResult jsapResult = ArgumentParserUtils.parseAndCheck(argsMajor, jsapTask, LOHcate.class.getName());		
-		String taskName = jsapResult.getString(lohcateTask);		
-		
-		long sys_time_init = System.currentTimeMillis();			
-		
-		// ==================
-		// CLUSTERING
-		// ==================
-		if (taskName.equals(taskClustering)) {
-			
-			String allelicBiasFile = "AllelicBiasFile";
-			FlaggedOption allelicBias = new FlaggedOption(allelicBiasFile).setStringParser(JSAP.STRING_PARSER).setRequired(false)
-					.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("allelicBias").setUsageName(allelicBiasFile);
-			allelicBias.setHelp("Specify a file that has allelic biases");
-			ArgumentParserUtils.registerJSAPParameter(jsapTask, allelicBias);
-			
-			String simOutFileRootUsage = "SimulationOutputFilenameRoot";
-			FlaggedOption simOutFileRoot = new FlaggedOption(simOutFileRootUsage).setStringParser(JSAP.STRING_PARSER).setRequired(false)
-					.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("simOutputFileRoot").setUsageName(simOutFileRootUsage);
-			simOutFileRoot.setHelp("Specify the filename root for simulation/evaluation output");
-			ArgumentParserUtils.registerJSAPParameter(jsapTask, simOutFileRoot);		
-			
-			String simParamsUsage = "SimulationParameters";
-			FlaggedOption simParamsDef = new FlaggedOption(simParamsUsage).setStringParser(JSAP.STRING_PARSER).setRequired(false)
-					.setShortFlag(JSAP.NO_SHORTFLAG).setLongFlag("simulation").setUsageName(simParamsUsage);
-			simParamsDef.setHelp("Specifies whether to run internal testing by simulation");
-			ArgumentParserUtils.registerJSAPParameter(jsapTask, simParamsDef);		
-			
-			ClusteringParams clusteringParams = ClusteringParams.GlobalClusteringParams;
-			clusteringParams.registerClusteringParameters(jsapTask);
-			
-			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
-			String rootFolderName      = jsapResult.getString(rootFolderPath);
-			String allelicBiasFilename = jsapResult.getString(allelicBiasFile);
-			String simOutRootFilename  = jsapResult.getString(simOutFileRootUsage);
-			String simParamsString     = jsapResult.getString(simParamsUsage);
-			clusteringParams.configureParameters(jsapResult);
-			
-			if (rootFolderName == null) {
-				CompareUtils.ensureTrue(false, "ERROR: Must specify valid root folder name!");
-			}
-			
-			LOHcate.Subdirs subdirs = new LOHcate.Subdirs(rootFolderName);
-			
-			LOHcateSimulator.LOHcateSimulatorParams simParams = null;
-			PrintStream simOutputStream = System.out;			
-			if (simParamsString != null) {				
-				ClusteringParams.GlobalClusteringParams.setIsSimulation(true);
-				simParams = new LOHcateSimulator.LOHcateSimulatorParams();
-				simParams.setParamsWithString(simParamsString);
-				simParams.printValues(System.out);		
-			}			
-			
-			//SeqPlatform platform = SeqPlatform.getPlatform(Integer.parseInt(args[2]));
-			Clustering.classifySites(subdirs,				
-									 allelicBiasFilename,
-					                 SeqPlatform.Illumina,
-					                 simParams,
-					                 simOutRootFilename); //args[2] --> 0::Illumina, 1::SOLiD
-			IOUtils.closePrintStream(simOutputStream);		                 
-			
-			getGeneEnrichment(subdirs.getSubDirPath(SubdirsDefault.SitesClassified), subdirs.getSubDirPath(SubdirsDefault.GeneEnrichment));
-			
-		} else if (taskName.equals(taskRegions)) {			
-			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
-			String rootFolderName = jsapResult.getString(rootFolderPath);
-			LOHcate.Subdirs subdirs = new LOHcate.Subdirs(rootFolderName);
-			
-			System.out.println("Task: Segmentation of regions...");
-			segmentRegionsAllFiles(subdirs.getSubDirPath(SubdirsDefault.SitesClassified),
-								   subdirs.getSubDirPath(SubdirsDefault.Regions),
-								   subdirs.getSubDirPath(SubdirsDefault.BrowserTracks));
-								
-		} else if (taskName.equals(taskGenes)) {
-			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
-			String rootFolderName = jsapResult.getString(rootFolderPath);
-			LOHcate.Subdirs subdirs = new LOHcate.Subdirs(rootFolderName);
-			
-			getGeneEnrichment(subdirs.getSubDirPath(SubdirsDefault.SitesClassified), subdirs.getSubDirPath(SubdirsDefault.GeneEnrichment));
-		}
-		
-		/*
-		String root = args[0]; //project directory
-		switch (Integer.parseInt(args[1])) { //args[1] --> 'switchboard' parameter
-			case 0:				
-				break;
-			case 1:
-				
-				break;
-			case 2:
-				
-				break;
-				
-			// Everything below this point is Sidd's original code	
-				/*
-			case 5:
-				for (int i = 0; i<Enrichment.cluster_names.length - 1; i++)
-					Enrichment.getPathwayEnrichment(root + "/gene_enrichment.csv", root + "/kegg_pathways_roster.tsv", root + "/kegg/pathway_enrichment/" + Enrichment.cluster_names[i] + ".csv", i);
-				break;
-			case 6:
-				Enrichment.annotatePathways(root + "/gene_enrichment.csv", root + "/kegg_pathways_roster.tsv", root + "/KEGG");
-				break;
-			case 7:
-				Enrichment.getGOTermCounts(root + "/gene_enrichment.csv", root + "/gene_association.goa_human", root + "/GO/counts/go_term_counts.csv");
-				for (int i = 0; i<Enrichment.cluster_names.length - 1; i++) {
-					Enrichment.getGOTermCounts(root + "/gene_enrichment/gene_enrichment_top_" + Enrichment.cluster_names[i] + ".csv", root + "/gene_association.goa_human", root + "/GO/counts/go_term_counts_top_" + Enrichment.cluster_names[i] + ".csv");
-					Enrichment.getGOTermEnrichment(root + "/GO/counts/go_term_counts.csv", root + "/GO/counts/go_term_counts_top_" + Enrichment.cluster_names[i] + ".csv", root + "/GO/enrichment/go_term_enrichment_top_" + Enrichment.cluster_names[i] + ".csv");
-					
-					Enrichment.getGOTermCounts(root + "/gene_enrichment/g1/gene_enrichment_top_" + Enrichment.cluster_names[i] + ".csv", root + "/gene_association.goa_human", root + "/GO/g1/counts/go_term_counts_top_" + Enrichment.cluster_names[i] + ".csv");
-					Enrichment.getGOTermEnrichment(root + "/GO/g1/counts/go_term_counts.csv", root + "/GO/g1/counts/go_term_counts_top_" + Enrichment.cluster_names[i] + ".csv", root + "/GO/g1/enrichment/go_term_enrichment_top_" + Enrichment.cluster_names[i] + ".csv");
-				}
-				break;
-				
-		}*/
-		
-		System.out.println("Time elapsed: " + (System.currentTimeMillis()-sys_time_init)/1000 + " seconds");
+	
 	}
 
 }

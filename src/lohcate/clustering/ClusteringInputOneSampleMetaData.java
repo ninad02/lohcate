@@ -8,7 +8,7 @@ import java.util.Arrays;
 
 import lohcate.CopyNumberRegionRange;
 import lohcate.CopyNumberRegionsByChromosome;
-import lohcate.Script;
+import lohcate.Regions;
 import nutils.PrimitiveWrapper;
 import nutils.RangeDouble;
 import nutils.counter.DynamicBucketCounter;
@@ -75,7 +75,7 @@ public class ClusteringInputOneSampleMetaData {
 	}
 	
 	public void printSiteInformation(PrintWriter out, int row, boolean printNewLine) {
-		out.printf(  "%g\t%g", mTumorCopyNumRatiosPerGene[row], (mTumorCopyNumRatiosPerGene[row] * Script.DefaultDiploidCopyNumber));  
+		out.printf(  "%g\t%g", mTumorCopyNumRatiosPerGene[row], (mTumorCopyNumRatiosPerGene[row] * Regions.DefaultDiploidCopyNumber));  
 		out.printf("\t%g\t%g", mAdjustedVAFTumor[row], mAdjustedVAFNormal[row]);
 		out.printf("\t%g\t%g", mImbalancePValuesTumor[row], mImbalancePValuesNormal[row]);
 		out.printf("\t%g", mSigPValuesPerSite[row]);

@@ -8,7 +8,7 @@ import java.util.Random;
 import nutils.CompareUtils;
 
 
-import lohcateEnums.ClusterType;
+import lohcateEnums.EventType;
 
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
@@ -20,19 +20,19 @@ import lohcateEnums.ClusterType;
  * @author Ninad Dewal
  *
  */
-public class ScriptTest extends Script {
+public class ScriptTest extends Regions {
 	
 	public static void TestRegionOverlaps() {
 		ArrayList<CopyNumberRegionRange> regionList = new ArrayList<CopyNumberRegionRange>();
 		
-		regionList.add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c1, 1, 1000));  //1
-		regionList.add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 1, 1));     //2
-		regionList.add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 1, 1));
-		regionList.add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 1, 10));
-		regionList.add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 4, 5));
-		regionList.add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 9, 10));
-		regionList.add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 5, 9));
-		regionList.add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 6, 8));
+		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c1, 1, 1000));  //1
+		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 1, 1));     //2
+		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 1, 1));
+		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 1, 10));
+		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 4, 5));
+		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 9, 10));
+		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 5, 9));
+		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 6, 8));
 		
 		for (int i = 0; i < regionList.size(); i++) {
 			System.out.print(i);
@@ -65,16 +65,16 @@ public class ScriptTest extends Script {
 			}
 			
 			// Now fill
-			regionsFromSamples.get(0).add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 1, 10));
+			regionsFromSamples.get(0).add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 1, 10));
 
-			regionsFromSamples.get(1).add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 1, 1));
+			regionsFromSamples.get(1).add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 1, 1));
 
-			regionsFromSamples.get(2).add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 4, 5));
-			regionsFromSamples.get(2).add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 9, 10));
+			regionsFromSamples.get(2).add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 4, 5));
+			regionsFromSamples.get(2).add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 9, 10));
 
-			regionsFromSamples.get(3).add(new CopyNumberRegionRange(ClusterType.LOH, Chrom.c2, 5, 9));
+			regionsFromSamples.get(3).add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 5, 9));
 
-			regionsFromSamples.get(4).add(new CopyNumberRegionRange(ClusterType.GainSomatic, Chrom.c2, 6, 8));
+			regionsFromSamples.get(4).add(new CopyNumberRegionRange(EventType.GainSomatic, Chrom.c2, 6, 8));
 
 			
 			// Do random shuffling
@@ -103,13 +103,13 @@ public class ScriptTest extends Script {
 			for (int i = startIndex + increment; (i >= 0) && (i < numSamples); i += increment) {
 				//System.out.println("");
 				//System.out.println(i);
-				Script.takeUnionAndBreakDownIntersectingRegions(regionsFromSamples.get(startIndex), regionsFromSamples.get(i), ClusterType.LOH);
+				Regions.takeUnionAndBreakDownIntersectingRegions(regionsFromSamples.get(startIndex), regionsFromSamples.get(i), EventType.LOH);
 			}
 
 			// Now we print the regions
 			outList.clear();			
 			for (CopyNumberRegionRange cnrr : regionsFromSamples.get(startIndex)) {
-				outList.add(cnrr.toString() + "\t" + cnrr.mCopyNumberClusterType + "\t" + cnrr.mRecurrenceScore);				
+				outList.add(cnrr.toString() + "\t" + cnrr.mCopyNumberEventType + "\t" + cnrr.mRecurrenceScore);				
 			}
 			Collections.sort(outList);
 			

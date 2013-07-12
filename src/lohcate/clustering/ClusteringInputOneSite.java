@@ -7,7 +7,7 @@ import genomeUtils.SiteInformation;
 
 import java.util.Comparator;
 
-import lohcate.Script;
+import lohcate.Regions;
 import lohcateEnums.MutationType;
 import lohcateEnums.SeqPlatform;
 import nutils.BitSetUtils;
@@ -61,13 +61,13 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	
 	// ========================================================================
 	public ClusteringInputOneSite(String line, SeqPlatform platform) {
-		mFlankingNormal = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_FlankingStringNormal,  StringUtils.FileExtensionTSV.mDelimiter);
-		mFlankingTumor  = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_FlankingStringTumor,   StringUtils.FileExtensionTSV.mDelimiter);
+		mFlankingNormal = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_FlankingStringNormal,  StringUtils.FileExtensionTSV.mDelimiter);
+		mFlankingTumor  = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_FlankingStringTumor,   StringUtils.FileExtensionTSV.mDelimiter);
 		
-		mCovgTotalNormal = Short.parseShort(StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_TotalCoverageNormal,   StringUtils.FileExtensionTSV.mDelimiter));
-		mCovgTotalTumor  = Short.parseShort(StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_TotalCoverageTumor,    StringUtils.FileExtensionTSV.mDelimiter));
-		mCovgVarNormal   = Short.parseShort(StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_VariantCoverageNormal, StringUtils.FileExtensionTSV.mDelimiter));
-		mCovgVarTumor    = Short.parseShort(StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_VariantCoverageTumor,  StringUtils.FileExtensionTSV.mDelimiter));
+		mCovgTotalNormal = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_TotalCoverageNormal,   StringUtils.FileExtensionTSV.mDelimiter));
+		mCovgTotalTumor  = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_TotalCoverageTumor,    StringUtils.FileExtensionTSV.mDelimiter));
+		mCovgVarNormal   = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_VariantCoverageNormal, StringUtils.FileExtensionTSV.mDelimiter));
+		mCovgVarTumor    = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_VariantCoverageTumor,  StringUtils.FileExtensionTSV.mDelimiter));
 
 		// Now for rsID
 		if (platform == SeqPlatform.SOLiD) {
@@ -75,8 +75,8 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 			// Sidd: For the NAStr case, strangely, the variant base is n/a in the SOLiD naf-taf-inputs 
 			// (and there's not much point in looking up the reference base's allele frequency)
 		} else if (platform == SeqPlatform.Illumina) {
-			String dbsnpStr = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_DbSNPString, StringUtils.FileExtensionTSV.mDelimiter); 
-			if (dbsnpStr.indexOf(Script.NovelStr) >= 0) {
+			String dbsnpStr = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_DbSNPString, StringUtils.FileExtensionTSV.mDelimiter); 
+			if (dbsnpStr.indexOf(Regions.NovelStr) >= 0) {
 				mRsID = GenotypeUtils.RsID_Novel;
 			} else {
 				String rsNumTemp = GenotypeUtils.extractRsNumberFromLine(dbsnpStr);
@@ -103,29 +103,29 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 			mHugoSymbol = (mHugoSymbol == "") ? Utils.NAStr : mHugoSymbol;
 
 		} else if (platform == SeqPlatform.Illumina) {			
-			String mutationTypeStr = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_MutationType, StringUtils.FileExtensionTSV.mDelimiter);
+			String mutationTypeStr = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_MutationType, StringUtils.FileExtensionTSV.mDelimiter);
 			int mutTypeCode = MutationType.getSNVType(mutationTypeStr).ordinal();
 			mDataUnit_ChromProsRevVarAllelesMutType = bsmMutType.setValueInCompactUnit(mutTypeCode, mDataUnit_ChromProsRevVarAllelesMutType);
 			
-			mHugoSymbol     = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_HugoSymbol, StringUtils.FileExtensionTSV.mDelimiter);
+			mHugoSymbol     = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_HugoSymbol, StringUtils.FileExtensionTSV.mDelimiter);
 			
 		}
 	
 		// Now set the chrom, position, and alleles
-		Chrom chrom  = Chrom.getChrom(   StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_Chrom,     StringUtils.FileExtensionTSV.mDelimiter) );
-		int position = Integer.parseInt( StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_Position,  StringUtils.FileExtensionTSV.mDelimiter) );
+		Chrom chrom  = Chrom.getChrom(   StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Chrom,     StringUtils.FileExtensionTSV.mDelimiter) );
+		int position = Integer.parseInt( StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Position,  StringUtils.FileExtensionTSV.mDelimiter) );
 		
-		char nucChar = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_AlleleRef,  StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
-		Nuc aRef     = nucChar == Script.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
+		char nucChar = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleRef,  StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		Nuc aRef     = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
 		
-		nucChar      = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_AlleleVarN, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
-		Nuc aVarN    = nucChar == Script.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
+		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarN, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		Nuc aVarN    = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
 		
-		nucChar      = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_AlleleVarT, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
-		Nuc aVarT    = nucChar == Script.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
+		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarT, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		Nuc aVarT    = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
 		
-		nucChar      = StringUtils.extractNthColumnValue(line, Script.Col_NAFTAFInput_AlleleVarPop, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
-		Nuc aVarPop  = nucChar == Script.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
+		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarPop, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		Nuc aVarPop  = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
 		
 		setChrom(chrom);
 		setPosition(position);			
@@ -234,7 +234,7 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 		  .append(delimiter).append(calcVAFTumor());
 		
 		if (mRsID == GenotypeUtils.RsID_Novel) {
-			sb.append(delimiter).append(Script.NovelStr);
+			sb.append(delimiter).append(Regions.NovelStr);
 		} else {
 			sb.append(delimiter).append(Utils.rsPrefix).append(mRsID);
 		}

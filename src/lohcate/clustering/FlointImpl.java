@@ -1,5 +1,4 @@
 package lohcate.clustering;
-import java.util.Comparator;
 import java.util.GregorianCalendar;
 
 
@@ -87,7 +86,7 @@ public class FlointImpl implements Comparable<FlointImpl>, Floint {
 					for (int m = 0; m < numIter; m++) {
 						int diff1 = i - j;
 						int diff2 = k - m;
-						double distance = Math.sqrt( diff1 * diff1 + diff2 * diff2 );
+						 Math.sqrt( diff1 * diff1 + diff2 * diff2 );
 					}
 				}
 			}
@@ -98,7 +97,7 @@ public class FlointImpl implements Comparable<FlointImpl>, Floint {
 			for (int j = 0;  j < numIter; j++) {
 				for (int k = 0; k < numIter; k++) {
 					for (int m = 0; m < numIter; m++) {
-						double distance = Math.sqrt( Math.pow((i - j), 2) + Math.pow((k - m), 2) );
+						 Math.sqrt( Math.pow((i - j), 2) + Math.pow((k - m), 2) );
 					}
 				}
 			}

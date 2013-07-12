@@ -17,7 +17,7 @@ public class RegionRange {
 	int mNumSitesInterrogated;
 	
 	public RegionRange(Chrom chrom, int rangeStart) {
-		set(chrom, rangeStart, rangeStart, false, 1);		
+		set(chrom, rangeStart);		
 	}
 	
 	public RegionRange(Chrom chrom, int rangeStart, int rangeEnd) {
@@ -57,6 +57,11 @@ public class RegionRange {
 	
 	/** Returns whether this range is finalized or not. */
 	public boolean isFinalized() { return mRangeFinalized; }
+	
+	/** Sets the range to the given chrom and position.  Automatically sets the range end. */
+	public void set(Chrom chrom, int rangeStart) {
+		set(chrom, rangeStart, rangeStart, false, 1);
+	}
 	
 	/** Sets the range. */
 	public void set(Chrom chrom, int rangeStart, int rangeEnd, boolean makeFinalized, int numSitesInterrogated) {
