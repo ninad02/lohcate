@@ -2,6 +2,7 @@ package nutils;
 
 import genomeEnums.Nuc;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -41,6 +42,31 @@ public class EnumMapSafe<K extends Enum<K>, V> extends EnumMap<K, V> {
 		((new Exception("ERROR: Unsupported EnumMapSafe operation: get(Object)!"))).printStackTrace();
 		System.exit(-1);
 		return null;
+	}
+
+	// ========================================================================
+	public static <E extends Enum<E>, V> EnumMapSafe<E, ArrayList<V>> createEnumMapOfArrayLists(Class<E> enumClass, Class<V> arrayTargetObject) {
+		EnumMapSafe<E, ArrayList<V>> newMap = new EnumMapSafe<E, ArrayList<V>>(enumClass);
+		E[] enumValues = enumClass.getEnumConstants();
+		
+		for (E enumValue : enumValues) {
+			newMap.put(enumValue, new ArrayList<V>());
+		}
+		
+		return newMap;
+	}
+
+	// ========================================================================
+	/** Creates an EnumMap and initializes it with (maps all keys with) the given value. */
+	public static <E extends Enum<E>, V> EnumMapSafe<E, V> createEnumMap(Class<E> enumClass, V initialValue) {
+		EnumMapSafe<E, V> newMap = new EnumMapSafe<E, V>(enumClass);
+		E[] enumValues = enumClass.getEnumConstants();
+		
+		for (E enumValue : enumValues) {
+			newMap.put(enumValue, initialValue);
+		}
+		
+		return newMap;
 	}
 
 	// ========================================================================

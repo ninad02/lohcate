@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.ListIterator;
 
 import lohcateEnums.EventType;
-import nutils.ArrayUtils;
 import nutils.EnumMapSafe;
 
 // ========================================================================
@@ -25,7 +24,7 @@ public class CopyNumberRegionsByChromosome {
 
 	// ========================================================================
 	public CopyNumberRegionsByChromosome(String sampleName) {
-		mRegionsByChrom = ArrayUtils.createEnumMapOfArrayLists(Chrom.class, CopyNumberRegionRange.class);
+		mRegionsByChrom = EnumMapSafe.createEnumMapOfArrayLists(Chrom.class, CopyNumberRegionRange.class);
 		mSampleName = sampleName;
 	}
 	

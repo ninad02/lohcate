@@ -69,6 +69,8 @@ import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.jfree.data.xy.DefaultXYDataset;
 import org.jfree.data.xy.XYSeries;
 
+import JISTIC.convertSEG;
+
 import com.carrotsearch.hppc.DoubleArrayList;
 import com.carrotsearch.hppc.IntArrayList;
 import com.carrotsearch.hppc.cursors.DoubleCursor;
@@ -349,7 +351,7 @@ public class Clustering {
 	public static AllelicBiasTable constructAllelicBiasTable(ArrayList<File> files, AllelicBiasTable biasTable, SNVMap snvMap, FileExtensionAndDelimiter fileExtAndDelim, SeqPlatform platform) {
 		biasTable = CompareUtils.isNull(biasTable) ? new AllelicBiasTable() : biasTable;
 		for (File inFile : files) {
-			ArrayList<String> allLines = readLinesFromFilesAsStringList(inFile, false, false, false);
+			ArrayList<String> allLines = readLinesFromFilesAsStringList(inFile, true, true, true);
 			for (String line : allLines) { 
 				final Chrom chrom  = Chrom.getChrom(   StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Chrom,    fileExtAndDelim.mDelimiter) );
 				final int position = Integer.parseInt( StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Position, fileExtAndDelim.mDelimiter) );
@@ -375,6 +377,7 @@ public class Clustering {
 	 */
 	public static void classifySites(LOHcate.Subdirs lohcateDirs, String allelicBiasInFile, SeqPlatform platform, LOHcateSimulator.LOHcateSimulatorParams simulatorParams, String simOutRootFilename) {
 		File[] files = (new File(lohcateDirs.getSubDirPath(SubdirsDefault.VAFInputsNormalTumor))).listFiles();
+
 		
 		// Get the list of valid files
 		ArrayList<File> validFiles = new ArrayList<File>(files.length);		
@@ -382,6 +385,7 @@ public class Clustering {
 			int indexOfSubstring = file.getName().indexOf(Regions.GermlineSuffix);
 			if (indexOfSubstring >= 0) {
 				validFiles.add(file);
+				System.out.println(file.getName().substring(0, indexOfSubstring));
 			}
 		}
 		
@@ -433,6 +437,8 @@ public class Clustering {
 		String outFilenameGISTIC = lohcateDirs.getSubDirPath(SubdirsDefault.Regions_GISTIC) + File.separator + "Regions.GISTIC.txt";
 		BufferedWriter outGISTIC = IOUtils.getBufferedWriter(outFilenameGISTIC);
 		IOUtils.writeToBufferedWriter(outGISTIC, GISTIC_Input_HeaderString, true);
+		String outFilenameProbeFile = lohcateDirs.getSubDirPath(SubdirsDefault.Regions_GISTIC) + File.separator + "AllProbes.GISTIC.txt";
+		allSitesMap.printMe(true, outFilenameProbeFile, false);		
 		
 		int fileIndex = 0;		
 		for (File file : validFiles) {			
@@ -456,6 +462,19 @@ public class Clustering {
 		// Now plot the LOH recurrence across samples
 		ClusteringPlotting.plotRecurrenceGenomeWide(eventCounts, lohcateDirs.getSubDirPath(SubdirsDefault.Plots_Recurrence));
 		ClusteringPlotting.plotEventsByCoordinateAcrossSamples(eventCoordinates, maxPosOnChrom, validFiles.size(), lohcateDirs.getSubDirPath(SubdirsDefault.Plots_Recurrence));
+		
+	
+		// Now do the GISTIC processing
+		String jisticCovertSEGOutputFilename = lohcateDirs.getSubDirPath(SubdirsDefault.Regions_GISTIC) + File.separator + "Regions.Matrix.JISTIC.txt";
+		convertSEG.main(new String[] {outFilenameGISTIC, outFilenameProbeFile, "outputfile=" + jisticCovertSEGOutputFilename});
+		String jisticInputPathPrefix = IOUtils.pathConcat(new String[] { "E:", "Research", "Code", "Libraries", "Java", "lib", "JISTIC" }) + File.separator; 
+		String jisticlocationsString = "locations=" + jisticInputPathPrefix + "hg18_Gene_Info.txt";
+		String jisticCytobandString  = "bands=" + jisticInputPathPrefix + "Human_cytoBand.txt";
+		String jisticCopyNumberString = "copynumber=" + jisticCovertSEGOutputFilename;
+		
+		String jisticInputSpecFile = IOUtils.pathConcat(new String[] { "spec=" + jisticInputPathPrefix + "glioexample", "focal", "GISTICFocal.spec" });		
+		//String jisticInputSpecFile = IOUtils.pathConcat(new String[] { "spec=" + jisticInputPathPrefix + "glioexample", "limited", "GISTICLimited.spec" });
+		JISTIC.Distribution.main(new String[] { jisticInputSpecFile, jisticCopyNumberString, jisticCytobandString, jisticlocationsString });
 	}
 	
 	// ========================================================================
@@ -678,6 +697,7 @@ public class Clustering {
 		}		
 		ClusteringInputOneSample oneSampleData = readLinesFromFiles(inFile);
 		if (oneSampleData.getNumSites() == 0) return;
+		oneSampleData.mSampleNameRoot = sampleNameRoot;
 
 		String[] columnHeaders = new String[] {
 			"chr", "coordinate", "refBase", "varBase", "variantBase-N", "variantBase-T", "refEnv-N", "refEnv-T", "Q20_TotCov_N", "Q20_TotCov_T", "Q20_VarCov_N", "Q20_VarCov_T", "Q20_VariantRatio_N", "Q20_VariantRatio_T", "dbsnp", "MutationType", "Hugo_Symbol", 
@@ -818,7 +838,7 @@ public class Clustering {
 				// Now, we segment the sample again since now all the sites have been 
 				// processed, and any unassigned sites between CNA regions have been filled in
 				CopyNumberRegionsByChromosome regionsByChromPostFill = Regions.segmentRegionsOneSample(oneSampleData, events, null, null);
-				Regions.printSegmentedRegionsToFile_GISTIC(outGISTIC, regionsByChromPostFill, events, oneSampleData, metaData, allSitesMap);				
+				Regions.ActionerGISTIC actionerGistic = new Regions.ActionerGISTIC(outGISTIC, regionsByChromPostFill, events, oneSampleData, metaData, allSitesMap);				
 			}
 			
 			// Now initialize the data structure needed to plot

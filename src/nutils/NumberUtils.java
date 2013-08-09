@@ -29,6 +29,14 @@ public class NumberUtils {
 		return (n == 0.0) ? Log10OfZero : Math.log10(n); 
 	}
 
+	// ========================================================================
+	public static double MathLog2(double n) { return MathLogBase(n, 2); }
+	
+	// ========================================================================
+	public static double MathLogBase(double n, double base) {
+		return (n == 0.0) ? Double.NaN : (Math.log10(n) / Math.log10(base));
+	}
+
 	/** Parses an integer written possibly and scientific format (with exponents) and returns the integer. 
 	 * For example, 6.5e+07 is returned as 65000000 */
 	public static int parseIntScientific(String token) {

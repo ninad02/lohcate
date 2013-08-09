@@ -1,5 +1,7 @@
 package lohcate;
 import genomeEnums.Chrom;
+import genomeUtils.RegionBreakerAndIntersecter;
+import genomeUtils.RegionBreakerAndIntersecter.RegionIntersectTester;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -100,10 +102,12 @@ public class ScriptTest extends Regions {
 			int startIndex = goForward ? 0 : numSamples - 1;
 			int increment =  goForward ? 1 : -1;
 
+			RegionIntersectTester<CopyNumberRegionRange> regionTester = new Regions.RegionTester(EventType.LOH); 
+					
 			for (int i = startIndex + increment; (i >= 0) && (i < numSamples); i += increment) {
 				//System.out.println("");
 				//System.out.println(i);
-				Regions.takeUnionAndBreakDownIntersectingRegions(regionsFromSamples.get(startIndex), regionsFromSamples.get(i), EventType.LOH);
+				RegionBreakerAndIntersecter.takeUnionAndBreakDownIntersectingRegions(regionsFromSamples.get(startIndex), regionsFromSamples.get(i), regionTester, CopyNumberRegionRange.class);
 			}
 
 			// Now we print the regions

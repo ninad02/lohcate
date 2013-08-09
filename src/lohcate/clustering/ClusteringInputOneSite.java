@@ -10,11 +10,11 @@ import java.util.Comparator;
 import lohcate.Regions;
 import lohcateEnums.MutationType;
 import lohcateEnums.SeqPlatform;
-import nutils.BitSetUtils;
 import nutils.CompareUtils;
 import nutils.NumberUtils;
 import nutils.StringUtils;
-import nutils.BitSetUtils.BitShiftAndMask;
+import nutils.BitUtils.BitSetUtils;
+import nutils.BitUtils.BitShiftAndMask;
 import shared.Utils;
 
 public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite>, SiteInformation.Writeable {
@@ -36,13 +36,13 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	// ========================================================================
 	private long mDataUnit_ChromProsRevVarAllelesMutType;
 	
-	private static final BitSetUtils.BitShiftAndMask bsmChrom = new BitShiftAndMask(5, 58);
-	private static final BitSetUtils.BitShiftAndMask bsmPos   = BitShiftAndMask.createBitShiftAndMaskInChain(28, bsmChrom);
-	private static final BitSetUtils.BitShiftAndMask bsmAlleleRef  = BitShiftAndMask.createBitShiftAndMaskInChain(3, bsmPos);
-	private static final BitSetUtils.BitShiftAndMask bsmAlleleVarN = BitShiftAndMask.createBitShiftAndMaskInChain(3, bsmAlleleRef);
-	private static final BitSetUtils.BitShiftAndMask bsmAlleleVarT = BitShiftAndMask.createBitShiftAndMaskInChain(3, bsmAlleleVarN);
-	private static final BitSetUtils.BitShiftAndMask bsmAlleleVarPop = BitShiftAndMask.createBitShiftAndMaskInChain(3, bsmAlleleVarT);		
-	private static final BitSetUtils.BitShiftAndMask bsmMutType    = BitShiftAndMask.createBitShiftAndMaskInChain(5, bsmAlleleVarPop);
+	private static final BitShiftAndMask bsmChrom = new BitShiftAndMask(5, 58);
+	private static final BitShiftAndMask bsmPos   = BitShiftAndMask.createBitShiftAndMaskInChain(28, bsmChrom);
+	private static final BitShiftAndMask bsmAlleleRef  = BitShiftAndMask.createBitShiftAndMaskInChain(3, bsmPos);
+	private static final BitShiftAndMask bsmAlleleVarN = BitShiftAndMask.createBitShiftAndMaskInChain(3, bsmAlleleRef);
+	private static final BitShiftAndMask bsmAlleleVarT = BitShiftAndMask.createBitShiftAndMaskInChain(3, bsmAlleleVarN);
+	private static final BitShiftAndMask bsmAlleleVarPop = BitShiftAndMask.createBitShiftAndMaskInChain(3, bsmAlleleVarT);		
+	private static final BitShiftAndMask bsmMutType    = BitShiftAndMask.createBitShiftAndMaskInChain(5, bsmAlleleVarPop);
 	
 	public String mFlankingNormal;
 	public String mFlankingTumor;

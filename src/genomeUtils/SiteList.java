@@ -62,6 +62,12 @@ public abstract class SiteList<E extends Comparable<E> & SiteInformation.Writeab
 			}
 		}
 	}
+
+	// ========================================================================
+	public synchronized E getSiteAtPosition(Chrom chrom, int position) {
+		int theIndex = getIndex(chrom, position);
+		return (theIndex < 0) ? null : getSiteAtIndex(chrom, theIndex);
+	}
 	
 	// ========================================================================
 	public synchronized int getIndex(Chrom chrom, int position) {

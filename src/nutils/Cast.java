@@ -18,8 +18,8 @@ public class Cast {
 	public static float toFloat(double d) { return (float) d; }
 	public static float toFloat(long l)   { return (float) l; }
 	
-	public static<T, S extends T> T upcast(S source)   { return (T) source; }
-	public static<S, T extends S> T downcast(S source) { return (T) source; }
+	public static<T, S extends T> T upcast(S source, Class<T> targetClass)   { return (T) source; }
+	public static<S, T extends S> T downcast(S source, Class<T> targetClass) { return (T) source; }
 
 	/**
 	 * @param args

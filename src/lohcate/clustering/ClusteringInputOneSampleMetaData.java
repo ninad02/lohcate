@@ -74,8 +74,16 @@ public class ClusteringInputOneSampleMetaData {
 		return mChromHasGermlineGain[chrom.ordinal()];
 	}
 	
+	public float getTumorNormalCopyNumRatioAtIndex(int row) {
+		return mTumorCopyNumRatiosPerGene[row];
+	}
+	
+	public float getCopyNumberAtIndex(int row) {
+		return mTumorCopyNumRatiosPerGene[row] * Regions.DefaultDiploidCopyNumber;
+	}
+	
 	public void printSiteInformation(PrintWriter out, int row, boolean printNewLine) {
-		out.printf(  "%g\t%g", mTumorCopyNumRatiosPerGene[row], (mTumorCopyNumRatiosPerGene[row] * Regions.DefaultDiploidCopyNumber));  
+		out.printf(  "%g\t%g", mTumorCopyNumRatiosPerGene[row], getCopyNumberAtIndex(row));  
 		out.printf("\t%g\t%g", mAdjustedVAFTumor[row], mAdjustedVAFNormal[row]);
 		out.printf("\t%g\t%g", mImbalancePValuesTumor[row], mImbalancePValuesNormal[row]);
 		out.printf("\t%g", mSigPValuesPerSite[row]);

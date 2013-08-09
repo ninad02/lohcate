@@ -10,6 +10,7 @@ public enum EventType {
 	HETGermline,
 	
 	HETSomatic,
+	DELHom,
 	//Homozygous,
 	Noise,
 	Ignored;

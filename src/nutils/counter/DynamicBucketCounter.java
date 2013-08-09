@@ -1,9 +1,9 @@
 package nutils.counter;
 
 import nutils.ArrayUtils;
-import nutils.BitSetUtils;
 import nutils.PrimitiveWrapper;
 import nutils.NullaryClassFactory;
+import nutils.BitUtils.BitSetUtils;
 
 import com.carrotsearch.hppc.FloatArrayList;
 import com.carrotsearch.hppc.DoubleArrayList;

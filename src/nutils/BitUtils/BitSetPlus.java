@@ -1,4 +1,4 @@
-package nutils;
+package nutils.BitUtils;
 /*
  * @(#)BitSetPlus.java	1.67 06/04/07
  *
@@ -11,6 +11,9 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamField;
+
+import nutils.ArrayUtils;
+import nutils.CompareUtils;
 
 /**
  * This class implements a vector of bits that grows as needed. Each
@@ -836,7 +839,7 @@ public class BitSetPlus implements Cloneable, java.io.Serializable {
 	 * @param   obj   the object to compare with.
 	 * @return  <code>true</code> if the objects are the same;
 	 *          <code>false</code> otherwise.
-	 * @see     java.nutils.BitSetPlus#size()
+	 * @see     nutils.BitUtils.nutils.BitSetPlus#size()
 	 */
 	public boolean equals(Object obj) {
 		if (!(obj instanceof BitSetPlus))
@@ -869,7 +872,7 @@ public class BitSetPlus implements Cloneable, java.io.Serializable {
 	 * <p>Overrides the <code>clone</code> method of <code>Object</code>.
 	 *
 	 * @return  a clone of this bit set.
-	 * @see     java.nutils.BitSetPlus#size()
+	 * @see     nutils.BitUtils.nutils.BitSetPlus#size()
 	 */
 	public Object clone() {
 		if (! mSizeIsSticky)

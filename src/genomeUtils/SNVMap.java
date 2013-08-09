@@ -27,18 +27,21 @@ import nutils.NumberUtils;
 
 public class SNVMap {
 
+	// ========================================================================
 	public static final int NucleotideMapUnknownAlleleIndex = 0;
 	public static final int IndexAlleleA = 0;
 	public static final int IndexAlleleB = 1;
 	public static final int IndexAlleleBoth = 2;
 	public static final int NumAllelesInCallSet = 2;
-	
+
+	public static final int DefaultRsId = 0;
+	public static final boolean DefaultStrand = true;
+
+	// ========================================================================
 	EnumMapSafe<Chrom, LongArrayList> mSNVsByPosition;
 	EnumMapSafe<Chrom, LongArrayList> mSNVsByRsId;	
 	
-	public static final int DefaultRsId = 0;
-	public static final boolean DefaultStrand = true;
-	
+	// ========================================================================
 	public SNVMap() {
 		mSNVsByPosition = new EnumMapSafe<Chrom, LongArrayList>(Chrom.class);				
 		mSNVsByRsId     = new EnumMapSafe<Chrom, LongArrayList>(Chrom.class);	
@@ -49,15 +52,24 @@ public class SNVMap {
 		}
 	}
 	
+	// ========================================================================
 	public static boolean isMissingAllele(char allele) { return Nuc.isValid(allele); }			
-	
-	public void printMe(boolean orderedByPosition, String outFilename) {
-		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);		
-		printMe((orderedByPosition ? mSNVsByPosition : mSNVsByRsId), out, orderedByPosition);
-		IOUtils.closeBufferedWriter(out);
+
+	// ========================================================================
+	public void printMe(boolean orderedByPosition, BufferedWriter out, boolean printAlleles) {
+		printMe((orderedByPosition ? mSNVsByPosition : mSNVsByRsId), out, orderedByPosition, printAlleles, false);
 	}
 	
-	private static void printMe(EnumMapSafe<Chrom, LongArrayList> tableToPrint, BufferedWriter out, boolean orderedByPosition) {
+	// ========================================================================
+	public void printMe(boolean orderedByPosition, String outFilename, boolean printAlleles) {
+		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);		
+		printMe(orderedByPosition, out, printAlleles);
+		IOUtils.closeBufferedWriter(out);
+	}
+		
+	// ========================================================================	
+	private static void printMe(EnumMapSafe<Chrom, LongArrayList> tableToPrint, BufferedWriter out, boolean orderedByPosition, boolean printAlleles, boolean printBinaryForm) {
+		IOUtils.writeToBufferedWriter(out, "Probe\tChromosome\tBasePair", true);
 		Nuc[] nucs = new Nuc[NumAllelesInCallSet];
 		StringBuilder sb = new StringBuilder(2048);
 		int novelCounter = 0;
@@ -77,9 +89,14 @@ public class SNVMap {
 				sb.append(StringUtils.TabStr).append(chrom.ordinal());
 				sb.append(StringUtils.TabStr).append(extractPositionFromCompactForm(compactUnit, !orderedByPosition));
 				
-				extractNucleotideIDsFromCompactForm(compactUnit, nucs);
-				sb.append(StringUtils.TabStr).append(nucs[0]).append(StringUtils.TabStr).append(nucs[1]);
-				sb.append(StringUtils.TabStr).append(Long.toBinaryString(compactUnit));
+				if (printAlleles) {
+					extractNucleotideIDsFromCompactForm(compactUnit, nucs);
+					sb.append(StringUtils.TabStr).append(nucs[0]).append(StringUtils.TabStr).append(nucs[1]);
+				}
+				
+				if (printBinaryForm) {
+					sb.append(StringUtils.TabStr).append(Long.toBinaryString(compactUnit));
+				}
 
 				IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 			}
@@ -600,7 +617,7 @@ public class SNVMap {
 		
 		
 		// Print the Affy structure
-		aMap.printMe(true, "AffyMap.txt");
+		aMap.printMe(true, "AffyMap.txt", true);
 		
 		// Now see that the elements exist
 		//byte[] result;

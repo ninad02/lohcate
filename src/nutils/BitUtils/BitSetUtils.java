@@ -1,4 +1,4 @@
-package nutils;
+package nutils.BitUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -7,9 +7,12 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.Random;
 
+import nutils.CompareUtils;
+import nutils.NumberUtils;
+
 public class BitSetUtils {
 	
-	public static final int NumBitsInLong = 64;
+	public static final int NumBitsInLong = Long.SIZE;
 	
 	public static final long[] MasksUnsignedLong = BitSetUtils.createUnsignedLongMasks();
 	
@@ -450,41 +453,6 @@ public class BitSetUtils {
 		//return ((1L << numBitsDesiredInMask) - 1);
 		return (numBitsDesiredInMask == 0 ? 0 : -1L >>> (NumBitsInLong - numBitsDesiredInMask));
 	}
-
-	// ========================================================================
-	// ========================================================================
-	public static class BitShiftAndMask {
-		public int  mNumBits;
-		public long mNumBitsToShift;
-		public long mMask;
-		public long mMaskShifted;
-		public long mClearShifted;
-		
-		public BitShiftAndMask(int numBits, long numBitsToShift) {
-			super();
-			mNumBits = numBits;
-			mNumBitsToShift = numBitsToShift;
-			mMask = getMask(numBits); 
-            mMaskShifted = mMask << mNumBitsToShift;
-            mClearShifted = ~mMaskShifted;
-		}	
-		
-		public long setValueInCompactUnit(long value, long compactUnit) {
-			value = Math.max(value, 0);
-			value = Math.min(value, mMask);
-			return ((compactUnit & mClearShifted) | (value << mNumBitsToShift));			
-		}
-		
-		public long getValueInCompactUnit(long compactUnit) {
-			return ((compactUnit >>> mNumBitsToShift) & mMask);
-		}
-		
-		public static BitShiftAndMask createBitShiftAndMaskInChain(int numBits, BitShiftAndMask bsm) {
-			return new BitShiftAndMask(numBits, bsm.mNumBitsToShift - numBits);
-		}
-	}
-	// ========================================================================
-	// ========================================================================
 
 	// ========================================================================
 	public interface ValueExtractor {

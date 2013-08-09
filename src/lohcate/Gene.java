@@ -59,7 +59,7 @@ public class Gene implements Comparable<Gene> {
 	}
 	
 	private void initializePatients() {
-		mPatients = ArrayUtils.createEnumMapOfArrayLists(EventType.class, String.class);
+		mPatients = EnumMapSafe.createEnumMapOfArrayLists(EventType.class, String.class);
 		mPatientsWithRefLost = new ArrayList<String>();
 	}
 	

@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
+import nutils.BitUtils.BitSetUtils;
 import nutils.counter.BucketCounterEnum;
 
 import com.carrotsearch.hppc.DoubleArrayList;
@@ -935,30 +936,5 @@ public class ArrayUtils {
 	// ========================================================================
 	public static double[][] combineTwoDynamicArraysIntoOneStatic(DoubleArrayList list1, DoubleArrayList list2) {
 		return new double[][] { list1.toArray(), list2.toArray() };
-	}
-	
-	// ========================================================================
-	public static <E extends Enum<E>, V> EnumMapSafe<E, ArrayList<V>> createEnumMapOfArrayLists(Class<E> enumClass, Class<V> arrayTargetObject) {
-		EnumMapSafe<E, ArrayList<V>> newMap = new EnumMapSafe<E, ArrayList<V>>(enumClass);
-		E[] enumValues = enumClass.getEnumConstants();
-		
-		for (E enumValue : enumValues) {
-			newMap.put(enumValue, new ArrayList<V>());
-		}
-		
-		return newMap;
-	}
-	
-	// ========================================================================
-	/** Creates an EnumMap and initializes it with (maps all keys with) the given value. */
-	public static <E extends Enum<E>, V> EnumMapSafe<E, V> createEnumMap(Class<E> enumClass, V initialValue) {
-		EnumMapSafe<E, V> newMap = new EnumMapSafe<E, V>(enumClass);
-		E[] enumValues = enumClass.getEnumConstants();
-		
-		for (E enumValue : enumValues) {
-			newMap.put(enumValue, initialValue);
-		}
-		
-		return newMap;
 	}
 }
