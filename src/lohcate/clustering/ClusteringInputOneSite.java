@@ -2,6 +2,7 @@ package lohcate.clustering;
 
 import genomeEnums.Chrom;
 import genomeEnums.Nuc;
+import genomeEnums.VariantFrequency;
 import genomeUtils.GenotypeUtils;
 import genomeUtils.SiteInformation;
 
@@ -53,6 +54,7 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	public short mCovgVarNormal;
 	public short mCovgVarTumor;
 	public int mRsID; 
+	public VariantFrequency mVarFrequency;
 	
 	// ========================================================================
 	public ClusteringInputOneSite() {
@@ -69,7 +71,31 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 		mCovgVarNormal   = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_VariantCoverageNormal, StringUtils.FileExtensionTSV.mDelimiter));
 		mCovgVarTumor    = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_VariantCoverageTumor,  StringUtils.FileExtensionTSV.mDelimiter));
 
+		// Now set the chrom, position, and alleles
+		Chrom chrom  = Chrom.getChrom(   StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Chrom,     StringUtils.FileExtensionTSV.mDelimiter) );
+		int position = Integer.parseInt( StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Position,  StringUtils.FileExtensionTSV.mDelimiter) );
+		
+		char nucChar = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleRef,  StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		Nuc aRef     = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
+		
+		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarN, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		Nuc aVarN    = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
+		
+		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarT, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		Nuc aVarT    = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
+		
+		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarPop, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		Nuc aVarPop  = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
+		
+		setChrom(chrom);
+		setPosition(position);			
+		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleRef.setValueInCompactUnit( aRef.getCode(),  mDataUnit_ChromProsRevVarAllelesMutType);
+		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarN.setValueInCompactUnit(aVarN.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
+		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarT.setValueInCompactUnit(aVarT.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
+		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarPop.setValueInCompactUnit(aVarPop.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
+		
 		// Now for rsID
+		mVarFrequency = VariantFrequency.Unknown;
 		if (platform == SeqPlatform.SOLiD) {
 			//variantAnnotation = (germCols[7].indexOf(Script.NovelStr) >= 0) ? Script.NovelStr : Utils.NAStr;
 			// Sidd: For the NAStr case, strangely, the variant base is n/a in the SOLiD naf-taf-inputs 
@@ -78,6 +104,7 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 			String dbsnpStr = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_DbSNPString, StringUtils.FileExtensionTSV.mDelimiter); 
 			if (dbsnpStr.indexOf(Regions.NovelStr) >= 0) {
 				mRsID = GenotypeUtils.RsID_Novel;
+				mVarFrequency = VariantFrequency.Novel;
 			} else {
 				String rsNumTemp = GenotypeUtils.extractRsNumberFromLine(dbsnpStr);
 				
@@ -88,6 +115,48 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 					mRsID = GenotypeUtils.RsID_Unknown;
 				} else {
 					mRsID = GenotypeUtils.getNumberFromRsId(rsNumTemp);
+					
+					System.out.println(dbsnpStr);
+					String[] items = dbsnpStr.split(",");  // Split on the comma
+					String[] alleles = items[2].split(";|\\|");
+					int numElementsTogether = 2;
+					if (alleles.length < numElementsTogether) {
+						mVarFrequency = VariantFrequency.Unknown;
+					} else if (alleles.length == numElementsTogether) {
+						mVarFrequency = VariantFrequency.Unknown;
+					} else if (alleles.length >= numElementsTogether) {
+						mVarFrequency = VariantFrequency.Common;
+						
+						double varFreqLowest = 1.0;
+						Nuc varFreqLowestNuc = Nuc.N;
+						Nuc tempNuc = Nuc.N;
+						for (int i = 0; i < alleles.length; i++) {
+							String allele = alleles[i];
+							if (NumberUtils.isEven(i)) {  // is at allele position
+								if (allele.length() > 0 && Character.isLetter(allele.charAt(0))) {
+									tempNuc = Nuc.getNuc(allele.charAt(0));
+								}
+							} else {
+								if (allele.length() > 0) {
+									double varFreq = Double.parseDouble(allele); 
+									if (varFreq < varFreqLowest) {
+										varFreqLowest = varFreq;
+										varFreqLowestNuc = tempNuc;
+									}
+								}
+								tempNuc = Nuc.N; // reset the allele
+							}
+						}
+						
+						// check that we're not the reference
+						if (varFreqLowestNuc == aRef) {
+							varFreqLowest = 1.0 - varFreqLowest;  // get variant allele fraction in population 
+						}
+						
+						if (varFreqLowest < 0.01) {
+							mVarFrequency = VariantFrequency.Rare;
+						}
+					}
 				}
 			}
 		} else {
@@ -111,28 +180,6 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 			
 		}
 	
-		// Now set the chrom, position, and alleles
-		Chrom chrom  = Chrom.getChrom(   StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Chrom,     StringUtils.FileExtensionTSV.mDelimiter) );
-		int position = Integer.parseInt( StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Position,  StringUtils.FileExtensionTSV.mDelimiter) );
-		
-		char nucChar = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleRef,  StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
-		Nuc aRef     = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
-		
-		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarN, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
-		Nuc aVarN    = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
-		
-		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarT, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
-		Nuc aVarT    = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
-		
-		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarPop, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
-		Nuc aVarPop  = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
-		
-		setChrom(chrom);
-		setPosition(position);			
-		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleRef.setValueInCompactUnit( aRef.getCode(),  mDataUnit_ChromProsRevVarAllelesMutType);
-		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarN.setValueInCompactUnit(aVarN.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
-		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarT.setValueInCompactUnit(aVarT.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
-		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarPop.setValueInCompactUnit(aVarPop.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
 	}
 
 	// ====================================================================
@@ -238,6 +285,7 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 		} else {
 			sb.append(delimiter).append(Utils.rsPrefix).append(mRsID);
 		}
+		sb.append(";").append(mVarFrequency);
 		
 		sb.append(delimiter).append(getMutationType().getPrintName());
 		sb.append(delimiter).append(mHugoSymbol);

@@ -33,6 +33,7 @@ public class ClusteringInputOneSampleMetaData {
 	float[] mTumorCopyNumRatiosPerGene;	
 	boolean[] mIsSomaticSite;
 	boolean[] mChromHasGermlineGain;
+	boolean[] mPossibleSampleContamination;
 	
 	CopyNumberRegionsByChromosome mGeneRegions;
 	RangeDouble mVAFNormalHetRange;
@@ -58,6 +59,7 @@ public class ClusteringInputOneSampleMetaData {
 		mAvgReadCountPerChromNormal = new float[Chrom.values().length];
 		mCopyNumRatioPerChromNormal = new float[Chrom.values().length];
 		mChromHasGermlineGain       = new boolean[Chrom.values().length];
+		mPossibleSampleContamination = new boolean[Chrom.values().length];
 		
 		Arrays.fill(mChromHasGermlineGain, false);
 		

@@ -20,7 +20,7 @@ public class CopyNumberRegionsByChromosome {
 	// ========================================================================
 	// MEMBER VARIABLES
 	String mSampleName;
-	EnumMapSafe<Chrom, ArrayList<CopyNumberRegionRange> > mRegionsByChrom;		
+	private EnumMapSafe<Chrom, ArrayList<CopyNumberRegionRange> > mRegionsByChrom;		
 
 	// ========================================================================
 	public CopyNumberRegionsByChromosome(String sampleName) {

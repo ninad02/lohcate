@@ -76,8 +76,8 @@ public class ClusteringPlotting {
 		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);		
 	
 		// Now write the plot		
-		int width  = 900;
-		int height = 900;
+		int width  = 1000;
+		int height = 1000;
 		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, width, height);
 	}
 	
@@ -330,7 +330,8 @@ public class ClusteringPlotting {
 				itemRenderer.setSeriesPaint(eventType.ordinal(), getColorForEvent(eventType).getColor());
 			}
 		}
-		itemRenderer.setSeriesPaint(EventType.values().length, ColorPastel.Black.getColor());
+		//itemRenderer.setSeriesPaint(EventType.HETSomatic.ordinal(), getColorForEvent(EventType.HETSomatic).getColor());
+		itemRenderer.setSeriesPaint(EventType.values().length, ColorPastel.Gray_80.getColor());
 	}
 
 	// ========================================================================
@@ -343,6 +344,7 @@ public class ClusteringPlotting {
 		case cnLOH:        return ColorPastel.Dark_Yellow;
 		case HETGermline:  return ColorPastel.Gray_60;
 		case HETSomatic:   return ColorPastel.Red_Orange;
+		case DELHom:       return ColorPastel.Light_Cyan_Blue;
 		case Noise:        return ColorPastel.Dark_Pea_Green;
 		case Ignored:      return ColorPastel.Gray_30;			
 		default:           return null;

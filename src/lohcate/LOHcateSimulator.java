@@ -60,7 +60,10 @@ public class LOHcateSimulator {
 		
 		protected InputParameterInteger mNumCNARegions = new InputParameterInteger(5, "NumCNARegions", JSAP.NO_SHORTFLAG, "NumCNARegions", JSAP.NO_DEFAULT);
 		protected InputParameterInteger mNumIterations = new InputParameterInteger(1, "NumIterations", JSAP.NO_SHORTFLAG, "NumIterations", JSAP.NO_DEFAULT);
-		protected InputParameterDouble mTumorPurity = new InputParameterDouble(0.40, "TumorPurity", JSAP.NO_SHORTFLAG, "TumorPurity", JSAP.NO_DEFAULT);					
+		
+		protected InputParameterDouble mTumorPurity  = new InputParameterDouble(0.40, "TumorPurity",  JSAP.NO_SHORTFLAG, "TumorPurity",  JSAP.NO_DEFAULT);					
+		protected InputParameterDouble mNormalPurity = new InputParameterDouble(1.00, "NormalPurity", JSAP.NO_SHORTFLAG, "NormalPurity", JSAP.NO_DEFAULT);
+		
 		
 		public ArrayList<InputParameter<?>> mParams;
 		
@@ -69,13 +72,13 @@ public class LOHcateSimulator {
 			mParams = new ArrayList<InputParameter<?>>();
 			
 			mParams.add(mNumCNARegions);
-			mParams.add(mTumorPurity);
+			mParams.add(mTumorPurity);			
 			mParams.add(mNumIterations);
+			mParams.add(mNormalPurity);
 			for (TissueType t : TissueType.values()) {
 				mParams.add(mCoverageGenerated[t.ordinal()]);
 				mParams.add(mCoverageExpected[t.ordinal()]);
-			}
-			
+			}			
 		}
 		
 		// ====================================================================
@@ -94,10 +97,11 @@ public class LOHcateSimulator {
 				case 0: mNumCNARegions.setValue((int) Math.round(theParamValue)); break;
 				case 1: mTumorPurity.setValue(theParamValue);                     break;
 				case 2: mNumIterations.setValue((int) Math.round(theParamValue)); break;
-				case 3: mCoverageGenerated[TissueType.Normal.ordinal()].setValue(theParamValue); break;
-				case 4: mCoverageExpected[TissueType.Normal.ordinal()].setValue(theParamValue);  break;
-				case 5: mCoverageGenerated[TissueType.Tumor.ordinal()].setValue(theParamValue);  break;
-				case 6: mCoverageExpected[TissueType.Tumor.ordinal()].setValue(theParamValue);   break;
+				case 3: mNormalPurity.setValue(theParamValue);                    break;
+				case 4: mCoverageGenerated[TissueType.Normal.ordinal()].setValue(theParamValue); break;
+				case 5: mCoverageExpected[TissueType.Normal.ordinal()].setValue(theParamValue);  break;
+				case 6: mCoverageGenerated[TissueType.Tumor.ordinal()].setValue(theParamValue);  break;
+				case 7: mCoverageExpected[TissueType.Tumor.ordinal()].setValue(theParamValue);   break;				
 				}
 			}
 		}
@@ -135,7 +139,9 @@ public class LOHcateSimulator {
 		// GETTERS
 		public double getCoverageGenerated(TissueType t) { return mCoverageGenerated[t.ordinal()].getValue(); }
 		
-		public double getPurity() { return mTumorPurity.getValue(); }
+		public double getTumorPurity() { return mTumorPurity.getValue(); }
+		
+		public double getNormalPurity() { return mNormalPurity.getValue(); }
 		
 		public int getNumCNARegions() { return mNumCNARegions.getValue(); } 
 
@@ -349,16 +355,16 @@ public class LOHcateSimulator {
 				eventTypeToAssign = EventType.GainGermline;
 						
 			} else if (cnRegion.mCopyNumberEventType == EventType.GainSomatic) {
-				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getPurity());				
+				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getTumorPurity());				
 				eventTypeToAssign = EventType.GainSomatic;
 				
 			} else if (cnRegion.mCopyNumberEventType == EventType.LOH) {				
-				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(0, simParams.getPurity());				
+				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(0, simParams.getTumorPurity());				
 				eventTypeToAssign = EventType.LOH;
 				
 			} else if (cnRegion.mCopyNumberEventType == EventType.cnLOH) {
-				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getPurity());
-				copyNumber[TissueType.Tumor.mCode][otherPhase.mCode]    = GenotypeUtils.adjustHaploidCopyNumber(0,                                        simParams.getPurity());
+				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getTumorPurity());
+				copyNumber[TissueType.Tumor.mCode][otherPhase.mCode]    = GenotypeUtils.adjustHaploidCopyNumber(0,                                        simParams.getTumorPurity());
 				eventTypeToAssign = EventType.cnLOH;
 			}
 			
@@ -373,6 +379,8 @@ public class LOHcateSimulator {
 					copyNumber[TissueType.Tumor.mCode][Phase.p0.mCode], copyNumber[TissueType.Tumor.mCode][Phase.p1.mCode], 
 					genotype, referenceAllele, allowHemizygousGenotype.getValue(), isBiAllelicChangeTumor, goldStandard, readAdjuster);
 			
+			// Now, contaminate the normal with the tumor
+			contaminateNormalWithTumor(iosos, simParams.getNormalPurity());
 			
 			// Finally, register the read counts
 			infoOneSite.setCovgVarNormal(iosos.mNormal.mAlleleB.mNumReads);
@@ -382,6 +390,16 @@ public class LOHcateSimulator {
 			
 			// System.out.println(infoOneSite.printToString(sb, true, StringUtils.FileExtensionTSV.mDelimiter) + "\t" + eventTypeToAssign);
 		}
+	}
+
+	// ========================================================================
+	private void contaminateNormalWithTumor(InfoOneSiteOneSample iosos, double normalPurity) {
+		if (normalPurity > 0.9999) return;
+		
+		double normalImpurity = 1.0 - normalPurity;
+		
+		iosos.mNormal.mAlleleA.set(iosos.mNormal.mAlleleA.mAllele, (short) (iosos.mNormal.mAlleleA.mNumReads * normalPurity + iosos.mTumor.mAlleleA.mNumReads * normalImpurity));
+		iosos.mNormal.mAlleleB.set(iosos.mNormal.mAlleleB.mAllele, (short) (iosos.mNormal.mAlleleB.mNumReads * normalPurity + iosos.mTumor.mAlleleB.mNumReads * normalImpurity));		
 	}
 	
 	// ========================================================================

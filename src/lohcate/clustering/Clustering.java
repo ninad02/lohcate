@@ -467,14 +467,7 @@ public class Clustering {
 		// Now do the GISTIC processing
 		String jisticCovertSEGOutputFilename = lohcateDirs.getSubDirPath(SubdirsDefault.Regions_GISTIC) + File.separator + "Regions.Matrix.JISTIC.txt";
 		convertSEG.main(new String[] {outFilenameGISTIC, outFilenameProbeFile, "outputfile=" + jisticCovertSEGOutputFilename});
-		String jisticInputPathPrefix = IOUtils.pathConcat(new String[] { "E:", "Research", "Code", "Libraries", "Java", "lib", "JISTIC" }) + File.separator; 
-		String jisticlocationsString = "locations=" + jisticInputPathPrefix + "hg18_Gene_Info.txt";
-		String jisticCytobandString  = "bands=" + jisticInputPathPrefix + "Human_cytoBand.txt";
-		String jisticCopyNumberString = "copynumber=" + jisticCovertSEGOutputFilename;
-		
-		String jisticInputSpecFile = IOUtils.pathConcat(new String[] { "spec=" + jisticInputPathPrefix + "glioexample", "focal", "GISTICFocal.spec" });		
-		//String jisticInputSpecFile = IOUtils.pathConcat(new String[] { "spec=" + jisticInputPathPrefix + "glioexample", "limited", "GISTICLimited.spec" });
-		JISTIC.Distribution.main(new String[] { jisticInputSpecFile, jisticCopyNumberString, jisticCytobandString, jisticlocationsString });
+		JISTICWrapper.callJISTIC(jisticCovertSEGOutputFilename, true);
 	}
 	
 	// ========================================================================
@@ -1389,8 +1382,9 @@ public class Clustering {
 			CopyNumberRegionRange range = new CopyNumberRegionRange(EventType.Ignored, chrom, oneSampleInfo.getSiteAtIndex(indexChromStart).getPosition(), oneSampleInfo.getSiteAtIndex(indexChromEnd).getPosition());
 			int indexOfMostLikelyList = determineCopyGainVAFMaxLikelihood(oneSampleInfo, metaData, range, listOfListOfMeans, TissueType.Normal, probFromMaxLikelihood);
 			
-			
-			metaData.mChromHasGermlineGain[chrom.ordinal()] = (indexOfMostLikelyList > 0);
+			boolean exceedsParam = (metaData.mCopyNumRatioPerChromNormal[chrom.ordinal()] >= ClusteringParams.GlobalClusteringParams.mGermlineTrisomyThreshold.getValue()); 
+			metaData.mChromHasGermlineGain[chrom.ordinal()]        = ((indexOfMostLikelyList > 0) &&  exceedsParam);
+			metaData.mPossibleSampleContamination[chrom.ordinal()] = ((indexOfMostLikelyList > 0) && !exceedsParam);
 			//metaData.mChromHasGermlineGain[chrom.ordinal()] = fillRegionBasedOnVAFMaxLikelihood(range, oneSampleInfo, metaData, null, ClusterType.GainGermline, probFromMaxLikelihood, false);
 			//System.out.printf("GermProb\tchr%d\t%g\t%g\t%b\n", chrom.ordinal(), prob[0], prob[1], metaData.mChromHasGermlineGain[chrom.ordinal()]);
 		}
@@ -1493,6 +1487,8 @@ public class Clustering {
 		
 		for (int i = 0; i < clusterAssignmentsLowerPlane.length; i++) {
 			int indexInMainList = planeSplit.getIndexOfPlaneElementInMainList(indexLowerPlane, i);
+			float copyNum = metaData.getCopyNumberAtIndex(indexInMainList);
+					//metaData.mTumorCopyNumRatiosPerGene[] * Regions.DefaultDiploidCopyNumber;
 			
 			if (clusterAssignmentsLowerPlane[i] == DBSCAN2.ClusterIDOfNoise) {
 				clusterResults.setClassification(indexInMainList, EventType.Noise, DBSCAN2.ClusterIDOfNoise);
@@ -1502,7 +1498,13 @@ public class Clustering {
 					clusterResults.setClassification(indexInMainList, EventType.Ignored, clusterAssignmentsLowerPlane[i]);
 					//nonHetPoints.add(pointsLowerPlane.get(i));				
 				} else {
-					clusterResults.setClassification(indexInMainList, EventType.HETGermline, clusterIDofHetBall);					
+					if (copyNum < 1 /* TODO ClusteringParams.GlobalClusteringParams.mDeletionThreshold.getValue() */) {
+						clusterResults.setClassification(indexInMainList, EventType.DELHom, clusterIDofHetBall);
+					} else if (copyNum > 3) {
+						clusterResults.setClassification(indexInMainList, EventType.GainGermline, clusterIDofHetBall);
+					} else {
+						clusterResults.setClassification(indexInMainList, EventType.HETGermline, clusterIDofHetBall);
+					}
 				}				
 			}
 		}
