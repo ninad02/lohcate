@@ -10,36 +10,38 @@ import lohcate.CopyNumberRegionRange;
 import lohcateEnums.EventType;
 import nutils.CompareUtils;
 import nutils.IOUtils;
+import nutils.NullaryClassFactory;
 
 /**
  * 
  * @author Ninad Dewal
  *
  */
-public class RegionAndSiteWalker {
+public class RegionAndSiteWalker<T extends RegionRange> {
 
 	// ========================================================================
 	// ========================================================================
-	public static interface Actioner {
+	public static interface Actioner<T extends RegionRange> {
 		
-		public void takeAction(ArrayList<Boolean> rangeInTargetSet, ArrayList<RegionRange> regions, RegionRange regionLatest);
+		public void takeAction(ArrayList<Boolean> rangeInTargetSet, ArrayList<T> regions, T regionLatest);
 	}
 
 	// ========================================================================
 	// ========================================================================
-	RegionRange dummyRange;
+	T mDummyRange;
+	NullaryClassFactory<T> mClassFactory;
 	ArrayList<Boolean> mRangeInTargetSet;
 
 	// ========================================================================
-	public void walk(ArrayList<RegionRange> regionsInChrom, SNVMap snvMap, Chrom chrom, Actioner actioner) {
+	public void walk(ArrayList<T> regionsInChrom, SNVMap snvMap, Chrom chrom, Actioner<T> actioner) {
 
 		clear();
 		int numSitesOnChrom = snvMap.getNumSitesOnChromosome(chrom);
 		if (numSitesOnChrom <= 0) return;
 
-		ListIterator<RegionRange> regionsInChromIter = regionsInChrom.listIterator();
-		RegionRange currentRegion = null;		
-		ArrayList<RegionRange> mergedRegionList = new ArrayList<RegionRange>(regionsInChrom.size());
+		ListIterator<T> regionsInChromIter = regionsInChrom.listIterator();
+		T currentRegion = null;		
+		ArrayList<T> mergedRegionList = new ArrayList<T>(regionsInChrom.size());
 
 		int indexInMap = 0;
 		boolean dummyRangeValid = false;
@@ -64,15 +66,15 @@ public class RegionAndSiteWalker {
 
 			if ((currentRegion == null) || currentRegion.beforeRange(chrom, mapPosition)) {
 				if (dummyRangeValid) {
-					if (dummyRange.isFinalized()) {
+					if (mDummyRange.isFinalized()) {
 						mRangeInTargetSet.add(Boolean.FALSE);
-						mergedRegionList.add(dummyRange);
-						actioner.takeAction(mRangeInTargetSet, mergedRegionList, dummyRange);							
+						mergedRegionList.add(mDummyRange);
+						actioner.takeAction(mRangeInTargetSet, mergedRegionList, mDummyRange);							
 						createAndSetNewBufferRegion(chrom, mapPosition);
 					} else {
-						boolean extendResult = dummyRange.extendRange(chrom, mapPosition);
+						boolean extendResult = mDummyRange.extendRange(chrom, mapPosition);
 						if (!extendResult) {
-							String errorString = "ERROR:  Could not extend range! " + chrom + "\t" + mapPosition + "\t" + dummyRange;
+							String errorString = "ERROR:  Could not extend range! " + chrom + "\t" + mapPosition + "\t" + mDummyRange;
 							CompareUtils.ensureTrue(extendResult, errorString);	
 						}
 
@@ -85,8 +87,8 @@ public class RegionAndSiteWalker {
 			} else if (currentRegion.inRange(chrom, mapPosition)) {
 				if (dummyRangeValid) {
 					mRangeInTargetSet.add(Boolean.FALSE);
-					mergedRegionList.add(dummyRange);
-					actioner.takeAction(mRangeInTargetSet, mergedRegionList, dummyRange);						
+					mergedRegionList.add(mDummyRange);
+					actioner.takeAction(mRangeInTargetSet, mergedRegionList, mDummyRange);						
 					dummyRangeValid = false;
 				}
 
@@ -122,8 +124,8 @@ public class RegionAndSiteWalker {
 
 		if (dummyRangeValid) {
 			mRangeInTargetSet.add(Boolean.FALSE);
-			mergedRegionList.add(dummyRange);
-			actioner.takeAction(mRangeInTargetSet, mergedRegionList, dummyRange);	
+			mergedRegionList.add(mDummyRange);
+			actioner.takeAction(mRangeInTargetSet, mergedRegionList, mDummyRange);	
 			createAndSetNewBufferRegion(Chrom.c0, 0);
 		}
 		
@@ -132,7 +134,7 @@ public class RegionAndSiteWalker {
 	}
 
 	// ========================================================================
-	private void testConstructedRegions(ArrayList<RegionRange> regions, SNVMap snvMap, Chrom chrom) {
+	private void testConstructedRegions(ArrayList<T> regions, SNVMap snvMap, Chrom chrom) {
 
 		int numSitesOnChrom = snvMap.getNumSitesOnChromosome(chrom);
 		if (numSitesOnChrom <= 0) return;
@@ -165,11 +167,12 @@ public class RegionAndSiteWalker {
 	// ========================================================================
 	public void clear() {
 		mRangeInTargetSet.clear();
-		dummyRange.set(Chrom.c0, 0, 0, false, 1);		
+		mDummyRange.set(Chrom.c0, 0, 0, false, 1);		
 	}
 
 	// ========================================================================
-	public RegionAndSiteWalker() {
+	public RegionAndSiteWalker(NullaryClassFactory<T> theClassFactory) {
+		mClassFactory = theClassFactory;
 		createAndSetNewBufferRegion(Chrom.c0, 0);
 		mRangeInTargetSet = new ArrayList<Boolean>();
 		// TODO Auto-generated constructor stub
@@ -177,7 +180,8 @@ public class RegionAndSiteWalker {
 	
 	// ========================================================================
 	private void createAndSetNewBufferRegion(Chrom chrom, int position) {
-		dummyRange = new RegionRange(chrom, position);
+		mDummyRange = mClassFactory.newInstance();		
+		mDummyRange.set(chrom, position);				
 	}
 
 	// ========================================================================

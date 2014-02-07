@@ -19,6 +19,7 @@ public enum EventType {
 	public static final EventType[] AmpLOH = new EventType[]     { GainSomatic, LOH };
 	public static final EventType[] OnlyLOH = new EventType[]    { LOH };
 	public static final EventType[] AmpLOHcnLOH = new EventType[] { GainSomatic, LOH, cnLOH };
+	public static final EventType[] AmpLOHcnLOHhetSomaticDelHom = new EventType[] { GainSomatic, LOH, cnLOH, HETGermline, HETSomatic, DELHom };
 	//public static final ClusterType[] AmpLOHcnLOH = new ClusterType[] { GainSomatic, cnLOH, LOH };
 	
 	//public static int getNumAberrantClusterTypes() { return 2; }

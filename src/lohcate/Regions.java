@@ -520,7 +520,7 @@ public class Regions {
 	// Printing JISTIC relevant output
 	// ========================================================================
 
-	public static class ActionerGISTIC implements RegionAndSiteWalker.Actioner {
+	public static class ActionerGISTIC implements RegionAndSiteWalker.Actioner<CopyNumberRegionRange> {
 
 		// ====================================================================		
 		private static final String Delim = StringUtils.FileExtensionTSV.mDelimiter;
@@ -538,20 +538,20 @@ public class Regions {
 				SNVMap snvMap) {
 						
 			mSB = new StringBuilder(2048);
-			RegionAndSiteWalker regionSiteWalker = new RegionAndSiteWalker();
+			RegionAndSiteWalker<CopyNumberRegionRange> regionSiteWalker = new RegionAndSiteWalker<CopyNumberRegionRange>(CopyNumberRegionRange.ClassFactory);
 			mOneSampleInfo = oneSampleInfo;
 			mMetaData = metaData;
 			mOut = outputWriter;
 			
 			for (Chrom chrom : Chrom.Autosomes) {
-				ArrayList<RegionRange> reigonsInChrom = new ArrayList<RegionRange>(regionsInSample.getRegions(chrom));				
+				ArrayList<CopyNumberRegionRange> reigonsInChrom = new ArrayList<CopyNumberRegionRange>(regionsInSample.getRegions(chrom));				
 				regionSiteWalker.walk(reigonsInChrom, snvMap, chrom, this);
 			}
 		}
 		
 		// ====================================================================
 		@Override
-		public void takeAction(ArrayList<Boolean> rangeInTargetSet, ArrayList<RegionRange> regions, RegionRange regionLatest) {
+		public void takeAction(ArrayList<Boolean> rangeInTargetSet, ArrayList<CopyNumberRegionRange> regions, CopyNumberRegionRange regionLatest) {
 			
 			int indexOfSite = mOneSampleInfo.getIndex(regionLatest.getChromosome(), regionLatest.getRangeStart());			
 			boolean regionLatestInTargetSet = rangeInTargetSet.get(rangeInTargetSet.size() - 1).booleanValue();
@@ -573,7 +573,9 @@ public class Regions {
 			  .append(Delim).append(regionLatest.getRangeStart())
 			  .append(Delim).append(regionLatest.getRangeEnd())
 			  .append(Delim).append(regionLatest.getNumSitesInterrogated())
-			  .append(Delim).append(log2CopyNumRatio);
+			  .append(Delim).append(log2CopyNumRatio)
+			  .append(Delim).append(regionLatest.mCopyNumberEventType)
+			  ;
 			
 			IOUtils.writeToBufferedWriter(mOut, mSB.toString(), true);			
 		}
@@ -1313,8 +1315,8 @@ public class Regions {
 		BucketCounterEnum<EventType> clusterTypeCountsGene = new BucketCounterEnum<EventType>(EventType.class);
 		
 		// A list of genes that we will keep binary sorted for efficieny purposes
-		ArrayList<Gene> genes = new ArrayList<Gene>(); 
-		Gene dummyGene = new Gene("", Chrom.c0);  // We'll use this gene for binary searching
+		ArrayList<GeneCounter> genes = new ArrayList<GeneCounter>(); 
+		GeneCounter dummyGene = new GeneCounter("", Chrom.c0);  // We'll use this gene for binary searching
 		
 		for (File file : files) { //iterate through curated SNP calls
 			
@@ -1341,7 +1343,7 @@ public class Regions {
 					int position = Integer.parseInt(components[ColCuratedTSV_Position]);					
 					String[] dbsnpStrSplit = components[ColCuratedTSV_dbSNP].split(";");
 					VariantFrequency varFreq = VariantFrequency.valueOf(dbsnpStrSplit[1]);
-					
+					String patientName = file.getName();
 					
 					if (!geneName.equals(MissingGeneNameValue)) { //avoid ".", which crops up a lot
 						if (geneName.indexOf("dist") >= 0) { //gene names can sometimes come with an uninteresting/irrelevant prefix
@@ -1356,9 +1358,9 @@ public class Regions {
 						if (resultIndex < 0) {  
 							// we haven't seen this gene before
 							resultIndex = ArrayUtils.getInsertPoint(resultIndex);  // calculate the proper insertion point 							 
-							genes.add(resultIndex, new Gene(geneName, chrom));							
+							genes.add(resultIndex, new GeneCounter(geneName, chrom));							
 						}
-						Gene currentGene = genes.get(resultIndex);
+						GeneCounter currentGene = genes.get(resultIndex);
 						clusterTypeCountsGene.clear();
 						
 						if (position > currentGene.mMaxBasePairPosition) { //get right-bound of gene's range of variants
@@ -1371,64 +1373,64 @@ public class Regions {
 						MutationType mutationType = MutationType.getSNVType(components[ColCuratedTSV_MutationType]);
 						currentGene.incrementCount(mutationType);  // increment synonymous or nonsynonymous variant count						
 						
-						VariantLocation variantLocation = 
-								Clustering.isVariantInGermline(Double.parseDouble(components[ColCuratedTSV_VafNormal])) ? VariantLocation.Germline : VariantLocation.Somatic; 						
-						currentGene.incrementCount(variantLocation);
+						//VariantLocation variantLocation = 
+						//		Clustering.isVariantInGermline(Double.parseDouble(components[ColCuratedTSV_VafNormal])) ? VariantLocation.Germline : VariantLocation.Somatic; 						
+						//currentGene.incrementCount(variantLocation);
 																
-						EventType clusterType = EventType.getClusterType(components[ColCuratedTSV_Cluster]);
-						if (clusterType == null) { CompareUtils.throwErrorAndExit("ERROR: Invalid cluster type: " + components[ColCuratedTSV_Cluster]); }
-						currentGene.incrementCount(clusterType);  // increment LOH/DUP/&c. count
+						EventType eventType = EventType.getClusterType(components[ColCuratedTSV_Cluster]);
+						if (eventType == null) { CompareUtils.throwErrorAndExit("ERROR: Invalid cluster type: " + components[ColCuratedTSV_Cluster]); }
+						currentGene.incrementCount(eventType);  // increment LOH/DUP/&c. count
 						double vafTumor = Double.parseDouble(components[ColCuratedTSV_VafTumor]);
-						if ((clusterType == EventType.LOH) && (vafTumor > 0.5) 
-								&& (varFreq == VariantFrequency.Rare || varFreq == VariantFrequency.Novel)) {
-							currentGene.mCountLOHreferenceLost++;
-							currentGene.addPatientIfNotAlreadyAdded_LOHRefLost(file.getName(), position);
-						}										
-						currentGene.addPatientIfNotAlreadyAdded(file.getName(), clusterType);
+						boolean vafTumorIsEnriched = (vafTumor > 0.5);
+						boolean isLOHType = (eventType == EventType.LOH || eventType == EventType.cnLOH);
+						boolean isAmpType = (eventType == EventType.GainSomatic);
+						boolean varAlleleNotCommon = (varFreq == VariantFrequency.Rare || varFreq == VariantFrequency.Novel);
+						if (vafTumorIsEnriched) {
+							if (isLOHType) {
+								if (varAlleleNotCommon) {
+									currentGene.mCountLOHreferenceLost++;
+									currentGene.addPatientIfNotAlreadyAdded_byAlleleEvent(EventTypeAllele.LossReference_VariantRare, patientName, position);
+								} else {
+									currentGene.addPatientIfNotAlreadyAdded_byAlleleEvent(EventTypeAllele.LossReference_VariantCommon, patientName, position);
+								}
+							} else if (isAmpType) {
+								if (varAlleleNotCommon) {
+									currentGene.addPatientIfNotAlreadyAdded_byAlleleEvent(EventTypeAllele.GainVariant_VariantRare, patientName, position);
+								} else {
+									currentGene.addPatientIfNotAlreadyAdded_byAlleleEvent(EventTypeAllele.GainVariant_VariantCommon, patientName, position);
+								}								
+							} 
+						} else {
+							// Variant allele was lost
+							if (isLOHType) {
+								if (varAlleleNotCommon) {
+									currentGene.addPatientIfNotAlreadyAdded_byAlleleEvent(EventTypeAllele.LossVariant_VariantRare, patientName, position);
+								} else {
+									currentGene.addPatientIfNotAlreadyAdded_byAlleleEvent(EventTypeAllele.LossVariant_VariantCommon, patientName, position);
+								}
+							} else if (isAmpType) {
+								if (varAlleleNotCommon) {
+									currentGene.addPatientIfNotAlreadyAdded_byAlleleEvent(EventTypeAllele.GainReference_VariantRare, patientName, position);
+								} else {
+									currentGene.addPatientIfNotAlreadyAdded_byAlleleEvent(EventTypeAllele.GainReference_VariantCommon, patientName, position);
+								}
+							}							
+						}
+		
+						currentGene.addPatientIfNotAlreadyAdded(file.getName(), eventType);
 					}
 				}
 			}
 		}
 		
-		String logStr = "_log";
-		String recurrenceStr = "_recurrence";
-		String densityStr = "_density";
 		String[] columnHeaders = new String[] { 
-				"chr", "bp_start", "bp_end", "length", "gene", 
-				MutationType.NonSynonymous_SNV.toLowerCase(), 
-				MutationType.Synonymous_SNV.toLowerCase(), 
-				VariantLocation.Germline.toLowerCase(), 
-				VariantLocation.Somatic.toLowerCase(),
-				
-				EventType.GainSomatic.name(),
-				EventType.LOH.name(), 
-				EventType.LOH.name() + "_refLost",
-				EventType.LOH.name() + "_refLost_Positions", 
-				EventType.HETGermline.name(),
-				EventType.HETSomatic.name(),
-				
-				EventType.GainSomatic.name() + logStr,
-				EventType.LOH.name() + logStr, 
-				EventType.LOH.name() + "_refLost" + logStr, 
-				EventType.HETGermline.name() + logStr,
-				EventType.HETSomatic.name() + logStr,
-				
-				EventType.GainSomatic.name()              + densityStr,
-				EventType.LOH.name()              + densityStr, 
-				EventType.LOH.name() + "_refLost" + densityStr, 
-				EventType.HETGermline.name()      + densityStr,
-				EventType.HETSomatic.name()       + densityStr,
-				
-				EventType.GainSomatic.name()         + recurrenceStr, 
-				EventType.LOH.name()         + recurrenceStr, 
-				EventType.HETGermline.name() + recurrenceStr,
-				EventType.HETSomatic.name()  + recurrenceStr
+				"chr", "bp_start", "bp_end", "length", "gene", GeneCounter.getHeaders(fileExtDelim.mDelimiter)
 		};
 		String headerStr = StringUtils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();
 
 		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);
 		IOUtils.writeToBufferedWriter(out, headerStr, true);
-		for (Gene gene : genes) {			
+		for (GeneCounter gene : genes) {			
 			sb.setLength(0);
 			sb.append(gene.mChrom.getCode())
 				.append(fileExtDelim.mDelimiter).append(gene.mMinBasePairPosition)
@@ -1445,13 +1447,15 @@ public class Regions {
 		BufferedWriter outBreakdown = IOUtils.getBufferedWriter(eventsByPatientPerGeneFilename);
 				
 		// Now write out individual gene outputs
-		for (Gene gene : genes) {
-			// Write samples for each gene out as well
-			ArrayList<String> patientsAllClusters = new ArrayList<String>();
+		for (GeneCounter gene : genes) {
+			// Write samples for each gene out as well			
 			for (EventType ct : EventType.values()) {
-				if ((ct == EventType.Noise) || (ct == EventType.Ignored)) continue;
+				if (    (ct == EventType.Noise) 
+					 || (ct == EventType.Ignored)
+					 || (ct == EventType.HETGermline)
+				   ) continue;
 				
-				ArrayList<String> patientsForEvent = gene.getPatientsForClusterType(ct);
+				ArrayList<String> patientsForEvent = gene.getPatientsForEventType(ct);
 				for (String patientForEvent : patientsForEvent) {
 					String outString = gene.getName() + "\t" + ct.name() + "\t" + patientForEvent;
 					IOUtils.writeToBufferedWriter(outBreakdown, outString, true);

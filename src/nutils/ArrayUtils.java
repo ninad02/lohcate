@@ -882,12 +882,11 @@ public class ArrayUtils {
 	 * @param element The element to be added if it doesn't already exist in the list
 	 * @return true if the element already existed in the list, false otherwise
 	 */
-	public static<T> boolean checkInListAndInsertIfMissing(List <? extends Comparable<? super T>> list, T key) {
+	public static<T extends Comparable<? super T>> boolean checkInListAndInsertIfMissing(List<T> list, T key) {
 		int resultIndex = Collections.binarySearch(list, key);
 		if (resultIndex < 0) {
 			int insertionIndex = getInsertPoint(resultIndex);
-			List<T> listCasted = (List<T>) list;
-			listCasted.add(insertionIndex, key);			
+			list.add(insertionIndex, key);			
 			return false;
 		} else {
 			return true;

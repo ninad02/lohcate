@@ -215,6 +215,11 @@ public class ClusteringPlotting {
 	
 		//xyPlot.getRangeAxis().setRange(0, 1.02);		
 		
+		TickUnits tunits = new TickUnits();
+		tunits.add(new NumberTickUnit(2));
+		//xyPlot.getRangeAxis().setRange(0, 62);
+		xyPlot.getRangeAxis().setStandardTickUnits(tunits);
+		
 		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 20);
 		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 20);
 		xyPlot.getRangeAxis().setLabelFont(rangeAxisLabelFont);		
@@ -286,6 +291,7 @@ public class ClusteringPlotting {
 		
 		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 20);
 		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 20);
+
 		xyPlot.getRangeAxis().setLabelFont(rangeAxisLabelFont);		
 		xyPlot.getRangeAxis().setTickLabelFont(rangeAxisTickFont);
 		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
@@ -323,7 +329,7 @@ public class ClusteringPlotting {
 				itemRenderer.setSeriesPaint(EventType.HETGermline.ordinal(), ColorPastel.Gray_15.getColor());
 				itemRenderer.setSeriesPaint(EventType.HETSomatic.ordinal(),  ColorPastel.Gray_15.getColor());
 				itemRenderer.setSeriesPaint(EventType.Noise.ordinal(),       ColorPastel.Gray_15.getColor());
-				itemRenderer.setSeriesPaint(EventType.Ignored.ordinal(),        ColorPastel.Gray_15.getColor());
+				itemRenderer.setSeriesPaint(EventType.Ignored.ordinal(),     ColorPastel.Gray_15.getColor());
 			}
 		} else {
 			for (EventType eventType : EventType.values()) {

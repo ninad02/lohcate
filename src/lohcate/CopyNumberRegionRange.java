@@ -3,6 +3,7 @@ import genomeEnums.Chrom;
 import genomeUtils.GenomeConstants;
 import genomeUtils.RegionRange;
 import lohcateEnums.EventType;
+import nutils.NullaryClassFactory;
 import nutils.counter.BucketCounterEnum;
 
 
@@ -11,6 +12,11 @@ import nutils.counter.BucketCounterEnum;
  *  regions into three such objects based on the clustering type (Dup, LOH, HET)
  */
 public class CopyNumberRegionRange extends RegionRange {
+	
+	// Nullary
+	public static NullaryClassFactory<CopyNumberRegionRange> ClassFactory = new NullaryClassFactory<CopyNumberRegionRange>(CopyNumberRegionRange.class);
+	
+	// Member variables
 	public EventType mCopyNumberEventType;
 	public float mRecurrenceScore;
 	public double mCopyNumber;
@@ -39,6 +45,11 @@ public class CopyNumberRegionRange extends RegionRange {
 		mRecurrenceScore       = rhs.mRecurrenceScore;
 		mCopyNumber            = rhs.mCopyNumber;
 		mClusterTypeCounts     = rhs.mClusterTypeCounts.getCopy();
+	}
+	
+	public CopyNumberRegionRange() {
+		super();
+		constructorCommon(EventType.Ignored);
 	}
 	
 	public CopyNumberRegionRange getCopy() { return new CopyNumberRegionRange(this); }

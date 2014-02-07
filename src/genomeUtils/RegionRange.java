@@ -16,6 +16,10 @@ public class RegionRange {
 	int mRangeEnd;		
 	int mNumSitesInterrogated;
 	
+	public RegionRange() {
+		set(Chrom.c0, 0);
+	}
+	
 	public RegionRange(Chrom chrom, int rangeStart) {
 		set(chrom, rangeStart);		
 	}

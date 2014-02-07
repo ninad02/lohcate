@@ -49,6 +49,7 @@ import nutils.ContingencyTable;
 import nutils.EnumMapSafe;
 import nutils.IOUtils;
 import nutils.PrimitiveWrapper;
+import nutils.SortUtils;
 import nutils.ContingencyTable.ContingencyTableValue;
 import nutils.RangeDouble;
 import nutils.StringUtils;
@@ -467,6 +468,12 @@ public class Clustering {
 		// Now do the GISTIC processing
 		String jisticCovertSEGOutputFilename = lohcateDirs.getSubDirPath(SubdirsDefault.Regions_GISTIC) + File.separator + "Regions.Matrix.JISTIC.txt";
 		convertSEG.main(new String[] {outFilenameGISTIC, outFilenameProbeFile, "outputfile=" + jisticCovertSEGOutputFilename});
+		ArrayList<String> sortedLines = SortUtils.sortLines(jisticCovertSEGOutputFilename, new int[] { 1, 2 }, new boolean[] { true, true }, new boolean[] { false, false }, StringUtils.TabStr, 1);
+		StringUtils.removeDuplicates(sortedLines, null);
+		IOUtils.writeOutputFile(jisticCovertSEGOutputFilename, sortedLines);
+
+		boolean doFocal = false;
+		JISTICWrapper.callJISTIC(jisticCovertSEGOutputFilename, false);
 		JISTICWrapper.callJISTIC(jisticCovertSEGOutputFilename, true);
 	}
 	
@@ -1498,10 +1505,10 @@ public class Clustering {
 					clusterResults.setClassification(indexInMainList, EventType.Ignored, clusterAssignmentsLowerPlane[i]);
 					//nonHetPoints.add(pointsLowerPlane.get(i));				
 				} else {
-					if (copyNum < 1 /* TODO ClusteringParams.GlobalClusteringParams.mDeletionThreshold.getValue() */) {
+					if (copyNum < 1.1 /* TODO ClusteringParams.GlobalClusteringParams.mDeletionThreshold.getValue() */) {
 						clusterResults.setClassification(indexInMainList, EventType.DELHom, clusterIDofHetBall);
 					} else if (copyNum > 3) {
-						clusterResults.setClassification(indexInMainList, EventType.GainGermline, clusterIDofHetBall);
+						clusterResults.setClassification(indexInMainList, EventType.GainSomatic, clusterIDofHetBall);
 					} else {
 						clusterResults.setClassification(indexInMainList, EventType.HETGermline, clusterIDofHetBall);
 					}

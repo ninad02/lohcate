@@ -245,7 +245,7 @@ public class GenotypeUtils {
 	// ------------------------------------------------------------------------
 	public static double getPValuesImbalanceTissue(int coverageTotal, int coverageVariant) {
 		int maxRefOrVarCovg = Math.max(coverageVariant, coverageTotal - coverageVariant);
-		return nutils.NumberUtils.cumulativeProbabilitySuccess(coverageTotal, maxRefOrVarCovg, 0.5);
+		return nutils.NumberUtils.cumulativeProbabilitySuccessBinomial(coverageTotal, maxRefOrVarCovg, 0.5);
 	}
 
 	// ========================================================================

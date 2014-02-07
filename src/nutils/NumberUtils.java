@@ -201,7 +201,7 @@ public class NumberUtils {
 	 * @param p The probability of one success
 	 * @return The probability P(X >= k), where X is a random variable of number of successes
 	 */
-	public static double cumulativeProbabilitySuccess(int n, int k, double p) throws IllegalArgumentException {
+	public static double cumulativeProbabilitySuccessBinomial(int n, int k, double p) throws IllegalArgumentException {
 		
 		if (k > n) {
 			throw new IllegalArgumentException("Argument k cannot be greater than argument n!");

@@ -1,7 +1,12 @@
 package nutils;
 
+import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Comparator;
+import java.util.ListIterator;
 import java.util.Random;
+
+import com.sun.org.apache.xml.internal.utils.StringComparable;
 
 
 public class StringUtils {
@@ -286,6 +291,31 @@ public class StringUtils {
 		}
 	}
 
+	// ========================================================================
+	/** Given a list of strings, this removes any duplicate entries.  Assumes that the input is sorted. 
+	 * 
+	 * @param lines The list of lines to be filtered for duplicates.  This list of lines is changed by the method.
+	 * @param comparator Compares two elements of the list.  If set to null, just tests via .equals()
+	 * @return This same list of lines, except with duplicates removed.    
+	 */
+	public static<T> ArrayList<T> removeDuplicates(ArrayList<T> lines, Comparator<? super T> comparator) {
+		if (lines.size() <= 1) return lines;
+
+		T elementPrev = lines.get(0);  // Initialize the previous element
+		for (int i = 1; i < lines.size(); i++) {
+			T elementCurr = lines.get(i);
+			if ( (UtilsBasic.isNull(comparator)    && elementPrev.equals(elementCurr)) ||
+				 (UtilsBasic.isNotNull(comparator) && (comparator.compare(elementPrev, elementCurr) == 0)) ) {
+				lines.set(i, null);
+			} else {
+				elementPrev = elementCurr;
+			}
+		}
+		
+		ArrayUtils.removeNullElements(lines);
+		return lines;
+	}
+	
 	// ========================================================================
 	public static StringBuilder constructColumnDelimitedString(String[] values, String delimiter, StringBuilder sb, boolean clearStringBuilder) {
 		if (clearStringBuilder) {

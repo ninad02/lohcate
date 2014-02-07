@@ -355,7 +355,12 @@ public class LOHcateSimulator {
 				eventTypeToAssign = EventType.GainGermline;
 						
 			} else if (cnRegion.mCopyNumberEventType == EventType.GainSomatic) {
-				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getTumorPurity());				
+				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getTumorPurity());
+				
+				// Randomly decide whether to make it biallelic amplification
+				if (NumberUtils.getRandomBit()) {
+					copyNumber[TissueType.Tumor.mCode][otherPhase.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getTumorPurity());
+				}
 				eventTypeToAssign = EventType.GainSomatic;
 				
 			} else if (cnRegion.mCopyNumberEventType == EventType.LOH) {				
