@@ -113,7 +113,9 @@ public class Clustering {
 	public static float ScalingFactor = 1.0f;			
 	public static final float ExpectedVAFNormalTrisomy = 2.0f / 3.0f;
 	
-	public static final String GISTIC_Input_HeaderString = "SampleID\tchrom\tposStart\tposEnd\tnumMarkers\tSegmentMean";			
+	public static final String GISTIC_Input_HeaderString = "SampleID\tchrom\tposStart\tposEnd\tnumMarkers\tSegmentMean";
+	
+	public static final String SitesClassifiedOutputSuffix = ".withCopyNum"; //".sitesClassified.lohcate";
 	
 	public static boolean correctAllelicBias() { return !ClusteringParams.GlobalClusteringParams.mIgnoreAllelicBias.getValue(); }	
 	public static double[] sigPValues = BinomialTestPermutationValues.initialize(new double[65000], -1);
@@ -706,7 +708,7 @@ public class Clustering {
 		String headerStr = StringUtils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();
 		
 		// Initialize output file
-		String outFilename = sampleNameRoot + ".withCopyNum" + sampleFilenameExtension;
+		String outFilename = sampleNameRoot + SitesClassifiedOutputSuffix + sampleFilenameExtension;
 		String outFilenameFullPath = lohcateDirs.getSubDirPath(SubdirsDefault.SitesClassified) + File.separator + outFilename;
 		PrintWriter out = new PrintWriter(IOUtils.getBufferedWriter(outFilenameFullPath));
 		out.println(headerStr);
@@ -878,7 +880,7 @@ public class Clustering {
 				
 				boolean chromCrossed = chromPosTracker.chromCrossedWithCurrentCoordinates(oneSiteInfo.getChrom(), oneSiteInfo.getPosition());						
 				for (double d = 0; chromCrossed && (d <= 5.0); d += 0.02) {
-					chromBoundaryXY.add(chromPosTracker.getPositionGenomeWide(), d);
+					chromBoundaryXY.add(oneSiteInfo.getChrom().calculateGenomeWidePositionStart(), d);
 				}
 				maxPosOnChrom.registerPosition(oneSiteInfo.getChrom(), chromPosTracker.getPositionGenomeWide());
 				
@@ -1462,23 +1464,33 @@ public class Clustering {
 			int startingRowGermlineOrSomaticOrAll, 
 			SeqPlatform platform) {
 
+		// Initialize the list of events
+		ClusteringResults<EventType> clusterResults = new ClusteringResults<EventType>(sites.getNumSites());
+		clusterResults.initializeResults(sites.getNumSites(), EventType.Ignored);
+		
 		//apply DBScan to points within NAF frame
-		ElementPlaneSplit<Floint> planeSplit = new ElementPlaneSplit<Floint>(sites.getNumSites(), 2);
+		ElementPlaneSplit<Floint> planeSplit = new ElementPlaneSplit<Floint>(sites.getNumSites(), 3);
 
+		// Split the points into the planes
 		getValidPointsForClustering(sites, planeSplit, metaData, ScalingFactor, platform, vafNormalRange);		
 		
-		int indexLowerPlane = 0, indexUpperPlane = 1;		
+		int indexLowerPlane = 0, indexUpperPlane = 1, indexGermlineGainPlane = 2;	
 		ArrayList<Floint> pointsLowerPlane = planeSplit.getPointsOnPlane(indexLowerPlane);
 		ArrayList<Floint> pointsUpperPlane = planeSplit.getPointsOnPlane(indexUpperPlane);
+		ArrayList<Floint> pointsGermlineGainPlane = planeSplit.getPointsOnPlane(indexGermlineGainPlane);
 		
 		System.out.printf("\tPoints Lower Plane: %d\n", pointsLowerPlane.size());
 		System.out.printf("\tPoints Upper Plane: %d\n", pointsUpperPlane.size());
+		System.out.printf("\tPoints Germline Plane: %d\n", pointsGermlineGainPlane.size());
 		System.out.println("\tBegin clustering algorithm: " + (new Date()).toString());
 
 		//DBScanFaster dbscanner = new DBScanFaster(points, HET_BALL_EPS + DUP_WEDGE_LASSO, DUP_WEDGE_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
-					
-		ClusteringResults<EventType> clusterResults = new ClusteringResults<EventType>(sites.getNumSites());
-		clusterResults.initializeResults(sites.getNumSites(), EventType.Ignored);
+		
+		// ------------------ First fill the germline gain plane --------------
+		for (int i = 0; i < pointsGermlineGainPlane.size(); i++) {
+			int indexInMainList = planeSplit.getIndexOfPlaneElementInMainList(indexGermlineGainPlane, i);
+			clusterResults.setClassification(indexInMainList, EventType.GainGermline, 0);
+		}		
 		
 		// ----------------------- Scan the lower plane
 		DBScanFaster dbscannerLowerPlane = new DBScanFaster(pointsLowerPlane, Clustering.HET_BALL_EPS, Clustering.HET_BALL_MINPTS, 0, 0, 1, 1); //parameters for capturing HET ball//KDBSCAN(param, 10, 0.0325f);
@@ -1661,8 +1673,24 @@ public class Clustering {
 				// Assume p-value as vertical row factor
 				boolean  tumorSigImbalanced = (metaData.mImbalancePValuesTumor[row] <= metaData.mSigPValuesPerSite[row]);
 		//      boolean  tumorSigImbalanced = (metaData.mImbalancePValuesTumor[row] <= metaData.mFDRTumor);
-				boolean normalSigImbalanced = (metaData.chromHasGermlineGain(oneSiteInfo.getChrom()));
-				int planeID = (tumorSigImbalanced || normalSigImbalanced) ? 1 : 0; 
+				boolean normalSigImbalanced = (metaData.mImbalancePValuesNormal[row] <= 0.01);				
+								
+				int planeID = 0; // Default to 0 plane				
+				if (metaData.chromHasGermlineGain(oneSiteInfo.getChrom())) {
+					planeID = 2;
+				} else if (tumorSigImbalanced || normalSigImbalanced) {
+					planeID = 1;
+					
+					if (ForcePointsOnDiagonalAsNull) {
+						if (pointOnDiagonal(thePoint, ClusterDiagonalLeeway) && isCopyNumInDiploidRange(metaData.getCopyNumberAtIndex(row))) {						
+							planeID = ElementPlaneSplit.InvalidPlaneID;
+						}
+					}
+				}
+				
+				
+
+				
 				planeSplit.registerElement(planeID, thePoint, row);
 			} else {
 				planeSplit.registerElement(ElementPlaneSplit.InvalidPlaneID, null, row);				

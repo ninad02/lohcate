@@ -208,7 +208,7 @@ public class LOHcate {
 					                 simOutRootFilename); //args[2] --> 0::Illumina, 1::SOLiD
 			IOUtils.closePrintStream(simOutputStream);		                 
 			
-			Regions.getGeneEnrichment(subdirs.getSubDirPath(SubdirsDefault.SitesClassified), subdirs.getSubDirPath(SubdirsDefault.GeneEnrichment));
+			GeneEnrichment.getGeneEnrichment(subdirs.getSubDirPath(SubdirsDefault.SitesClassified), subdirs.getSubDirPath(SubdirsDefault.GeneEnrichment));
 			
 		} else if (taskName.equals(taskRegions)) {			
 			jsapResult = ArgumentParserUtils.parseAndCheck(args, jsapTask, LOHcate.class.getName());			
@@ -225,7 +225,7 @@ public class LOHcate {
 			String rootFolderName = jsapResult.getString(rootFolderPath);
 			LOHcate.Subdirs subdirs = new LOHcate.Subdirs(rootFolderName);
 			
-			Regions.getGeneEnrichment(subdirs.getSubDirPath(SubdirsDefault.SitesClassified), subdirs.getSubDirPath(SubdirsDefault.GeneEnrichment));
+			GeneEnrichment.getGeneEnrichment(subdirs.getSubDirPath(SubdirsDefault.SitesClassified), subdirs.getSubDirPath(SubdirsDefault.GeneEnrichment));
 		}
 		
 		/*

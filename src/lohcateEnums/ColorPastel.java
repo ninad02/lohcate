@@ -13,6 +13,7 @@ public enum ColorPastel {
 	// GrayScale HEX
 	Black(0x000000, 0, 0, 0),	
 	White(0xFFFFFF, 255, 255, 255),	
+	Gray_05(0xEBEBEB, 245, 245, 245),
 	Gray_10(0xEBEBEB, 235, 235, 235),	
 	Gray_15(0xE1E1E1, 225, 225, 225),	
 	Gray_20(0xD7D7D7, 215, 215, 215),	

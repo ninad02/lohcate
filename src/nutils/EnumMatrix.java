@@ -21,7 +21,7 @@ public class EnumMatrix<E extends Enum<E>, V> {
 
 	//=========================================================================
 	public EnumMatrix(Class<E> keyType) {
-		this(keyType, null);
+		this(keyType, (V) null);
 	}
 	
 	//=========================================================================
@@ -29,6 +29,18 @@ public class EnumMatrix<E extends Enum<E>, V> {
 		mMatrix = new EnumMapSafe<E, EnumMapSafe<E, V>>(keyType);
 		allocateRowElements(keyType);
 		clear(initialValue);		
+	}
+	
+	//=========================================================================
+	public EnumMatrix(Class<E> keyType, NullaryClassFactory<V> classFactory) {
+		mMatrix = new EnumMapSafe<E, EnumMapSafe<E, V>>(keyType);
+		allocateRowElements(keyType);
+		
+		for (E enumKeyRow : mMatrix.keySet()) {
+			for (E enumKeyCol : mMatrix.keySet()) {
+				put(enumKeyRow, enumKeyCol, classFactory.newInstance());
+			}
+		}
 	}
 	
 	//=========================================================================

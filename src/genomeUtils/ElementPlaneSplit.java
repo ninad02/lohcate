@@ -25,6 +25,9 @@ public class ElementPlaneSplit<E> {
 			mPlanes.add(new PlaneElements<E>(numPoints));
 		}
 	}
+
+	// ========================================================================
+	public int getNumPlanes() { return mPlanes.size(); }
 	
 	// ========================================================================
 	public void registerElement(int planeID, E element, int indexOfElementInMainList) {
@@ -57,8 +60,7 @@ public class ElementPlaneSplit<E> {
 	
 	// ========================================================================
 	public int getPlane(int indexOfElementInMainList, PrimitiveWrapper.WInteger indexInPlane) {
-		indexInPlane.mInt = 
-		  mIndexInPlane.get(indexOfElementInMainList);
+		indexInPlane.mInt = mIndexInPlane.get(indexOfElementInMainList);
 		return mPlaneID.get(indexOfElementInMainList);
 	}
 

@@ -2,33 +2,34 @@ package genomeEnums;
 
 import java.util.ArrayList;
 
+
 public enum Chrom {
-	c0,
-	c1,
-	c2,
-	c3,
-	c4,
-	c5,
-	c6,
-	c7,
-	c8,
-	c9,
-	c10,
-	c11,
-	c12,
-	c13,
-	c14,
-	c15,
-	c16,
-	c17,
-	c18,
-	c19,
-	c20,
-	c21,
-	c22,
-	cX,
-	cY,
-	cM;
+	c0(0, 0),
+	c1(248_956_422, 125000000),
+	c2(242_193_529, 93300000),
+	c3(198_295_559, 91000000),
+	c4(190_214_555, 50400000),
+	c5(181_538_259, 48400000),
+	c6(170_805_979, 61000000),
+	c7(159_345_973, 59900000),
+	c8(145_138_636, 45600000),
+	c9(138_394_717, 49000000),
+	c10(133_797_422, 40200000),
+	c11(135_086_622, 53700000),
+	c12(133_275_309, 35800000),
+	c13(114_364_328, 17900000),
+	c14(107_043_718, 17600000),
+	c15(101_991_189, 19000000),
+	c16(90_338_345, 36600000),
+	c17(83_257_441, 24000000),
+	c18(80_373_285, 17200000),
+	c19(58_617_616, 26500000),
+	c20(64_444_167, 27500000),
+	c21(46_709_983, 13200000),
+	c22(50_818_468, 14700000),
+	cX(156_040_895, 60600000),
+	cY(57_227_415, 12_500_000),
+	cM(0, 0);
 	
 	public static final int IndexAutosomalStart = 1;
 	public static final int IndexAutosomalEnd   = 22;
@@ -50,13 +51,47 @@ public enum Chrom {
 		}
 		return autosomes;
 	}
+
+	// ========================================================================
+	// MEMBER VARIABLE
+	protected int mLength;
+	protected int mLengthArmP; 
 	
 	// ========================================================================
-	private Chrom() {}
+	private Chrom(int length, int lengthPArm) {
+		mLength = length;
+		mLengthArmP = lengthPArm;
+	}
 	
 	// ========================================================================
 	public byte getCode() { return (byte) ordinal(); }
 
+	// ========================================================================
+	public int getLength() { return mLength; }
+
+	// ========================================================================
+	public int getLengthOfPArm() { return mLengthArmP; }
+	
+	// ========================================================================
+	public long calculateGenomeWidePositionStart() {
+		long genomeWidePositionStart = 0;
+		for (Chrom chrom : Chrom.values()) {
+			if (chrom == this) break;			
+			genomeWidePositionStart += chrom.getLength();
+		}
+		return genomeWidePositionStart;
+	}
+
+	// ========================================================================
+	public long calculateGenomeWidePositionEndOfArmP() {
+		return calculateGenomeWidePositionStart() + mLengthArmP;
+	}
+	
+	// ========================================================================
+	public long calculateGenomeWidePositionEnd() {
+		return calculateGenomeWidePositionStart() + getLength();
+	}
+	
 	// ========================================================================
 	public static Chrom getChrom(String chromStr) {
 		chromStr = chromStr.trim().toLowerCase();

@@ -10,7 +10,12 @@ public class Cast {
 
 	public static int toInt(double d) { return (int) d; }
 	public static int toInt(long l)   { return (int) l; }
-	public static int toInt(float f)  { return (int) f; }	
+	public static int toInt(float f)  { return (int) f; }
+	
+	public static short toShort(int i)    { return (short) i; }
+	public static short toShort(long l)   { return (short) l; }
+	public static short toShort(float f)  { return (short) f; }
+	public static short toShort(double d) { return (short) d; } 
 	
 	public static long toLong(double d) { return Math.round(d); }
 	public static long toLong(float  f) { return Math.round(f); }

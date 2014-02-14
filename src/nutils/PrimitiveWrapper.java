@@ -10,6 +10,10 @@ package nutils;
 public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements Comparable<T> {
 		
 	protected static final byte DefaultValue = 0;
+
+	//=========================================================================
+	public abstract boolean equals(Object o);
+	public abstract int hashCode();
 	
 	//=========================================================================
 	/** Provides a wrapper for a primitive int value that can be changed.  Useful
@@ -24,6 +28,35 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		public int compareTo(WInteger rhs) {
 			return Integer.compare(mInt, rhs.mInt);
 		}
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + mInt;
+			return result;
+		}
+		
+		/* (non-Javadoc)
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			WInteger other = (WInteger) obj;
+			if (mInt != other.mInt)
+				return false;
+			return true;
+		}
+		
+		
 	}
 	
 	//=========================================================================
@@ -48,6 +81,8 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		}
 		
 		public boolean isAlreadySetOnce() { return mAlreadySetOnce; }
+		
+		
 	}
 
 	//=========================================================================
@@ -55,13 +90,42 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		public double mDouble;
 		public WDouble(double d) { mDouble = d; }
 		
-		public boolean equals(Object o) {			
-			return mDouble == ((WDouble) o).mDouble;
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			long temp;
+			temp = Double.doubleToLongBits(mDouble);
+			result = prime * result + (int) (temp ^ (temp >>> 32));
+			return result;
+		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			WDouble other = (WDouble) obj;
+			if (Double.doubleToLongBits(mDouble) != Double
+					.doubleToLongBits(other.mDouble))
+				return false;
+			return true;
 		}
 		
 		public int compareTo(WDouble rhs) {
 			return Double.compare(mDouble, rhs.mDouble);
 		}
+		
+		
 	}
 
 	//=========================================================================
@@ -69,13 +133,40 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		public float mFloat;
 		public WFloat(float f) { mFloat = f; }
 		
-		public boolean equals(Object o) {
-			return mFloat == ((WFloat) o).mFloat;
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + Float.floatToIntBits(mFloat);
+			return result;
+		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			WFloat other = (WFloat) obj;
+			if (Float.floatToIntBits(mFloat) != Float
+					.floatToIntBits(other.mFloat))
+				return false;
+			return true;
 		}
 		
 		public int compareTo(WFloat rhs) {
 			return Float.compare(mFloat, rhs.mFloat);
 		}
+		
+		
 	}
 
 	//=========================================================================
@@ -86,6 +177,36 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		public int compareTo(WByte rhs) {
 			return Byte.compare(mByte, rhs.mByte);
 		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + mByte;
+			return result;
+		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			WByte other = (WByte) obj;
+			if (mByte != other.mByte)
+				return false;
+			return true;
+		}
+		
+		
 	}
 
 	//=========================================================================
@@ -96,6 +217,36 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		public int compareTo(WBoolean rhs) {
 			return Boolean.compare(mBoolean, rhs.mBoolean);
 		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + (mBoolean ? 1231 : 1237);
+			return result;
+		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			WBoolean other = (WBoolean) obj;
+			if (mBoolean != other.mBoolean)
+				return false;
+			return true;
+		}
+		
+		
 	}
 
 	//=========================================================================
@@ -106,6 +257,36 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		public int compareTo(WLong rhs) {
 			return Long.compare(mLong, rhs.mLong);
 		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + (int) (mLong ^ (mLong >>> 32));
+			return result;
+		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			WLong other = (WLong) obj;
+			if (mLong != other.mLong)
+				return false;
+			return true;
+		}
+		
+		
 	}
 
 	//=========================================================================
@@ -116,6 +297,36 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		public int compareTo(WChar rhs) {
 			return Character.compare(mChar, rhs.mChar);
 		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + mChar;
+			return result;
+		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			WChar other = (WChar) obj;
+			if (mChar != other.mChar)
+				return false;
+			return true;
+		}
+		
+		
 	}
 
 	//=========================================================================
@@ -126,6 +337,39 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		public int compareTo(WString rhs) {
 			return mStr.compareTo(rhs.mStr);
 		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((mStr == null) ? 0 : mStr.hashCode());
+			return result;
+		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			WString other = (WString) obj;
+			if (mStr == null) {
+				if (other.mStr != null)
+					return false;
+			} else if (this.compareTo(other) != 0)
+				return false;
+			return true;
+		}
+		
+		
 	}
 
 	//=========================================================================
@@ -136,6 +380,39 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		public int compareTo(WObject<E> rhs) {
 			return mObj.compareTo(rhs.mObj);
 		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((mObj == null) ? 0 : mObj.hashCode());
+			return result;
+		}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			WObject other = (WObject) obj;
+			if (mObj == null) {
+				if (other.mObj != null)
+					return false;
+			} else if (!mObj.equals(other.mObj))
+				return false;
+			return true;
+		}
+		
+		
 	}
 	
 	//=========================================================================

@@ -27,6 +27,7 @@ public class GeneCounter implements Comparable<GeneCounter> {
 	
 	public String mLabel;
 	public Chrom mChrom;
+	public int mNumericID;
 	public EnumMapSafe<EventType, ArrayList<String>> mPatients; 	
 	
 	public BucketCounterEnum<MutationType> mMutationTypeCounts;	
@@ -40,9 +41,12 @@ public class GeneCounter implements Comparable<GeneCounter> {
 	
 	EnumMapSafe<EventTypeAllele, DynamicBucketCounter> mVariantAlleleCounts;
 	
-	public GeneCounter(String name, Chrom chrom) {		
+	
+	
+	public GeneCounter(String name, Chrom chrom, int numericID) {		
 		mLabel = name;
 		mChrom = chrom;
+		mNumericID = numericID;
 		initializePatients();
 				
 		mMutationTypeCounts    = new BucketCounterEnum<MutationType>(MutationType.class);  // stores hit counts for synonymous, nonsynonymous
@@ -66,6 +70,8 @@ public class GeneCounter implements Comparable<GeneCounter> {
 		//mAlleleEventTypeCounts.clear();
 		mCountLOHreferenceLost = 0;
 	}
+	
+	public int getNumericID() { return mNumericID; }
 	
 	private void initializePatients() {
 		mPatients = EnumMapSafe.createEnumMapOfArrayLists(EventType.class, String.class);		
@@ -231,4 +237,35 @@ public class GeneCounter implements Comparable<GeneCounter> {
 	public int compareTo(GeneCounter rhs) {
 		return mLabel.compareToIgnoreCase(rhs.mLabel);
 	}
+	
+	/* (non-Javadoc)
+	 * @see java.lang.Object#hashCode()
+	 */
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((mLabel == null) ? 0 : mLabel.hashCode());
+		return result;
+	}
+
+	/* (non-Javadoc)
+	 * @see java.lang.Object#equals(java.lang.Object)
+	 */
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj) return true;
+		if (obj == null) return false;
+		if (getClass() != obj.getClass()) return false;
+		
+		GeneCounter other = (GeneCounter) obj;
+		if (mLabel == null) {
+			if (other.mLabel != null)
+				return false;
+		} else if (mLabel.compareToIgnoreCase(other.mLabel) != 0) {				
+			return false;
+		} 
+		return true;
+	}
+	
 }
