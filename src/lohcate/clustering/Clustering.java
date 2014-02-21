@@ -853,8 +853,6 @@ public class Clustering {
 			// Do the post-processing
 			chromPosTracker.clear();
 			
-			ParallelArrayDoubleDynamic chromBoundaryXY = new ParallelArrayDoubleDynamic();			
-			
 			int startingRowGermlineOrSomaticOrAll = 0;  // 0 because header line has been stripped away
 			int numSites = oneSampleData.getNumSites();
 			for (int row = startingRowGermlineOrSomaticOrAll; row < numSites; row++) {
@@ -878,10 +876,7 @@ public class Clustering {
 				}
 
 				
-				boolean chromCrossed = chromPosTracker.chromCrossedWithCurrentCoordinates(oneSiteInfo.getChrom(), oneSiteInfo.getPosition());						
-				for (double d = 0; chromCrossed && (d <= 5.0); d += 0.02) {
-					chromBoundaryXY.add(oneSiteInfo.getChrom().calculateGenomeWidePositionStart(), d);
-				}
+				boolean chromCrossed = chromPosTracker.chromCrossedWithCurrentCoordinates(oneSiteInfo.getChrom(), oneSiteInfo.getPosition());										
 				maxPosOnChrom.registerPosition(oneSiteInfo.getChrom(), chromPosTracker.getPositionGenomeWide());
 				
 				if (eventType.isSomaticCopyNumberEvent() || (eventType == EventType.GainGermline)) {
@@ -891,18 +886,18 @@ public class Clustering {
 				// Add recurrence count
 				eventCountsByCoordinate.get(eventType).get(oneSiteInfo.getChrom()).incrementCount(oneSiteInfo.getPosition());
 
+				double divisor = 1;
 				clusterCoordinates .get(eventType).add( metaData.mAdjustedVAFTumor[row],         metaData.mAdjustedVAFNormal[row] );
-				waterfallPlotTumor .get(eventType).add( chromPosTracker.getPositionGenomeWide(), metaData.mAdjustedVAFTumor[row]);
-				waterfallPlotNormal.get(eventType).add( chromPosTracker.getPositionGenomeWide(), metaData.mAdjustedVAFNormal[row]);
-				copyNumPlot        .get(eventType).add( chromPosTracker.getPositionGenomeWide(), (metaData.mTumorCopyNumRatiosPerGene[row] * Regions.DefaultDiploidCopyNumber));
+				waterfallPlotTumor .get(eventType).add( chromPosTracker.getPositionGenomeWide() / divisor, metaData.mAdjustedVAFTumor[row]);
+				waterfallPlotNormal.get(eventType).add( chromPosTracker.getPositionGenomeWide() / divisor, metaData.mAdjustedVAFNormal[row]);
+				copyNumPlot        .get(eventType).add( chromPosTracker.getPositionGenomeWide() / divisor, metaData.getCopyNumberAtIndex(row)); 						
 			}									
 
-			// Now let's create the datasets needed to
-			double[][] boundaryArrays = chromBoundaryXY.toArrays();
+			// Now let's create the datasets needed to			
 			DefaultXYDataset xyDatasetVAFPlot             = classifySitesHelper_createAndFillXYData(clusterCoordinates, null);
-			DefaultXYDataset xyDatasetWaterfallPlotTumor  = classifySitesHelper_createAndFillXYData(waterfallPlotTumor,  boundaryArrays);
-			DefaultXYDataset xyDatasetWaterfallPlotNormal = classifySitesHelper_createAndFillXYData(waterfallPlotNormal, boundaryArrays);
-			DefaultXYDataset xyDatasetCopyNumber          = classifySitesHelper_createAndFillXYData(copyNumPlot, boundaryArrays);
+			DefaultXYDataset xyDatasetWaterfallPlotTumor  = classifySitesHelper_createAndFillXYData(waterfallPlotTumor,  null);
+			DefaultXYDataset xyDatasetWaterfallPlotNormal = classifySitesHelper_createAndFillXYData(waterfallPlotNormal, null);
+			DefaultXYDataset xyDatasetCopyNumber          = classifySitesHelper_createAndFillXYData(copyNumPlot, null);
 
 			ClusteringPlotting.plotVAFComparison(xyDatasetVAFPlot,             lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_2D)         + File.separator + sampleNameRoot + ".VAFComparison", sampleNameRoot);
 			ClusteringPlotting.plotVAFGenomeWide(xyDatasetWaterfallPlotTumor,  lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_GenomeWide) + File.separator + sampleNameRoot + ".VAF_GenomeWide_Tumor",  sampleNameRoot, true);				

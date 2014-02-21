@@ -19,6 +19,77 @@ public class BitSetUtils {
 	public static Random randomGenerator = new Random();
 
 	// ========================================================================
+	private static void Test_setBit() {
+		String s = "";
+		
+		for (int i = 0; i <= 20; i++) {
+			String result = setBit(s, i, true);
+			System.out.println(result.length() + "\t" + result);
+		}
+	}
+	
+	// ========================================================================
+	/** Given a string that contains 0 and 1 characters, this sets the character at
+	 *  the specified index to 1.  If the string is of insufficient legnth, it is 
+	 *  expanded to include the index
+	 * @param bitString The string containing 0 and 1 characters to be modified
+	 * @param bitIndex The index of the bit to be modified.  If it exceeds the string, the string is expanded.
+	 */
+	private static StringBuilder setBitStringBuilder = new StringBuilder(2048); 
+	public static String setBit(String bitString, int bitIndex, boolean value) {
+		int valueInt = value ? 1 : 0;
+		String rV = null;
+		synchronized(setBitStringBuilder) {
+			setBitStringBuilder.setLength(0);
+			int bitStringLen = bitString.length();
+			
+			if (bitIndex >= bitStringLen) {
+				setBitStringBuilder.append(bitString);
+				
+				int diffFinalLength = bitIndex - bitStringLen;
+				for (int i = 0; i < diffFinalLength; i++) {
+					setBitStringBuilder.append("0");
+				}
+				
+				// Now finally append the bit in question
+				setBitStringBuilder.append(valueInt);
+				
+			} else {
+				// Loop and call charAt() to avoid memory-using substring operations
+				for (int i = 0; i < bitIndex; i++) {
+					setBitStringBuilder.append(bitString.charAt(i));
+				}
+				
+				// Now set the actual character
+				setBitStringBuilder.append(valueInt);
+				
+				// Now the remaining chars
+				for (int i = bitIndex + 1; i < bitStringLen; i++) {
+					setBitStringBuilder.append(bitString.charAt(i));
+				}
+			}			
+			rV = setBitStringBuilder.toString();
+		}
+		return rV;
+	}
+	
+	// ========================================================================
+	/** Given a BitSet and a string of bits, this populates the bitset.  Any non-zero characters
+	 *  are treated as 1.  If the BitSet passed in is null, it returns a new BitSet.
+	 */
+	public static BitSet setBitSet(BitSet bs, String bitString, boolean clearBitSet) {
+		int strLen = bitString.length();
+		bs = (bs == null) ? new BitSet(strLen) : bs;
+		
+		if (clearBitSet) { bs.clear(); }
+		for (int i = 0; i < strLen; i++) { 
+			bs.set(i, bitString.charAt(i) != '0');
+		}
+		return bs;
+	}
+	
+	
+	// ========================================================================
 	/** Given a number of items, this returns a bitset of length: number of items.  
 	 * Given a probability, each bit is set to 1 with that given probability.
 	 */
@@ -444,7 +515,8 @@ public class BitSetUtils {
 	public static void main(String[] args) {
 		//ArrayUtils.printLongArray(MasksUns64>>ignedLong);
 		//System.out.println((-1L >>> 63) >> 1);
-		for (int i = 0; i <= NumBitsInLong; i++) { System.out.println(getMask(i)); }		
+		//for (int i = 0; i <= NumBitsInLong; i++) { System.out.println(getMask(i)); }
+		Test_setBit();
 	}
 
 	// ========================================================================
@@ -459,6 +531,10 @@ public class BitSetUtils {
 		public long extractValue(long compactUnit);		
 	}
 
+	public static ValueExtractor LongExtractorWhole = new ValueExtractor() {
+		public long extractValue(long compactUnit) { return compactUnit; }
+	};
+	
 	public static BitSetUtils.ValueExtractor IntExtractorLSB = new BitSetUtils.ValueExtractor() { 
 		public long extractValue(long compactUnit) { return (compactUnit & 0xFFFFFFFFL); }
 	};

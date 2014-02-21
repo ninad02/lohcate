@@ -70,6 +70,19 @@ public class IOUtils {
 	}
 
 	// ========================================================================
+	/** Creates a new blank file. */
+	public static File createBlankFile(String filename) {
+		File newFile = new File(filename);
+		try {
+			boolean fileCreated = newFile.createNewFile();
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(-1);
+		}
+		return newFile;
+	}
+	
+	// ========================================================================
 	/** Given a parent pathname and a filename, this returns the full path. */
 	public static String pathConcat(String parentPath, String filename) {
 		return parentPath + File.separatorChar + filename;

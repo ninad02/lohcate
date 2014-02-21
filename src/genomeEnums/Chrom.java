@@ -56,11 +56,13 @@ public enum Chrom {
 	// MEMBER VARIABLE
 	protected int mLength;
 	protected int mLengthArmP; 
+	protected long mGenomeWidePositionStart;
 	
 	// ========================================================================
 	private Chrom(int length, int lengthPArm) {
 		mLength = length;
 		mLengthArmP = lengthPArm;
+		mGenomeWidePositionStart = -1;
 	}
 	
 	// ========================================================================
@@ -71,9 +73,9 @@ public enum Chrom {
 
 	// ========================================================================
 	public int getLengthOfPArm() { return mLengthArmP; }
-	
+
 	// ========================================================================
-	public long calculateGenomeWidePositionStart() {
+	private long calculateGenomeWidePositionStart() {
 		long genomeWidePositionStart = 0;
 		for (Chrom chrom : Chrom.values()) {
 			if (chrom == this) break;			
@@ -81,15 +83,28 @@ public enum Chrom {
 		}
 		return genomeWidePositionStart;
 	}
+	
+	// ========================================================================
+	public long getGenomeWidePositionStart() {
+		if (mGenomeWidePositionStart < 0) {
+			mGenomeWidePositionStart = calculateGenomeWidePositionStart();
+		}
+		return mGenomeWidePositionStart;
+	}
 
 	// ========================================================================
 	public long calculateGenomeWidePositionEndOfArmP() {
-		return calculateGenomeWidePositionStart() + mLengthArmP;
+		return getGenomeWidePositionStart() + mLengthArmP;
 	}
 	
 	// ========================================================================
 	public long calculateGenomeWidePositionEnd() {
-		return calculateGenomeWidePositionStart() + getLength();
+		return getGenomeWidePositionStart() + getLength();
+	}
+	
+	// ========================================================================
+	public long calculateGenomeWidePositionMidpoint() {
+		return getGenomeWidePositionStart() + (mLength >> 1);
 	}
 	
 	// ========================================================================

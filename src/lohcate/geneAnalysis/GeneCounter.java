@@ -1,4 +1,4 @@
-package lohcate;
+package lohcate.geneAnalysis;
 import genomeEnums.Chrom;
 import genomeEnums.VariantLocation;
 
@@ -12,6 +12,7 @@ import nutils.NumberUtils;
 import nutils.counter.BucketCounterEnum;
 import nutils.counter.DynamicBucketCounter;
 
+import lohcate.EventTypeAllele;
 import lohcateEnums.EventType;
 import lohcateEnums.MutationType;
 

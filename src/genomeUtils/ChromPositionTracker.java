@@ -36,7 +36,7 @@ public class ChromPositionTracker extends ObjectWalkerTracker<Chrom> {
 		ChangeType chromChangeType = hasChanged(chromCurrent, true);
 		
 		if (chromChangeType.hasChanged()) {			
-			mPositionGenomeWide = chromCurrent.calculateGenomeWidePositionStart() + positionCurrent;
+			mPositionGenomeWide = chromCurrent.getGenomeWidePositionStart() + positionCurrent;
 		} else {
 			mPositionGenomeWide += (positionCurrent - mPositionPrev);
 		}

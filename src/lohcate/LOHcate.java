@@ -5,6 +5,7 @@ import java.io.PrintStream;
 
 import lohcate.clustering.Clustering;
 import lohcate.clustering.ClusteringParams;
+import lohcate.geneAnalysis.GeneEnrichment;
 import lohcateEnums.SeqPlatform;
 
 import com.martiansoftware.jsap.FlaggedOption;

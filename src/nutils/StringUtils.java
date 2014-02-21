@@ -318,6 +318,8 @@ public class StringUtils {
 	
 	// ========================================================================
 	public static StringBuilder constructColumnDelimitedString(String[] values, String delimiter, StringBuilder sb, boolean clearStringBuilder) {
+		sb = (sb == null) ? new StringBuilder(2048) : sb;
+		
 		if (clearStringBuilder) {
 			sb.setLength(0);
 		}

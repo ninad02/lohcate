@@ -10,11 +10,13 @@ public class ClusteringResults<E> {
 
 	// ========================================================================
 	public ArrayList<E> mClassificationForPoint;
+	public ArrayList<E> mClassificationForPoint2;
 	public IntArrayList mSubClusterID;
 		
 	// ========================================================================
 	public ClusteringResults(int numExpectedPoints) {
-		mClassificationForPoint = new ArrayList<E>(numExpectedPoints);
+		mClassificationForPoint  = new ArrayList<E>(numExpectedPoints);
+		mClassificationForPoint2 = new ArrayList<E>(numExpectedPoints);
 		mSubClusterID = new IntArrayList(numExpectedPoints);
 	}
 	
@@ -33,6 +35,7 @@ public class ClusteringResults<E> {
 		clear();
 		for (int i = 0; i < numPoints; i++) {
 			mClassificationForPoint.add(initialValue);
+			mClassificationForPoint2.add(null);
 			mSubClusterID.add(InvalidSubClusteringID);
 		}
 	}
@@ -40,8 +43,12 @@ public class ClusteringResults<E> {
 	// ========================================================================
 	public void clear() {
 		mClassificationForPoint.clear();
+		mClassificationForPoint2.clear();
 		mSubClusterID.clear();
 	}
+
+	// ========================================================================
+	public E getClassificationSecond(int index) { return mClassificationForPoint2.get(index); }
 	
 	// ========================================================================
 	public E getClassification(int index) { return mClassificationForPoint.get(index); }

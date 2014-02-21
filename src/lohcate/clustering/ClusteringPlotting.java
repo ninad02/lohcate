@@ -35,6 +35,7 @@ import org.jfree.chart.JFreeChart;
 import org.jfree.chart.LegendItem;
 import org.jfree.chart.LegendItemCollection;
 import org.jfree.chart.annotations.XYBoxAnnotation;
+import org.jfree.chart.annotations.XYTextAnnotation;
 import org.jfree.chart.axis.NumberTickUnit;
 import org.jfree.chart.axis.TickUnit;
 import org.jfree.chart.axis.TickUnits;
@@ -162,11 +163,7 @@ public class ClusteringPlotting {
 	public static void plotRecurrenceGenomeWideByEvent(EnumMapSafe<Chrom, DynamicBucketCounter> eventCount, String outDir, EventType eventType) {
 		DoubleArrayList positionsGenomeWideAllSamples = new DoubleArrayList();
 		DoubleArrayList eventCountAllSamples          = new DoubleArrayList();		
-		
-		DoubleArrayList chromBoundaryXValue = new DoubleArrayList();
-		DoubleArrayList chromBoundaryYValue = new DoubleArrayList();
-		PrimitiveWrapper.WInteger lastKey = new PrimitiveWrapper.WInteger(0);		
-		
+			
 		// First get the max count for the chromosome boundaries
 		int maxCountAllChromosomes = 1;
 		for (Chrom chrom : Chrom.Autosomes) {
@@ -174,29 +171,19 @@ public class ClusteringPlotting {
 		}
 		
 		for (Chrom chrom : Chrom.values()) {
-			if (chrom.isAutosomal()) {
-				long chromPosStartGenomeWide = chrom.calculateGenomeWidePositionStart();
+			if (chrom.isAutosomal()) {				
 				DoubleArrayList[] positionAndCount = eventCount.get(chrom).toArrayListDouble();
 				for (int i = 0; i < positionAndCount[0].size(); i++) {
-					positionAndCount[0].set(i, positionAndCount[0].get(i) + chromPosStartGenomeWide);
+					positionAndCount[0].set(i, positionAndCount[0].get(i) + chrom.getGenomeWidePositionStart());
 				}
 				
 				positionsGenomeWideAllSamples.addAll(positionAndCount[0]);
-				eventCountAllSamples.addAll         (positionAndCount[1]);
-				
-				boolean lastKeyExists = eventCount.get(chrom).getKeyLast(lastKey);							
-				
-				double increment = (maxCountAllChromosomes) / 50.0;
-				for (double d = 0; d <= maxCountAllChromosomes; d += increment) {
-					chromBoundaryXValue.add(chromPosStartGenomeWide);
-					chromBoundaryYValue.add(d);
-				}
+				eventCountAllSamples.addAll         (positionAndCount[1]);				
 			}
 		}
 		DefaultXYDataset posAndEventCountDataset = new DefaultXYDataset();
 		posAndEventCountDataset.addSeries(eventType.name(), ArrayUtils.combineTwoDynamicArraysIntoOneStatic(positionsGenomeWideAllSamples, eventCountAllSamples));
-		posAndEventCountDataset.addSeries("Boundary",       ArrayUtils.combineTwoDynamicArraysIntoOneStatic(chromBoundaryXValue, chromBoundaryYValue));
-		ClusteringPlotting.plotEventSampleRecurrence(posAndEventCountDataset, outDir + File.separator + "All_Samples." + eventType.name(), getColorForEvent(eventType).getColor(), ColorPastel.Gray_70.getColor());
+		ClusteringPlotting.plotEventSampleRecurrence(posAndEventCountDataset, outDir + File.separator + "All_Samples." + eventType.name(), getColorForEvent(eventType).getColor(), maxCountAllChromosomes);
 	}
 	
 	// ========================================================================
@@ -207,7 +194,7 @@ public class ClusteringPlotting {
 	}
 
 	// ========================================================================
-	public static void plotEventSampleRecurrence(XYDataset xyDataset, String outFilenameRoot, Color seriesColor, Color boundaryColor) {
+	public static void plotEventSampleRecurrence(XYDataset xyDataset, String outFilenameRoot, Color seriesColor, int maxYValue) {
 		String xAxisLabel = "Position";
 		String yAxisLabel = "# Samples with Event";
 		String title = "Recurrence over Samples for Event: " + xyDataset.getSeriesKey(0);				
@@ -215,22 +202,26 @@ public class ClusteringPlotting {
 		JFreeChart theChart = 
 				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, true, false, false);
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
-		theChart.addSubtitle(getChromSubtitle());
+		//theChart.addSubtitle(getChromSubtitle());
 		
 		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(5);		
 		//setSeriesPaintPerCluster(itemRenderer);
-		itemRenderer.setSeriesPaint(0, seriesColor);
-		itemRenderer.setSeriesPaint(1, boundaryColor);
+		itemRenderer.setSeriesPaint(0, seriesColor);		
 		xyPlot.setRenderer(itemRenderer);		
 		
 		xyPlot.setBackgroundPaint(ColorPastel.White.getColor());
 		xyPlot.setDomainGridlinePaint(Color.white);
 		xyPlot.setRangeGridlinePaint(Color.white);		
 		
+		double maxYRangeAxis = Math.max(maxYValue, 10);
+		formatXYPlotBackground(xyPlot, maxYRangeAxis, false, 0, 1);
+		
+		
+		formatLegendItems(xyPlot);
 		LegendTitle legendTitle = theChart.getLegend();
 		legendTitle.setID("Event");
-		legendTitle.setItemFont(new Font("Arial", Font.BOLD, 20));
-	
+		legendTitle.setItemFont(new Font("Arial", Font.BOLD, 32));
+
 		//xyPlot.getRangeAxis().setRange(0, 1.02);		
 		
 		TickUnits tunits = new TickUnits();
@@ -238,46 +229,69 @@ public class ClusteringPlotting {
 		//xyPlot.getRangeAxis().setRange(0, 62);
 		xyPlot.getRangeAxis().setStandardTickUnits(tunits);
 		
-		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 20);
+		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 32);
 		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 20);
 		xyPlot.getRangeAxis().setLabelFont(rangeAxisLabelFont);		
 		xyPlot.getRangeAxis().setTickLabelFont(rangeAxisTickFont);
+		xyPlot.getRangeAxis().setRange(0, maxYRangeAxis + 2);
 		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
 		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);	
 		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, 2400, 800);
 		
 	}
 
+	// ========================================================================	
+	
+	// ========================================================================
+	public static double getMaxY(XYDataset xyDataset) {
+		double maxYValue = -java.lang.Double.MAX_VALUE;
+		int numSeries = xyDataset.getSeriesCount();
+		for (int seriesIndex = 0; seriesIndex < numSeries; seriesIndex++) {
+			int itemCount = xyDataset.getItemCount(seriesIndex);
+			for (int itemIndex = 0; itemIndex < itemCount; itemIndex++) {
+				double yVal = xyDataset.getYValue(seriesIndex, itemIndex);
+				if (yVal > maxYValue) { maxYValue = yVal; }
+			}
+		}
+		return maxYValue;
+	}
+	
 	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of a tissue vs the genomic position. */
 	public static void plotCopyNumGenomeWide(XYDataset xyDataset, String outFilenameRoot, String sampleName) {
-		String xAxisLabel = "Position";
-		String yAxisLabel = "Copy Number";
-		String title = "Copy Number: " + sampleName;				
-		
+		String xAxisLabel = "Genomic Position";
+		String yAxisLabel = "Total Copy Number [Tumor]";
+		String title = "Total Copy Number [Tumor]: " + sampleName;				
+				
 		JFreeChart theChart = 
 				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, true, false, false);
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
-		theChart.addSubtitle(getChromSubtitle());
+		//theChart.addSubtitle(getChromSubtitle());
 		
 		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(5);		
 		setSeriesPaintPerCluster(itemRenderer);
 		xyPlot.setRenderer(itemRenderer);		
+		xyPlot.addRangeMarker(new ValueMarker(2.0));
 		
 		xyPlot.setBackgroundPaint(ColorPastel.White.getColor());
 		xyPlot.setDomainGridlinePaint(Color.white);
 		xyPlot.setRangeGridlinePaint(Color.white);		
 		
+		double maxCopyNumber = getMaxY(xyDataset);
+		formatXYPlotBackground(xyPlot, maxCopyNumber, false, 0, 0.10);
+		
+		formatLegendItems(xyPlot);
 		LegendTitle legendTitle = theChart.getLegend();
-		legendTitle.setID("Clusters");
-		legendTitle.setItemFont(new Font("Arial", Font.BOLD, 20));
-	
+		legendTitle.setID("Events");		
+		legendTitle.setItemFont(new Font("Arial", Font.BOLD, 32));
+		
 		//xyPlot.getRangeAxis().setRange(0, 1.02);		
 		
-		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 20);
+		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 32);
 		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 20);
 		xyPlot.getRangeAxis().setLabelFont(rangeAxisLabelFont);		
 		xyPlot.getRangeAxis().setTickLabelFont(rangeAxisTickFont);
+		xyPlot.getRangeAxis().setRange(0, maxCopyNumber + 0.25);
 		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
 		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);	
 		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, 2400, 800);
@@ -362,10 +376,40 @@ public class ClusteringPlotting {
 	}
 	
 	// ========================================================================
+	private static void formatXYPlotBackground(XYPlot xyPlot, double maxYValue, boolean doWhiteBackground, double backgroundBufferYTop, double chromLabelHeightBuffer) {
+		Color backgroundGreyArmP = new Color(235, 235, 235, 220);
+	
+		backgroundBufferYTop   += maxYValue;
+		chromLabelHeightBuffer += maxYValue; 
+		
+		for (Chrom chrom : Chrom.Autosomes) {
+			if (doWhiteBackground) {
+				xyPlot.addAnnotation(new XYBoxAnnotation(chrom.getGenomeWidePositionStart(), maxYValue, chrom.calculateGenomeWidePositionEnd(), backgroundBufferYTop, null, null, ColorPastel.White.getColor()));
+			}
+			xyPlot.addDomainMarker(new IntervalMarker(chrom.getGenomeWidePositionStart(), chrom.calculateGenomeWidePositionEndOfArmP(), backgroundGreyArmP), Layer.BACKGROUND);
+			xyPlot.addDomainMarker(new ValueMarker(chrom.getGenomeWidePositionStart() + 1, ColorPastel.Gray_90.getColor(), new BasicStroke()));
+			XYTextAnnotation chromNumber = new XYTextAnnotation("" + chrom.ordinal(), chrom.calculateGenomeWidePositionMidpoint(), chromLabelHeightBuffer);
+			chromNumber.setFont(new Font("Arial", Font.BOLD, 24));
+			xyPlot.addAnnotation(chromNumber);
+		}
+	}
+
+	// ========================================================================
+	private static void formatLegendItems(XYPlot xyPlot) {
+		LegendItemCollection legendItemCollection = xyPlot.getLegendItems();
+		int numItems = legendItemCollection.getItemCount();
+		for (int i = 0; i < numItems; i++) {
+			LegendItem lItem = legendItemCollection.get(i);
+			lItem.setShape(new Rectangle(25, 25));			
+		}
+		xyPlot.setFixedLegendItems(legendItemCollection);
+	}
+	
+	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of a tissue vs the genomic position. */
 	public static void plotVAFGenomeWide(XYDataset xyDataset, String outFilenameRoot, String sampleName, boolean isTumor) {
-		String xAxisLabel = "Position";
-		String yAxisLabel = "VAF";
+		String xAxisLabel = "Genomic Position";
+		String yAxisLabel = "Variant Allele Fraction (VAF)";
 		String title = "VAF GenomeWide: " + sampleName + (isTumor ? " [Tumor]" : " [Normal]");
 		
 		//+ "\n" + ChromTitleString;
@@ -373,7 +417,8 @@ public class ClusteringPlotting {
 		JFreeChart theChart = 
 				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, true, false, false);
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
-		theChart.addSubtitle(getChromSubtitle());
+		//theChart.addSubtitle(getChromSubtitle());
+		theChart.getTitle().setMargin(0, 0, 10, 0);
 		
 		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(5);		
 		setSeriesPaintPerCluster(itemRenderer);
@@ -383,29 +428,17 @@ public class ClusteringPlotting {
 		xyPlot.setDomainGridlinePaint(Color.white);
 		xyPlot.setRangeGridlinePaint(Color.white);
 				
-		Color backgroundGreyArmP = new Color(235, 235, 235, 220);
-	
-		//xyPlot.addAnnotation(new XYBoxAnnotation(0, 0, Chrom.c1.calculateGenomeWidePositionEndOfArmP(), 1.0, null, null, backgroundGreyArmP));
+		double maxValueY = 1.0;
+		formatXYPlotBackground(xyPlot, maxValueY, true, 0.04, 0.02);
 		
-		for (Chrom chrom : Chrom.Autosomes) {
-			xyPlot.addDomainMarker(new IntervalMarker(chrom.calculateGenomeWidePositionStart(), chrom.calculateGenomeWidePositionEndOfArmP(), backgroundGreyArmP), Layer.BACKGROUND);
-			xyPlot.addDomainMarker(new ValueMarker(chrom.calculateGenomeWidePositionStart() + 1, ColorPastel.Gray_90.getColor(), new BasicStroke()));
-		}
-		
-		LegendItemCollection legendItemCollection = xyPlot.getLegendItems();
-		int numItems = legendItemCollection.getItemCount();
-		for (int i = 0; i < numItems; i++) {
-			LegendItem lItem = legendItemCollection.get(i);
-			lItem.setShape(new Rectangle(25, 25));
-		}
-		xyPlot.setFixedLegendItems(legendItemCollection);
+		formatLegendItems(xyPlot);
 		
 		LegendTitle legendTitle = theChart.getLegend();
 		legendTitle.setID("Clusters");
 		legendTitle.setItemFont(new Font("Arial", Font.BOLD, 32));
 		
 	
-		xyPlot.getRangeAxis().setRange(0, 1.02);		
+		xyPlot.getRangeAxis().setRange(0, 1.04);		
 		
 		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 32);
 		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 20);
@@ -454,9 +487,7 @@ public class ClusteringPlotting {
 				itemRenderer.setSeriesPaint(eventType.ordinal(), getColorForEvent(eventType).getColor());
 			}
 		}
-		//itemRenderer.setSeriesPaint(EventType.HETSomatic.ordinal(), getColorForEvent(EventType.HETSomatic).getColor());
-		itemRenderer.setSeriesPaint(EventType.values().length, ColorPastel.Gray_70.getColor());
-		itemRenderer.setSeriesShape(EventType.values().length, new Rectangle(1, 20)); 				
+		//itemRenderer.setSeriesPaint(EventType.HETSomatic.ordinal(), getColorForEvent(EventType.HETSomatic).getColor());			
 	}
 
 	// ========================================================================

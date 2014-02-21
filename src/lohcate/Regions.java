@@ -126,16 +126,16 @@ public class Regions {
 	private static final int MaxSitesInWindowAllowed = 3;
 	
 	// Column constants for the curated TSV files (files that have a cluster column)
-	static final int ColCuratedTSV_Chrom    = Col_NAFTAFInput_Chrom;
-	static final int ColCuratedTSV_Position = Col_NAFTAFInput_Position;
+	public static final int ColCuratedTSV_Chrom    = Col_NAFTAFInput_Chrom;
+	public static final int ColCuratedTSV_Position = Col_NAFTAFInput_Position;
 	//private static final int ColCuratedTSV_VariantBaseTumor = 2;
 	private static final int ColCuratedTSV_VafNormal    = Col_NAFTAFInput_VariantRatioNormal;
-	static final int ColCuratedTSV_VafTumor     = Col_NAFTAFInput_VariantRatioTumor;
-	static final int ColCuratedTSV_dbSNP        = Col_NAFTAFInput_DbSNPString;	
-	static final int ColCuratedTSV_MutationType = Col_NAFTAFInput_MutationType;
-	static final int ColCuratedTSV_Gene         = Col_NAFTAFInput_HugoSymbol;
+	public static final int ColCuratedTSV_VafTumor     = Col_NAFTAFInput_VariantRatioTumor;
+	public static final int ColCuratedTSV_dbSNP        = Col_NAFTAFInput_DbSNPString;	
+	public static final int ColCuratedTSV_MutationType = Col_NAFTAFInput_MutationType;
+	public static final int ColCuratedTSV_Gene         = Col_NAFTAFInput_HugoSymbol;
 	//private static final int ColCuratedTSV_VariantLocation = 7;
-	static final int ColCuratedTSV_Cluster      = 17; //8;
+	public static final int ColCuratedTSV_Cluster      = 17; //8;
 	
 	public static final GenotypeUtils.GenomicCoordinateComparatorInTextFileLine LineComparatorTab = new GenotypeUtils.GenomicCoordinateComparatorInTextFileLine();
 	public static final NullaryClassFactory<ArrayList> NullClassFactoryArrayList = new NullaryClassFactory<ArrayList>(ArrayList.class);
