@@ -440,6 +440,14 @@ public class ArrayUtils {
 	}
 	
 	// ========================================================================
+	public static int getFailPoint(int arrayIndex) {
+		if (arrayIndex < 0) {
+			CompareUtils.ensureTrue(false, "ERROR: Failing point index must be >= 0 instead of: " + arrayIndex);
+		}
+		return (-arrayIndex - 1);
+	}
+	
+	// ========================================================================
 	/** Assumes that both lists are of the same size.  If not, it returns null. */ 
 	public static double[][] convertToTwoDimensionalArrays(Collection<Double> list0, Collection<Double> list1) {
 		if (list0.size() != list1.size()) return null;
@@ -676,6 +684,14 @@ public class ArrayUtils {
 			Arrays.fill(subArray, value);
 		}
 	}	
+	
+	// ========================================================================
+	/** Given a two dimensional object array, this fills all elements with the specified value. */
+	public static<E> void arrayFill(E[][] theMatrix, E value) {
+		for (E[] theArray : theMatrix) {
+			Arrays.fill(theArray, value);
+		}
+	}
 	
 	// ========================================================================
 	/** Given a two dimensional integer array, this fills all elements with the specified value. */

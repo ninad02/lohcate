@@ -10,11 +10,13 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -25,6 +27,7 @@ import com.google.common.collect.ArrayListMultimap;
 
 import lohcate.EventTypeAllele;
 import lohcate.Regions;
+import lohcate.clustering.AlleleFractionStatsForSample;
 import lohcate.clustering.Clustering;
 import lohcateEnums.EventType;
 import lohcateEnums.MutationType;
@@ -42,6 +45,9 @@ import nutils.BitUtils.Compactor.CompactorInf;
 import nutils.BitUtils.Compactor.CompactorIntoInt;
 import nutils.BitUtils.Compactor.CompactorIntoLong;
 import nutils.StringUtils.FileExtensionAndDelimiter;
+import nutils.array.FastArrayListLong;
+import nutils.array.FastArrayListLong.FastArrayListIndex;
+import nutils.array.FastArrayListLong.FastArrayListIterator;
 import nutils.collectionsSorted.ArrayListSortedComparable;
 import nutils.counter.BucketCounterEnum;
 
@@ -97,10 +103,15 @@ public class GeneEnrichment {
 	 * @param inDir curated SNP calls
 	 */
 	public static void getGeneEnrichment(String inDir, String outDir) {
-		String outFilename = outDir + File.separator + "geneEnrichment" + StringUtils.FileExtensionTSV.mExtension;
 		IOUtils.createDirectoryPath(outDir, false);
 		File[] files = (new File(inDir)).listFiles();
-		StringUtils.FileExtensionAndDelimiter fileExtDelim = StringUtils.FileTextTabDelim; 
+		StringUtils.FileExtensionAndDelimiter fileExtDelim = StringUtils.FileTextTabDelim;
+		
+		String outFilename                  = outDir + File.separator + "geneEnrichment"    + StringUtils.FileExtensionTSV.mExtension;		
+		String outFilenameDualEventsOneGene = outDir + File.separator + "dualEventsOneGene" + StringUtils.FileExtensionTSV.mExtension;
+		BufferedWriter outDualEventsOneGene = IOUtils.getBufferedWriter(outFilenameDualEventsOneGene);
+		String outfilenameDualEventsRecurrent = outDir + File.separator + "dualEventsRecurrent" + StringUtils.FileExtensionTSV.mExtension;
+		BufferedWriter outDualEventsRecurrent = IOUtils.getBufferedWriter(outfilenameDualEventsRecurrent);
 				
 		StringBuilder sb = new StringBuilder(4096);		
 		//TwoGenesAndEvents2 coOcurrenceWithPatientsDummy = new TwoGenesAndEvents2();		
@@ -125,6 +136,7 @@ public class GeneEnrichment {
 		System.out.println(cacheFilename);
 		File cacheFile = IOUtils.createBlankFile(cacheFilename);		
 		LongArrayList allDualEvents = new LongArrayList();
+		FastArrayListLong allDualEventsFast = new FastArrayListLong();
 		
 		ArrayList<String> allPatients = new ArrayList<String>(files.length);
 		ArrayList<File> mValidFiles = new ArrayList<File>(files.length);		
@@ -158,9 +170,26 @@ public class GeneEnrichment {
 			int numCombos = 0;			
 			Collection<Map.Entry<GeneCounter, EventType>> keysAndValuesMap = eventsForGene.entries();
 				
+			for (GeneCounter gene : eventsForGene.keySet()) {
+				List<EventType> events = eventsForGene.get(gene);
+				int numEvents = events.size();
+				if (numEvents > 1) {
+					sb.setLength(0);
+					sb.append(patientName)
+					  .append(StringUtils.FileExtensionTSV.mDelimiter)
+					  .append(gene.getName())
+					  .append(StringUtils.FileExtensionTSV.mDelimiter)
+					  .append(numEvents);
+					for (EventType event : events) {
+						sb.append(StringUtils.FileExtensionTSV.mDelimiter)
+						  .append(event.name());
+					}
+					IOUtils.writeToBufferedWriter(outDualEventsOneGene, sb.toString(), true);
+				}
+			}
 			int numPairs = (keysAndValuesMap.size() * (keysAndValuesMap.size() - 1)) / 2;
 			LongArrayList allPairsOnePatient = new LongArrayList(numPairs);
-				
+			
 			for (Map.Entry<GeneCounter, EventType> keyValueIter1 : keysAndValuesMap) {
 				for (Map.Entry<GeneCounter, EventType> keyValueIter2: keysAndValuesMap) {
 					GeneCounter gene1 = keyValueIter1.getKey();
@@ -225,7 +254,8 @@ public class GeneEnrichment {
 			ArrayUtils.sort(allPairsOnePatient);
 			System.out.println("Sorting done; now reading file...");
 			//readFromCoOcurrenceFileAndUpdate(allPairsOnePatient, patientIndex, cacheFile.getAbsolutePath(), System.out);
-			readFromCoOccurrenceListAndUpdate(allPairsOnePatient, allDualEvents, System.out);
+			//readFromCoOccurrenceListAndUpdate(allPairsOnePatient, allDualEvents, System.out);
+			readFromCoOccurrenceListAndUpdate(allPairsOnePatient, allDualEventsFast, System.out);
 
 			//System.out.println("Num New Combos: " + numNewCombos);
 			eventsForGene.clear();
@@ -233,13 +263,81 @@ public class GeneEnrichment {
 			System.gc();
 		}
 		
+		// Now count all the dual events
+		int[] numPatientsTalliesForDualEvent = new int[allPatients.size() + 1];
+		Arrays.fill(numPatientsTalliesForDualEvent, 0);
+		for (FastArrayListIterator iter = allDualEventsFast.iterator(); iter.hasNextAndGet(twoGenesTwoEventsCompactDummy); ) {
+			long compactUnit = twoGenesTwoEventsCompactDummy.mLong;
+			int patientCount = Cast.toInt(TwoGenesWithEvents.Compactor.getValue(TwoGenesWithEvents.PatientCount, compactUnit));
+			numPatientsTalliesForDualEvent[patientCount]++;			
+		}
+		
+		int numEventsTotal = ArrayUtils.arraySum(numPatientsTalliesForDualEvent);
+		System.out.printf("\n-----\nNumEventsTotal:\t%d\n", numEventsTotal);
+		for (int i = 0; i < numPatientsTalliesForDualEvent.length; i++) {
+			System.out.printf("Num Dual Events with\t%d\tpatients observing dual event:\t%d\n", i, numPatientsTalliesForDualEvent[i]);
+		}
+		
+		int numEventsTop = Cast.toInt(numEventsTotal * 0.01);
+		int numPatientsLowerBound = 1;
+		int sum = 0;
+		for (int i = numPatientsTalliesForDualEvent.length - 1; i >= 0; i--) {
+			sum += numPatientsTalliesForDualEvent[i];
+			if (sum >= numEventsTop) {
+				numPatientsLowerBound = i;
+				break;
+			}
+		}
+		
+		for (FastArrayListIterator iter = allDualEventsFast.iterator(); iter.hasNextAndGet(twoGenesTwoEventsCompactDummy); ) {
+			long compactUnit = twoGenesTwoEventsCompactDummy.mLong;
+			int patientCount = Cast.toInt(TwoGenesWithEvents.Compactor.getValue(TwoGenesWithEvents.PatientCount, compactUnit));
+			if (patientCount >= numPatientsLowerBound && patientCount > 1) {
+				int gene1ID = Cast.toInt(TwoGenesWithEvents.Compactor.getValue(TwoGenesWithEvents.ID_Gene1, compactUnit));
+				int gene2ID = Cast.toInt(TwoGenesWithEvents.Compactor.getValue(TwoGenesWithEvents.ID_Gene2, compactUnit));
+				GeneCounter gene1 = tallier.getGene(gene1ID);
+				GeneCounter gene2 = tallier.getGene(gene2ID);
+				EventType event1 = EventType.getClusterType( Cast.toInt(TwoGenesWithEvents.Compactor.getValue(TwoGenesWithEvents.Event_Gene1, compactUnit)) );
+				EventType event2 = EventType.getClusterType( Cast.toInt(TwoGenesWithEvents.Compactor.getValue(TwoGenesWithEvents.Event_Gene2, compactUnit)) );
+				double distanceScore = calcDistanceScore(gene1, gene2);
+				double score = distanceScore * patientCount;
+				if (score >= 0) {
+				sb.setLength(0);
+				sb.append(gene1.mChrom.getCode())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter)
+				  .append(gene1.getName())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter)
+				  .append(event1.name())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter)
+				  .append(gene2.mChrom.getCode())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter)
+				  .append(gene2.getName())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter)
+				  .append(event2.name())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter)
+				  .append(patientCount)
+				  .append(StringUtils.FileExtensionTSV.mDelimiter)
+				  .append((gene1.mChrom == gene2.mChrom ? 0 : 1))
+				  .append(StringUtils.FileExtensionTSV.mDelimiter)
+				  .append(score)
+				  ;
+				
+				}
+				IOUtils.writeToBufferedWriter(outDualEventsRecurrent, sb.toString(), true);
+			}
+		}		
+		
+		
+		// Close the dual events file
+		IOUtils.closeBufferedWriter(outDualEventsRecurrent);
+		IOUtils.closeBufferedWriter(outDualEventsOneGene);
 		
 		// Print out the basic summary statistics of the genes
 		printBasicGeneSummary(outFilename, fileExtDelim, tallier.getGenes());
 		
 		// Print out the breakdown of (Gene, Event, Patient)
 		String eventsByPatientPerGeneFilename = outDir + File.separator + "eventsByPatientPerGene" + StringUtils.FileExtensionTSV.mExtension;
-		printGenePatientBreakdown(outFilename, tallier.getGenes());
+		printGenePatientBreakdown(eventsByPatientPerGeneFilename, tallier.getGenes());
 		
 		
 		// Store co-occurrence counts			
@@ -252,6 +350,7 @@ public class GeneEnrichment {
 			int geneID2 = Cast.toInt(TwoGenesWithEvents.Compactor.getValue(TwoGenesWithEvents.ID_Gene2, compactUnit.mLong));
 			GeneCounter gene1 = tallier.getGene(geneID1);
 			GeneCounter gene2 = tallier.getGene(geneID2);
+			
 			
 			int eventIndex1 = Cast.toInt(TwoGenesWithEvents.Compactor.getValue(TwoGenesWithEvents.Event_Gene1, compactUnit.mLong));
 			EventType eventGene1 = EventType.values()[eventIndex1];
@@ -280,6 +379,20 @@ public class GeneEnrichment {
 	}
 
 	// ========================================================================
+	private static double calcDistanceScore(GeneCounter gene1, GeneCounter gene2) {
+		if (gene1.getChrom() == gene2.getChrom()) {
+			if (gene1.mMinBasePairPosition > gene2.mMinBasePairPosition) {
+				return calcDistanceScore(gene2, gene1);
+			} else {
+				int diffDistance = gene2.mMinBasePairPosition - gene1.mMaxBasePairPosition;
+				return ((double) diffDistance) / (double) gene1.getChrom().getLength();
+			}
+		} else {
+			return 1;
+		}
+	}
+	
+	// ========================================================================
 	private static void printGenePatientBreakdown(String outFilename, ArrayList<GeneCounter> genes) {
 		BufferedWriter outBreakdown = IOUtils.getBufferedWriter(outFilename);
 		
@@ -294,6 +407,14 @@ public class GeneEnrichment {
 					String outString = gene.getName() + "\t" + eventType.name() + "\t" + patientForEvent;
 					IOUtils.writeToBufferedWriter(outBreakdown, outString, true);
 				}
+			}
+			
+			for (EventTypeAllele eta : EventTypeAllele.values()) {
+				ArrayList<String> patientsForEvent = gene.getPatientsForAlleleEventType(eta);
+				for (String patientForEvent : patientsForEvent) {
+					String outString = gene.getName() + "\t" + eta.name() + "\t" + patientForEvent;
+					IOUtils.writeToBufferedWriter(outBreakdown, outString, true);
+				}				
 			}
 		}
 		IOUtils.closeBufferedWriter(outBreakdown);
@@ -328,6 +449,43 @@ public class GeneEnrichment {
 		
 	}
 
+	// ========================================================================
+	private static void readFromCoOccurrenceListAndUpdate(LongArrayList coOccurrencesOnePatient, FastArrayListLong allDualEvents, PrintStream outStream) {
+		
+		allDualEvents.setValueExtractor(TwoGenesWithEvents.Extractor);
+		
+		int numCoOccurrencesAlreadyExisted = 0;
+		int[] numXTons = new int[92]; 		
+		
+		// Iterate through the dual events in the patient
+		FastArrayListIndex indexAndValue = FastArrayListLong.getNewIndexToken();
+		for (int indexInPatient = 0; indexInPatient < coOccurrencesOnePatient.size(); indexInPatient++) {
+			long dualEventInPatient = coOccurrencesOnePatient.get(indexInPatient);
+			FastArrayListIndex exists = allDualEvents.getIndex(dualEventInPatient, indexAndValue);
+			long patientCount = 1;
+			
+			if (exists == null) {
+				// Does not exist.  Just add
+				allDualEvents.add(dualEventInPatient);				
+			} else {				
+				patientCount = TwoGenesWithEvents.Compactor.getValue(TwoGenesWithEvents.PatientCount, indexAndValue.mValue);
+				long replaceUnit  = TwoGenesWithEvents.Compactor.setValue(TwoGenesWithEvents.PatientCount, ++patientCount, indexAndValue.mValue);
+				allDualEvents.replace(indexAndValue, replaceUnit);
+				++numCoOccurrencesAlreadyExisted;
+			}	
+			
+			++numXTons[Cast.toInt(Math.min(patientCount, numXTons.length - 1))];
+		}
+		
+		outStream.printf("Num Co-occurrences Visited, New, Total:\t%d\t%d\t%d\n", 
+				numCoOccurrencesAlreadyExisted, coOccurrencesOnePatient.size() - numCoOccurrencesAlreadyExisted, coOccurrencesOnePatient.size());
+
+		for (int j = 1; j < numXTons.length; j++) {
+			outStream.printf("Num\t%d\t-ton:\t%d\n", j, numXTons[j]);					
+		}
+
+	}
+	
 	// ========================================================================
 	private static void readFromCoOccurrenceListAndUpdate(LongArrayList coOccurrencesOnePatient, LongArrayList allDualEvents, PrintStream outStream) {
 		
@@ -570,6 +728,11 @@ public class GeneEnrichment {
 		public int compare_ExcludingCounts(long dualEvent1, long dualEvent2) {
 			return Long.compare(dualEvent1 >>> PatientCount.mNumBits, dualEvent2 >>> PatientCount.mNumBits);
 		}
+		
+		public static BitSetUtils.ValueExtractor Extractor = new BitSetUtils.ValueExtractor() {			
+			@Override
+			public long extractValue(long compactUnit) { return (compactUnit >>> PatientCount.mNumBits); }
+		};
 	}
 	
 	// ========================================================================

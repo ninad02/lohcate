@@ -61,6 +61,8 @@ import com.carrotsearch.hppc.DoubleArrayList;
 public class ClusteringPlotting {
 
 	private static final String ChromTitleString = buildChromString();
+	public static final double GenomeWidePositionDivisor = 1_000_000; 
+	private static final String GenomeWideXAxisLabel = "Genomic Position (MB)";
 	
 	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of the normal tissue comapred to the tumor tissue. */
@@ -174,7 +176,8 @@ public class ClusteringPlotting {
 			if (chrom.isAutosomal()) {				
 				DoubleArrayList[] positionAndCount = eventCount.get(chrom).toArrayListDouble();
 				for (int i = 0; i < positionAndCount[0].size(); i++) {
-					positionAndCount[0].set(i, positionAndCount[0].get(i) + chrom.getGenomeWidePositionStart());
+					double newPosAdj = (positionAndCount[0].get(i) + chrom.getGenomeWidePositionStart()) / GenomeWidePositionDivisor; 
+					positionAndCount[0].set(i, newPosAdj);
 				}
 				
 				positionsGenomeWideAllSamples.addAll(positionAndCount[0]);
@@ -195,7 +198,7 @@ public class ClusteringPlotting {
 
 	// ========================================================================
 	public static void plotEventSampleRecurrence(XYDataset xyDataset, String outFilenameRoot, Color seriesColor, int maxYValue) {
-		String xAxisLabel = "Position";
+		String xAxisLabel = GenomeWideXAxisLabel;
 		String yAxisLabel = "# Samples with Event";
 		String title = "Recurrence over Samples for Event: " + xyDataset.getSeriesKey(0);				
 		
@@ -259,7 +262,7 @@ public class ClusteringPlotting {
 	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of a tissue vs the genomic position. */
 	public static void plotCopyNumGenomeWide(XYDataset xyDataset, String outFilenameRoot, String sampleName) {
-		String xAxisLabel = "Genomic Position";
+		String xAxisLabel = GenomeWideXAxisLabel;
 		String yAxisLabel = "Total Copy Number [Tumor]";
 		String title = "Total Copy Number [Tumor]: " + sampleName;				
 				
@@ -294,6 +297,7 @@ public class ClusteringPlotting {
 		xyPlot.getRangeAxis().setRange(0, maxCopyNumber + 0.25);
 		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
 		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);	
+		xyPlot.getDomainAxis().setRange(0, Chrom.c22.calculateGenomeWidePositionEnd() / GenomeWidePositionDivisor);
 		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, 2400, 800);
 	}
 
@@ -382,13 +386,18 @@ public class ClusteringPlotting {
 		backgroundBufferYTop   += maxYValue;
 		chromLabelHeightBuffer += maxYValue; 
 		
-		for (Chrom chrom : Chrom.Autosomes) {
+		for (Chrom chrom : Chrom.Autosomes) {			
+			double posStartAdj = chrom.getGenomeWidePositionStart()             / GenomeWidePositionDivisor;
+			double posEndAdj   = chrom.calculateGenomeWidePositionEnd()         / GenomeWidePositionDivisor;
+			double posEndPArmAdj = chrom.calculateGenomeWidePositionEndOfArmP() / GenomeWidePositionDivisor;
+			double posMidAdj   = chrom.calculateGenomeWidePositionMidpoint()    / GenomeWidePositionDivisor;
+			
 			if (doWhiteBackground) {
-				xyPlot.addAnnotation(new XYBoxAnnotation(chrom.getGenomeWidePositionStart(), maxYValue, chrom.calculateGenomeWidePositionEnd(), backgroundBufferYTop, null, null, ColorPastel.White.getColor()));
+				xyPlot.addAnnotation(new XYBoxAnnotation(posStartAdj, maxYValue, posEndAdj, backgroundBufferYTop, null, null, ColorPastel.White.getColor()));
 			}
-			xyPlot.addDomainMarker(new IntervalMarker(chrom.getGenomeWidePositionStart(), chrom.calculateGenomeWidePositionEndOfArmP(), backgroundGreyArmP), Layer.BACKGROUND);
-			xyPlot.addDomainMarker(new ValueMarker(chrom.getGenomeWidePositionStart() + 1, ColorPastel.Gray_90.getColor(), new BasicStroke()));
-			XYTextAnnotation chromNumber = new XYTextAnnotation("" + chrom.ordinal(), chrom.calculateGenomeWidePositionMidpoint(), chromLabelHeightBuffer);
+			xyPlot.addDomainMarker(new IntervalMarker(posStartAdj, posEndPArmAdj, backgroundGreyArmP), Layer.BACKGROUND);
+			xyPlot.addDomainMarker(new ValueMarker(posStartAdj, ColorPastel.Gray_90.getColor(), new BasicStroke()));
+			XYTextAnnotation chromNumber = new XYTextAnnotation("" + chrom.ordinal(), posMidAdj, chromLabelHeightBuffer);
 			chromNumber.setFont(new Font("Arial", Font.BOLD, 24));
 			xyPlot.addAnnotation(chromNumber);
 		}
@@ -408,17 +417,19 @@ public class ClusteringPlotting {
 	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of a tissue vs the genomic position. */
 	public static void plotVAFGenomeWide(XYDataset xyDataset, String outFilenameRoot, String sampleName, boolean isTumor) {
-		String xAxisLabel = "Genomic Position";
+		String xAxisLabel = GenomeWideXAxisLabel;
 		String yAxisLabel = "Variant Allele Fraction (VAF)";
-		String title = "VAF GenomeWide: " + sampleName + (isTumor ? " [Tumor]" : " [Normal]");
+		String title = sampleName.substring(0, sampleName.indexOf(".")) + (isTumor ? " [Tumor]" : " [Normal]");
 		
 		//+ "\n" + ChromTitleString;
 		
+		boolean showLegend = true;
 		JFreeChart theChart = 
-				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, true, false, false);
+				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, showLegend, false, false);
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
 		//theChart.addSubtitle(getChromSubtitle());
 		theChart.getTitle().setMargin(0, 0, 10, 0);
+		theChart.getTitle().setFont(new Font("Arial", Font.BOLD, 32));
 		
 		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(5);		
 		setSeriesPaintPerCluster(itemRenderer);
@@ -433,16 +444,19 @@ public class ClusteringPlotting {
 		
 		formatLegendItems(xyPlot);
 		
-		LegendTitle legendTitle = theChart.getLegend();
-		legendTitle.setID("Clusters");
-		legendTitle.setItemFont(new Font("Arial", Font.BOLD, 32));
-		
+		if (showLegend) {
+			LegendTitle legendTitle = theChart.getLegend();
+			legendTitle.setID("Clusters");
+			legendTitle.setItemFont(new Font("Arial", Font.BOLD, 32));
+		}
 	
 		xyPlot.getRangeAxis().setRange(0, 1.04);		
+		xyPlot.getDomainAxis().setRange(0, Chrom.c22.calculateGenomeWidePositionEnd() / GenomeWidePositionDivisor);
 		
 		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 32);
 		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 20);
 
+		//xyPlot.getDomainAxis().setTickLabelsVisible(false);
 		xyPlot.getRangeAxis().setLabelFont(rangeAxisLabelFont);		
 		xyPlot.getRangeAxis().setTickLabelFont(rangeAxisTickFont);
 		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);

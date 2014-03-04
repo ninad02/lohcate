@@ -39,7 +39,8 @@ public class LOHcate {
 		
 		Plots_VAF_2D        ("plots" + File.separator + "VAF_2D"),
 		Plots_VAF_GenomeWide("plots" + File.separator + "VAF_Genomewide"),
-		Plots_CopyNumber    ("plots" + File.separator + "copyNumber"),
+		Plots_VAF_CopyNumber("plots" + File.separator + "VAF_CopyNum_Genomwide"),
+		Plots_CopyNumber    ("plots" + File.separator + "copyNumber"),		
 		Plots_Recurrence    ("plots" + File.separator + "recurrence"),
 		
 		Regions_GISTIC(       "regions" + File.separator + "gistic"),

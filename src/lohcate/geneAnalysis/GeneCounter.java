@@ -72,6 +72,8 @@ public class GeneCounter implements Comparable<GeneCounter> {
 		mCountLOHreferenceLost = 0;
 	}
 	
+	public Chrom getChrom() { return mChrom; }
+	
 	public int getNumericID() { return mNumericID; }
 	
 	private void initializePatients() {
@@ -95,8 +97,12 @@ public class GeneCounter implements Comparable<GeneCounter> {
 		return patientList.size();
 	}
 	
-	public ArrayList<String> getPatientsForEventType(EventType ct) {
-		return mPatients.get(ct);
+	public ArrayList<String> getPatientsForEventType(EventType eventType) {
+		return mPatients.get(eventType);
+	}
+	
+	public ArrayList<String> getPatientsForAlleleEventType(EventTypeAllele eventForAllele) {
+		return mAlleleEventType.get(eventForAllele);
 	}
 	
 	public void incrementCount(EventType eventType)    { mEventTypeCounts.increment(eventType); }	
@@ -174,7 +180,13 @@ public class GeneCounter implements Comparable<GeneCounter> {
 		   
 		  
 		  for (EventTypeAllele eta : EventTypeAllele.values()) {
-			  sb.append(delim).append(eta.name()).append("_Positions_in_").append(EventType.LOH.name()).append("_or_").append(EventType.cnLOH.name());			  
+			  sb.append(delim).append(eta.name()).append("_Positions_in_");
+			  
+			  if (eta.getIsLossType()) { 
+				  sb.append(EventType.LOH.name()).append("_or_").append(EventType.cnLOH.name());
+			  } else {
+				  sb.append(EventType.GainSomatic.name());
+			  }
 		  }		  
 
 		//EventType.LOH.name() + "_refLost" + logStr, 		

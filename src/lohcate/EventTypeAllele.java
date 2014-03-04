@@ -2,15 +2,22 @@ package lohcate;
 
 public enum EventTypeAllele {
 	
-	LossReference_VariantCommon,
-	LossReference_VariantRare,
-	LossVariant_VariantCommon,
-	LossVariant_VariantRare,
+	LossReference_VariantCommon(true),
+	LossReference_VariantRare  (true),
+	LossVariant_VariantCommon  (true),
+	LossVariant_VariantRare    (true),
 	
-	GainReference_VariantCommon,
-	GainReference_VariantRare,
-	GainVariant_VariantCommon,
-	GainVariant_VariantRare,
+	GainReference_VariantCommon (false),
+	GainReference_VariantRare   (false),
+	GainVariant_VariantCommon   (false),
+	GainVariant_VariantRare     (false),
 	;
 	
+	private boolean mIsLossType;
+	
+	private EventTypeAllele(boolean isLossType) {
+		mIsLossType = isLossType;
+	}
+	
+	public boolean getIsLossType() { return mIsLossType; }
 }

@@ -58,6 +58,7 @@ import nutils.counter.BucketCounterEnum;
 import nutils.counter.BucketCounterEnumMatrix;
 import nutils.counter.DynamicBucketCounter;
 import nutils.counter.DynamicRoundedDoubleCounter;
+import nutils.image.ImageAppender;
 import nutils.math.BinomialTestPermutationValues;
 import nutils.math.PoissonDistributionList;
 
@@ -135,6 +136,7 @@ public class Clustering {
 		lohcateDirs.createDirectoryPathOnDisk(SubdirsDefault.SitesClassified);
 		lohcateDirs.createDirectoryPathOnDisk(SubdirsDefault.Plots_VAF_2D);
 		lohcateDirs.createDirectoryPathOnDisk(SubdirsDefault.Plots_VAF_GenomeWide);
+		lohcateDirs.createDirectoryPathOnDisk(SubdirsDefault.Plots_VAF_CopyNumber);
 		lohcateDirs.createDirectoryPathOnDisk(SubdirsDefault.Plots_CopyNumber);
 		lohcateDirs.createDirectoryPathOnDisk(SubdirsDefault.Plots_Recurrence);
 		lohcateDirs.createDirectoryPathOnDisk(SubdirsDefault.Simulation);
@@ -591,7 +593,9 @@ public class Clustering {
 			final EventType event = events.get(row);
 			if (resetToHetGermline) {
 				if (event == targetEventType) {
-					events.set(row, EventType.HETGermline);
+					if (metaData.getCopyNumberAtIndex(row) < 3.8) {
+						events.set(row, EventType.HETGermline);
+					}
 				}
 			} else {
 				if (event == EventType.HETGermline || event == EventType.Noise || event == EventType.Ignored) {
@@ -886,7 +890,7 @@ public class Clustering {
 				// Add recurrence count
 				eventCountsByCoordinate.get(eventType).get(oneSiteInfo.getChrom()).incrementCount(oneSiteInfo.getPosition());
 
-				double divisor = 1;
+				double divisor = ClusteringPlotting.GenomeWidePositionDivisor;
 				clusterCoordinates .get(eventType).add( metaData.mAdjustedVAFTumor[row],         metaData.mAdjustedVAFNormal[row] );
 				waterfallPlotTumor .get(eventType).add( chromPosTracker.getPositionGenomeWide() / divisor, metaData.mAdjustedVAFTumor[row]);
 				waterfallPlotNormal.get(eventType).add( chromPosTracker.getPositionGenomeWide() / divisor, metaData.mAdjustedVAFNormal[row]);
@@ -899,10 +903,18 @@ public class Clustering {
 			DefaultXYDataset xyDatasetWaterfallPlotNormal = classifySitesHelper_createAndFillXYData(waterfallPlotNormal, null);
 			DefaultXYDataset xyDatasetCopyNumber          = classifySitesHelper_createAndFillXYData(copyNumPlot, null);
 
+			String outFilenameVAFGenomeWideTumor  = lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_GenomeWide)  + File.separator + sampleNameRoot + ".VAF_GenomeWide_Tumor";
+			String outFilenameVAFGenomeWideNormal = lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_GenomeWide)  + File.separator + sampleNameRoot + ".VAF_GenomeWide_Normal";
+			String outFilenameCopyNumber          = lohcateDirs.getSubDirPath(SubdirsDefault.Plots_CopyNumber)      + File.separator + sampleNameRoot + ".CopyNumber_GenomeWide";
+			String outFilenameVAFCopyNumGenomeWide = lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_CopyNumber) + File.separator + sampleNameRoot + ".VAF_CopyNumberTumor_GenomeWide"; 
+			
 			ClusteringPlotting.plotVAFComparison(xyDatasetVAFPlot,             lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_2D)         + File.separator + sampleNameRoot + ".VAFComparison", sampleNameRoot);
-			ClusteringPlotting.plotVAFGenomeWide(xyDatasetWaterfallPlotTumor,  lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_GenomeWide) + File.separator + sampleNameRoot + ".VAF_GenomeWide_Tumor",  sampleNameRoot, true);				
-			ClusteringPlotting.plotVAFGenomeWide(xyDatasetWaterfallPlotNormal, lohcateDirs.getSubDirPath(SubdirsDefault.Plots_VAF_GenomeWide) + File.separator + sampleNameRoot + ".VAF_GenomeWide_Normal", sampleNameRoot, false);
-			ClusteringPlotting.plotCopyNumGenomeWide(xyDatasetCopyNumber,      lohcateDirs.getSubDirPath(SubdirsDefault.Plots_CopyNumber)     + File.separator + sampleNameRoot + ".CopyNumber_GenomeWide", sampleNameRoot);				
+			ClusteringPlotting.plotVAFGenomeWide(xyDatasetWaterfallPlotTumor,  outFilenameVAFGenomeWideTumor,  sampleNameRoot, true);				
+			ClusteringPlotting.plotVAFGenomeWide(xyDatasetWaterfallPlotNormal, outFilenameVAFGenomeWideNormal, sampleNameRoot, false);
+			ClusteringPlotting.plotCopyNumGenomeWide(xyDatasetCopyNumber,      outFilenameCopyNumber,          sampleNameRoot);
+			
+			// Append the copy number and VAF Genomewide plots
+			ImageAppender.appendImages(3, 1, true, outFilenameVAFCopyNumGenomeWide + ".png", new String[] { outFilenameCopyNumber + ".png", outFilenameVAFGenomeWideTumor + ".png", outFilenameVAFGenomeWideNormal + ".png"});
 		}
 		out.close();
 				
