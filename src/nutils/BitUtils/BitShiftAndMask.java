@@ -2,7 +2,7 @@ package nutils.BitUtils;
 
 // ========================================================================
 // ========================================================================
-public class BitShiftAndMask {
+public class BitShiftAndMask implements ValueExtractor {
 	public int  mNumBits;
 	public long mNumBitsToShift;
 	public long mMask;
@@ -27,7 +27,7 @@ public class BitShiftAndMask {
 	}
 	
 	// ========================================================================
-	public long getValueInCompactUnit(long compactUnit) {
+	public long extractValue(long compactUnit) {
 		return ((compactUnit >>> mNumBitsToShift) & mMask);
 	}
 	

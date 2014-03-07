@@ -73,6 +73,11 @@ public enum Chrom {
 
 	// ========================================================================
 	public int getLengthOfPArm() { return mLengthArmP; }
+	
+	// ========================================================================
+	public Arm getArm(int positionOnChrom) {
+		return (positionOnChrom >= getLengthOfPArm() ? Arm.q : Arm.p); 
+	}
 
 	// ========================================================================
 	private long calculateGenomeWidePositionStart() {
@@ -176,4 +181,7 @@ public enum Chrom {
 	public Chrom getNextChrom() {
 		return Chrom.getChrom((byte) (ordinal() + 1));
 	}
+	
+	// ========================================================================
+	public static enum Arm { p, q; }
 }

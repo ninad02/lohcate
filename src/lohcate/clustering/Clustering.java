@@ -183,37 +183,49 @@ public class Clustering {
 	
 	// ========================================================================	
 	private static ArrayList<String> readLinesFromFilesAsStringList(File file, boolean removeDuplicateRows, boolean removeHighDensitySNVSites, boolean removeExtremeGCSites) {
-		String somaticFilename = file.getAbsolutePath().replace(VariantLocation.Germline.toLowerCase(), VariantLocation.Somatic.toLowerCase());
-		ArrayList<String> somaticSpecificVariantRows  = IOUtils.readAllLinesFromFile(somaticFilename);
-		ArrayList<String> germlineSpecificVariantRows = IOUtils.readAllLinesFromFile(file.getAbsolutePath());
-		System.out.println("\tRead All Lines...");
-		System.out.printf("\tNum Lines in File: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());				
 		
-		//String headerStringGermline = germlineSpecificVariantRows.get(0);
-		//String headerStringSomatic  = somaticSpecificVariantRows.get(0);
-
-		//upstream pipelines will randomly spit header lines into the 
-		// middle of a naf-taf-input file. we're just avoiding those
-		germlineSpecificVariantRows = Regions.curateSNPCalls_removeHeaderLinesFromRows(germlineSpecificVariantRows, removeHighDensitySNVSites, removeExtremeGCSites);
-		somaticSpecificVariantRows  = Regions.curateSNPCalls_removeHeaderLinesFromRows(somaticSpecificVariantRows,  removeHighDensitySNVSites, removeExtremeGCSites);
-		System.out.printf("\tNum Sites Retained after Header and GC Removal: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
+		ArrayList<String> allVariantRowsStr = null;
 		
-		// Create a combined set of rows
-		ArrayList<String> allVariantRowsStr = new ArrayList<String>(germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
-		allVariantRowsStr.addAll(germlineSpecificVariantRows);
-		//int indexFirstSomaticRowInAllVariants = allVariantRowsStr.size();  // save the size with just the germline variants added
-		allVariantRowsStr.addAll(somaticSpecificVariantRows);
+		if (LOHcate.RunOld) {
+			String somaticFilename = file.getAbsolutePath().replace(VariantLocation.Germline.toLowerCase(), VariantLocation.Somatic.toLowerCase());
+			ArrayList<String> somaticSpecificVariantRows  = IOUtils.readAllLinesFromFile(somaticFilename);
+			ArrayList<String> germlineSpecificVariantRows = IOUtils.readAllLinesFromFile(file.getAbsolutePath());
+			System.out.println("\tRead All Lines...");
+			System.out.printf("\tNum Lines in File: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());				
 
-		//Collections.sort(germlineSpecificVariantRows, LineComparatorTab);
-		//Collections.sort(somaticSpecificVariantRows,  LineComparatorTab);
-		Collections.sort(allVariantRowsStr,              Regions.LineComparatorTab);
+			//String headerStringGermline = germlineSpecificVariantRows.get(0);
+			//String headerStringSomatic  = somaticSpecificVariantRows.get(0);
+
+			//upstream pipelines will randomly spit header lines into the 
+			// middle of a naf-taf-input file. we're just avoiding those
+			germlineSpecificVariantRows = Regions.curateSNPCalls_removeHeaderLinesFromRows(germlineSpecificVariantRows, removeHighDensitySNVSites, removeExtremeGCSites);
+			somaticSpecificVariantRows  = Regions.curateSNPCalls_removeHeaderLinesFromRows(somaticSpecificVariantRows,  removeHighDensitySNVSites, removeExtremeGCSites);
+			System.out.printf("\tNum Sites Retained after Header and GC Removal: %d\n", germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
+
+			// Create a combined set of rows
+			allVariantRowsStr = new ArrayList<String>(germlineSpecificVariantRows.size() + somaticSpecificVariantRows.size());
+			allVariantRowsStr.addAll(germlineSpecificVariantRows);
+			//int indexFirstSomaticRowInAllVariants = allVariantRowsStr.size();  // save the size with just the germline variants added
+			allVariantRowsStr.addAll(somaticSpecificVariantRows);
+			
+		} else {
+			System.out.printf("\tReading: %s\n", file.getName());
+			allVariantRowsStr = IOUtils.readAllLinesFromFile(file.getAbsolutePath());
+			System.out.printf("\tNum Lines in File: %d\n", allVariantRowsStr.size());
+
+			// Remove GC
+			allVariantRowsStr = Regions.curateSNPCalls_removeHeaderLinesFromRows(allVariantRowsStr, removeHighDensitySNVSites, removeExtremeGCSites);
+			System.out.printf("\tNum Sites Retained after Header and GC Removal: %d\n", allVariantRowsStr.size());
+		}
+		
+		Collections.sort(allVariantRowsStr, Regions.LineComparatorTab);
 		System.out.println("\tAll Sites Finished Sorting...");
-		
+
 		if (removeDuplicateRows) {
 			int numDuplicateRows = removeDuplicateSites(allVariantRowsStr);
 			System.out.printf("\tRemoved %d duplicate Rows.  Num Rows left: %d\n", numDuplicateRows, allVariantRowsStr.size());
 		}
-		
+
 		return allVariantRowsStr;
 	}
 
@@ -387,7 +399,7 @@ public class Clustering {
 		// Get the list of valid files
 		ArrayList<File> validFiles = new ArrayList<File>(files.length);		
 		for (File file : files) {
-			int indexOfSubstring = file.getName().indexOf(Regions.GermlineSuffix);
+			int indexOfSubstring = file.getName().indexOf(LOHcate.SuffixInputFile);
 			if (indexOfSubstring >= 0) {
 				validFiles.add(file);
 				System.out.println(file.getName().substring(0, indexOfSubstring));
@@ -448,7 +460,7 @@ public class Clustering {
 		int fileIndex = 0;		
 		for (File file : validFiles) {			
 			String filename = file.getName();
-			String sampleNameRoot = filename.substring(0, file.getName().indexOf(Regions.GermlineSuffix));  	
+			String sampleNameRoot = filename.substring(0, file.getName().indexOf(LOHcate.SuffixInputFile));  	
 			String extension = filename.substring(filename.lastIndexOf(StringUtils.DotStr), filename.length());
 			System.out.println("Processing (" + ++fileIndex + " / " + validFiles.size() + "): " + file.getName());				
 			classifySitesOneSample(file, sampleNameRoot, extension, fileIndex, allelicBiasTable, allSitesMap, eventCounts, eventCoordinates, eventTablesTotal, countBreakdownPerEventTotal, simulatorParams, simOutputStream, maxPosOnChrom, lohcateDirs, platform, outGISTIC);
@@ -530,7 +542,7 @@ public class Clustering {
 				
 				// Now test via density
 				Frequency freqDist = new Frequency();
-				double multiplierFreq = 100.0;
+				double multiplierFreq = 1000.0;
 				for (int i = 0; i < vafTumorsSorted.size(); i++) {
 					int vafTumorMultiplied = Cast.toInt( Math.round(vafTumorsSorted.get(i) * multiplierFreq) );
 					freqDist.addValue(vafTumorMultiplied);
@@ -542,7 +554,7 @@ public class Clustering {
 				
 				double probMean0  = NumberUtils.getCumProbInterval(freqDist, mean0, leeway); 						
 				double probMean1  = NumberUtils.getCumProbInterval(freqDist, mean1, leeway);
-				double probCenter = NumberUtils.getCumProbInterval(freqDist, 50, leeway);
+				double probCenter = NumberUtils.getCumProbInterval(freqDist, 500, leeway);
 				boolean denserPeaks = (probMean0 > probCenter) && (probMean1 > probCenter);
 				System.out.printf("\tFREQ: %d\t%d\t%g\t%g\t%g\n", mean0, mean1, probMean0, probMean1, probCenter);
 				noDenserPeaks = !denserPeaks;
@@ -1330,7 +1342,7 @@ public class Clustering {
 		indexChromEnd = Math.min(indexChromEnd, oneSampleInfo.getNumSites() - 1);
 		
 		// Construct our lists
-		int multiplier = 100;
+		int multiplier = 10000;
 		ArrayList<PoissonDistributionList> pdListofLists = new ArrayList<PoissonDistributionList>();				
 		for (DoubleArrayList doubleArray : listOfListOfMeans) {
 			PoissonDistributionList pdList = new PoissonDistributionList();

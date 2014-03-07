@@ -2,24 +2,33 @@ package lohcate;
 import genomeEnums.Chrom;
 
 import java.io.BufferedReader;
+
+import com.sun.corba.se.spi.ior.MakeImmutable;
+
 import nutils.CompareUtils;
 import nutils.EnumSortedMap;
+import nutils.EnumSortedMapLong;
 import nutils.IOUtils;
+import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
+import nutils.BitUtils.Compactor.CompactorInf;
+import nutils.BitUtils.Compactor.CompactorIntoLong;
 
 
 /** This table will contain values of bias in an optimized fashion. */
 
 public class AllelicBiasTable {
 	
+	protected final static float VAFNormalMultiplier = 10000;
+	
 	// An arraylist for each chromosome
-	EnumSortedMap<Chrom, PositionAndPayload> mPositionsAndVAFs;
-	PositionAndPayload mDummyPayload;
+	EnumSortedMapLong<Chrom> mPositionsAndVAF;		
+	PrimitiveWrapper.WLong mLongHolder;
 
 	// ========================================================================
-	public AllelicBiasTable() {
-		mDummyPayload = new PositionAndPayload(0, 0, 0);
-		mPositionsAndVAFs = new EnumSortedMap<Chrom, PositionAndPayload>(Chrom.class); 
+	public AllelicBiasTable() {		
+		mPositionsAndVAF = new EnumSortedMapLong<>(Chrom.class, PositionAndVAF.Compactor.getValueExtractor(PositionAndVAF.Position));
+		mLongHolder = new PrimitiveWrapper.WLong(0);
 	}
 
 	// ========================================================================
@@ -28,6 +37,25 @@ public class AllelicBiasTable {
 	public float getAvgVAF(Chrom chrom, int position) {
 		return getAvgVAF(chrom, position, 0);
 	}
+
+	// ========================================================================
+	private static float storedVAFtoVAF(long unit) {
+		return PositionAndVAF.Compactor.getValue(PositionAndVAF.VAFNormal, unit) / VAFNormalMultiplier;
+	}
+	
+	// ========================================================================
+	private static long vafToStoredVAF(float vaf) {
+		return Math.round(vaf * VAFNormalMultiplier);		
+	}
+
+	// ========================================================================
+	public long getNumSitesRegisteredAtPosition(Chrom chrom, int position) {
+		long key = PositionAndVAF.Compactor.setValue(PositionAndVAF.Position, position, 0L);
+		boolean exists = mPositionsAndVAF.get(chrom, key, mLongHolder);
+		return exists ? 
+				PositionAndVAF.Compactor.getValue(PositionAndVAF.NumSamples, mLongHolder.mLong) :
+				-1;
+	}
 	
 	// ========================================================================
 	/** Given a chromosome, position, and site threshold, this returns the average VAF reported for that position
@@ -35,21 +63,58 @@ public class AllelicBiasTable {
 	 *  @return the average VAF, -1 if the position does not exist, or -2 if not enough sites meet the threshold.
 	 */
 	public float getAvgVAF(Chrom chrom, int position, int siteThresholdInclusive) {
-		mDummyPayload.mPosition = position;
-		final PositionAndPayload pap = mPositionsAndVAFs.get(chrom, mDummyPayload);
-		return ( (pap == null) ? -1 : (pap.mNumSamplesRepresented >= siteThresholdInclusive ? pap.mVAFNormal : -2) );
+		long key = PositionAndVAF.Compactor.setValue(PositionAndVAF.Position, position, 0L);
+		boolean exists = mPositionsAndVAF.get(chrom, key, mLongHolder);
+		if (exists) {
+			long numSitesRepresented = PositionAndVAF.Compactor.getValue(PositionAndVAF.NumSamples, mLongHolder.mLong);
+			if (numSitesRepresented >= siteThresholdInclusive) {
+				return storedVAFtoVAF(mLongHolder.mLong);
+			} else {
+				return -2;
+			}
+		} else {
+			return -1;
+		}
 	}
 
 	// ========================================================================
+	private static long makePositionVAFCompactUnit(int position, int numSamplesRepresented, float vaf) {
+		long key = PositionAndVAF.Compactor.setValue(PositionAndVAF.Position,   position,                   0L);
+		key      = PositionAndVAF.Compactor.setValue(PositionAndVAF.NumSamples, numSamplesRepresented,     key);
+		key      = PositionAndVAF.Compactor.setValue(PositionAndVAF.VAFNormal,  vafToStoredVAF(vaf),       key);
+		return key;
+	}
+	
+	// ========================================================================
 	/** Registers a site with a normal vaf value. If a site already exists, the vaf value is weighted-averaged with the existing vaf value. */
 	public void registerSite(Chrom chrom, int position, float vafNormal) {
-		mDummyPayload.set(position, 1, vafNormal);
-		PositionAndPayload papExists = mPositionsAndVAFs.addSorted(chrom, mDummyPayload);
-		if (papExists == null) {
-			mDummyPayload = new PositionAndPayload(0, 0, 0);  // Create new dummy object since previous was put into map			
-		} else {
-			papExists.registerVAFNormalForAnotherSite(vafNormal);
-		}
+		// Make the key
+		long key = makePositionVAFCompactUnit(position, 1, vafNormal);
+
+		int resultIndex = mPositionsAndVAF.addSorted(chrom, key, mLongHolder);
+		if (resultIndex >= 0) {
+			final long newUnit = registerVAFNormalForAnotherSite(vafNormal, mLongHolder.mLong);
+			mPositionsAndVAF.replace(chrom, resultIndex, newUnit);
+		} 
+	}
+
+	// ========================================================================
+	/** Updates the unit to incorporate the new vaf value and returns the new unit */
+	private long registerVAFNormalForAnotherSite(final double vafNormaNew, final long compactUnit) {
+		CompareUtils.ensureTrue(vafNormaNew >= 0, "ERROR: vafNormal cannot be less than 0!");
+		CompareUtils.ensureTrue(vafNormaNew <= 1, "ERROR: vafNormal cannot be greater than 1!");
+		
+		float vafNormal = storedVAFtoVAF(compactUnit);
+		long numSamplesRepresented = PositionAndVAF.Compactor.getValue(PositionAndVAF.NumSamples, compactUnit);
+		
+		vafNormal *= numSamplesRepresented;
+		vafNormal += vafNormaNew;		
+		vafNormal /= (++numSamplesRepresented);
+		
+		long compactUnitNew = compactUnit;  // Make a copy 
+		compactUnitNew = PositionAndVAF.Compactor.setValue(PositionAndVAF.NumSamples, numSamplesRepresented, compactUnitNew);
+		compactUnitNew = PositionAndVAF.Compactor.setValue(PositionAndVAF.VAFNormal, vafToStoredVAF(vafNormal), compactUnitNew);
+		return compactUnitNew;
 	}
 	
 	// ========================================================================
@@ -67,16 +132,66 @@ public class AllelicBiasTable {
 			int position = Integer.parseInt(StringUtils.extractNthColumnValue(line, 1, delim));
 			int numSamplesRepresented = Integer.parseInt(StringUtils.extractNthColumnValue(line, colNumSamples,   delim));
 			float avgVAFNormal        = Float.parseFloat(StringUtils.extractNthColumnValue(line, colAvgVAFNormal, delim));
-			PositionAndPayload posAndPay = new PositionAndPayload(position, numSamplesRepresented, avgVAFNormal);
 			
-			allelicBiasTable.mPositionsAndVAFs.addToTail(chrom, posAndPay);			
+			long compactUnit = makePositionVAFCompactUnit(position, numSamplesRepresented, avgVAFNormal);
+			allelicBiasTable.mPositionsAndVAF.addToTail(chrom, compactUnit);			
 		}		
 		IOUtils.closeBufferedReader(in);
 
-		allelicBiasTable.mPositionsAndVAFs.sortTable();
+		allelicBiasTable.mPositionsAndVAF.sortTable();
 		return allelicBiasTable;
 	}
+
+	// ========================================================================
+	private static enum PositionAndVAF implements CompactorInf<PositionAndVAF> {
+		Position(29),
+		NumSamples(16),
+		VAFNormal(16)
+		;
+
+		// ========================================================================
+		public static final CompactorIntoLong<PositionAndVAF> Compactor = new CompactorIntoLong<>(PositionAndVAF.class, false);
+		
+		// ========================================================================		
+		int mNumBits;
+		private PositionAndVAF(int numBits) {
+			mNumBits = numBits;
+		}
+		// ========================================================================
+		@Override
+		public int getNumBits() { return mNumBits; }		
+	}
 	
+	// ========================================================================
+	private static void Test() {
+		AllelicBiasTable abt = new AllelicBiasTable();
+		AllelicBiasTableOld abtOld = new AllelicBiasTableOld();
+		
+		int numIter = 100;
+		for (Chrom chrom : Chrom.Autosomes) {
+			for (int i = 0; i < numIter; i++) {
+				float vafNormal = (float) i / (float) numIter;
+				for (int j = 0; j < i; j++) {					
+					abt.registerSite(chrom, i, vafNormal);
+					abtOld.registerSite(chrom, i, vafNormal);
+				}
+			}
+		}
+		
+		for (Chrom chrom : Chrom.Autosomes) {
+			for (int i = 0; i < numIter; i++) {
+				float avgVAF = abt.getAvgVAF(chrom, i);
+				float avgVAFOld = abtOld.getAvgVAF(chrom, i);
+				
+				if (Math.abs(avgVAF - avgVAFOld) > 0.00001) {
+					System.out.printf("ERROR: Mismatch: %s\t%d\t%f\t%f\n", chrom, i, avgVAF, avgVAFOld);
+				}
+				//System.out.printf("%s\t%d\t%d\t%g\n", chrom, i, abt.getNumSitesRegisteredAtPosition(chrom, i), avgVAF);
+			}
+		}
+		
+		//abt.mPositionsAndVAF.print(System.out);
+	}
 	
 	// ========================================================================
 	/**
@@ -84,55 +199,7 @@ public class AllelicBiasTable {
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-
+		Test();
 	}
-
-	// ========================================================================
-	private static class PositionAndPayload implements Comparable<PositionAndPayload> {
-		int mPosition;
-		int mNumSamplesRepresented;
-		float mVAFNormal;
-		
-		public PositionAndPayload(int position, int numSamplesRepresented, float avgVafNormal) {
-			set(position, numSamplesRepresented, avgVafNormal);
-		}
-		
-		public void set(int position, int numSamplesRepresented, float avgVafNormal) {
-			mPosition = position;
-			mNumSamplesRepresented = numSamplesRepresented;
-			mVAFNormal = avgVafNormal;			
-		}
-		
-		public int compareTo(PositionAndPayload rhs) {
-			return Integer.compare(mPosition, rhs.mPosition);
-		}
-		
-		public float registerVAFNormalForAnotherSite(double vafNormal) {
-			CompareUtils.ensureTrue(vafNormal >= 0, "ERROR: vafNormal cannot be less than 0!");
-			CompareUtils.ensureTrue(vafNormal <= 1, "ERROR: vafNormal cannot be greater than 1!");
-						
-			mVAFNormal *= mNumSamplesRepresented;
-			mVAFNormal += vafNormal;
-			mVAFNormal /= (++mNumSamplesRepresented);
-			return mVAFNormal;
-		}		
-	}
-	
-	// ========================================================================
-	/** Given a base pair position and a vafNormal value, and the number of samples
-	 *  involved in the averaging of the vafNormal value, this packs them into a
-	 *  long variable.  The vafNormal is rounded to the nearing 0.0001 and coverted
-	 *  to a format that can be stored within a long.
-	 */
-	/* DON'T IMPLEMENT EFFICIENT VERSION FOR NOW
-	private static final int ShiftPosition = 35;
-	private static final long MaxValuePosition = Utils.getMask(28);
-	private static final int MaskPosition = 0x0FFFFFFF;
-	
-	private static final int 
-	public static long packPositionAndVAFAndNumSamples(int position, float avgVafNormal, int numSamplesRepresented) {
-		position = Math.min(position, MaxValuePosition);
-	}
-	*/
 	
 }

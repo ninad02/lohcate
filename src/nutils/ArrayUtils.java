@@ -8,7 +8,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
-import nutils.BitUtils.BitSetUtils;
+import nutils.BitUtils.ValueExtractor;
 import nutils.counter.BucketCounterEnum;
 
 import com.carrotsearch.hppc.DoubleArrayList;
@@ -594,7 +594,7 @@ public class ArrayUtils {
 	
 	
 	// ========================================================================
-	public static long searchMaxValue(LongArrayList longArray, BitSetUtils.ValueExtractor extractor) {
+	public static long searchMaxValue(LongArrayList longArray, ValueExtractor extractor) {
 		long maxValue = Long.MIN_VALUE;
 		int maxValueIndex = -1;
 		
@@ -617,7 +617,7 @@ public class ArrayUtils {
 	/** Given a sample index and integer array, this performs a binary search
 	 *  for the sample index on the integer array.  If the sample index is 
 	 *  found, an index >= 0 is returned, else (-(insertion point) - 1) is returned. */
-	public static int binarySearchValue(final long value, LongArrayList longArray, BitSetUtils.ValueExtractor extractor) {
+	public static int binarySearchValue(final long value, com.carrotsearch.hppc.LongArrayList longArray, ValueExtractor extractor) {
 		int lowerIndex = 0;
 		int upperIndex = longArray.size() - 1;
 		int midIndex = 0;
@@ -660,6 +660,53 @@ public class ArrayUtils {
 		return -(lowerIndex + 1);
 	}
 
+	// ========================================================================
+	/** Given a sample index and integer array, this performs a binary search
+	 *  for the sample index on the integer array.  If the sample index is 
+	 *  found, an index >= 0 is returned, else (-(insertion point) - 1) is returned. */
+	public static int binarySearchValue(final long value, cern.colt.list.LongArrayList longArray, ValueExtractor extractor) {
+		int lowerIndex = 0;
+		int upperIndex = longArray.size() - 1;
+		int midIndex = 0;
+		
+		// If empty array, we return with the insertion point at index 0
+		if (upperIndex < 0) return -1;
+		
+		// Shortcut Lower: Test if the value is <= than the lowest value the array.
+		// If so, then we don't perform the binary search, and we simply return.
+		long valueLowerIndex = extractor.extractValue(longArray.get(lowerIndex));
+		if (value < valueLowerIndex) {
+			return ((-lowerIndex) - 1);			
+		} else if (value == valueLowerIndex) {
+			return lowerIndex;
+		} 
+
+		// Shortcut Upper: Test if the value is >= the high value in the array.
+		// If so, then we don't perform the binary search, and we simply return.
+		long valueUpperIndex = extractor.extractValue(longArray.get(upperIndex));
+		if (value > valueUpperIndex) {
+			return (-(upperIndex + 1) - 1);
+		} else if (value == valueUpperIndex) {
+			return upperIndex;
+		}
+				
+		long valueAtMidIndex;
+		while (lowerIndex <= upperIndex) {
+			midIndex = (lowerIndex + upperIndex) >>> 1;  // right-shift by 1 to divide by 2; 
+			valueAtMidIndex = extractor.extractValue(longArray.get(midIndex));
+			
+			if (value == valueAtMidIndex) {
+				return midIndex;
+			} else if (value > valueAtMidIndex) {
+				lowerIndex = midIndex + 1;
+			} else {
+				upperIndex = midIndex - 1;
+			}
+		}
+		
+		return -(lowerIndex + 1);
+	}
+	
 	// ========================================================================
 	/** Given a target collection, this adds elements from the source collection at the end
 	 *  of the target collection.  We create this function because it is ironically more 

@@ -41,6 +41,7 @@ import nutils.NumberUtils;
 import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
 import nutils.BitUtils.BitSetUtils;
+import nutils.BitUtils.ValueExtractor;
 import nutils.BitUtils.Compactor.CompactorInf;
 import nutils.BitUtils.Compactor.CompactorIntoInt;
 import nutils.BitUtils.Compactor.CompactorIntoLong;
@@ -175,11 +176,9 @@ public class GeneEnrichment {
 				int numEvents = events.size();
 				if (numEvents > 1) {
 					sb.setLength(0);
-					sb.append(patientName)
-					  .append(StringUtils.FileExtensionTSV.mDelimiter)
-					  .append(gene.getName())
-					  .append(StringUtils.FileExtensionTSV.mDelimiter)
-					  .append(numEvents);
+					sb.append(patientName);
+					appendGeneCoordinates(gene, sb);
+					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(numEvents);
 					for (EventType event : events) {
 						sb.append(StringUtils.FileExtensionTSV.mDelimiter)
 						  .append(event.name());
@@ -304,22 +303,14 @@ public class GeneEnrichment {
 				if (score >= 0) {
 				sb.setLength(0);
 				sb.append(gene1.mChrom.getCode())
-				  .append(StringUtils.FileExtensionTSV.mDelimiter)
-				  .append(gene1.getName())
-				  .append(StringUtils.FileExtensionTSV.mDelimiter)
-				  .append(event1.name())
-				  .append(StringUtils.FileExtensionTSV.mDelimiter)
-				  .append(gene2.mChrom.getCode())
-				  .append(StringUtils.FileExtensionTSV.mDelimiter)
-				  .append(gene2.getName())
-				  .append(StringUtils.FileExtensionTSV.mDelimiter)
-				  .append(event2.name())
-				  .append(StringUtils.FileExtensionTSV.mDelimiter)
-				  .append(patientCount)
-				  .append(StringUtils.FileExtensionTSV.mDelimiter)
-				  .append((gene1.mChrom == gene2.mChrom ? 0 : 1))
-				  .append(StringUtils.FileExtensionTSV.mDelimiter)
-				  .append(score)
+				  .append(StringUtils.FileExtensionTSV.mDelimiter).append(gene1.getName())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter).append(event1.name())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter).append(gene2.mChrom.getCode())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter).append(gene2.getName())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter).append(event2.name())
+				  .append(StringUtils.FileExtensionTSV.mDelimiter).append(patientCount)
+				  .append(StringUtils.FileExtensionTSV.mDelimiter).append((gene1.mChrom == gene2.mChrom ? 0 : 1))
+				  .append(StringUtils.FileExtensionTSV.mDelimiter).append(score)
 				  ;
 				
 				}
@@ -391,11 +382,23 @@ public class GeneEnrichment {
 			return 1;
 		}
 	}
+
+	// ========================================================================
+	private static StringBuilder appendGeneCoordinates(GeneCounter gene, StringBuilder sb) {
+		sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(gene.getChrom().ordinal())
+		  .append(StringUtils.FileExtensionTSV.mDelimiter).append(gene.getChrom().getArm(gene.mMaxBasePairPosition).name())							  
+		  .append(StringUtils.FileExtensionTSV.mDelimiter).append(gene.mMinBasePairPosition)
+		  .append(StringUtils.FileExtensionTSV.mDelimiter).append(gene.mMaxBasePairPosition)
+		  .append(StringUtils.FileExtensionTSV.mDelimiter).append(gene.getName())
+		  ;
+		return sb;
+	}
 	
 	// ========================================================================
 	private static void printGenePatientBreakdown(String outFilename, ArrayList<GeneCounter> genes) {
 		BufferedWriter outBreakdown = IOUtils.getBufferedWriter(outFilename);
 		
+		StringBuilder sb = new StringBuilder(1024);
 		// Now write out individual gene outputs
 		for (GeneCounter gene : genes) {
 			// Write samples for each gene out as well			
@@ -403,17 +406,23 @@ public class GeneEnrichment {
 				if (isEventToIgnore(eventType)) continue;
 				
 				ArrayList<String> patientsForEvent = gene.getPatientsForEventType(eventType);
-				for (String patientForEvent : patientsForEvent) {
-					String outString = gene.getName() + "\t" + eventType.name() + "\t" + patientForEvent;
-					IOUtils.writeToBufferedWriter(outBreakdown, outString, true);
+				for (String patientForEvent : patientsForEvent) {					
+					sb.setLength(0);
+					appendGeneCoordinates(gene, sb);
+					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(eventType.name());
+					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(patientForEvent);
+					IOUtils.writeToBufferedWriter(outBreakdown, sb.toString(), true);
 				}
 			}
 			
 			for (EventTypeAllele eta : EventTypeAllele.values()) {
 				ArrayList<String> patientsForEvent = gene.getPatientsForAlleleEventType(eta);
 				for (String patientForEvent : patientsForEvent) {
-					String outString = gene.getName() + "\t" + eta.name() + "\t" + patientForEvent;
-					IOUtils.writeToBufferedWriter(outBreakdown, outString, true);
+					sb.setLength(0);
+					appendGeneCoordinates(gene, sb);
+					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(eta.name());					
+					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(patientForEvent);
+					IOUtils.writeToBufferedWriter(outBreakdown, sb.toString(), true);
 				}				
 			}
 		}
@@ -423,7 +432,7 @@ public class GeneEnrichment {
 	// ========================================================================
 	private static void printBasicGeneSummary(String outFilename, StringUtils.FileExtensionAndDelimiter fileExtDelim, ArrayList<GeneCounter> genes) {
 		String[] columnHeaders = new String[] { 
-				"chr", "bp_start", "bp_end", "length", "gene", GeneCounter.getHeaders(fileExtDelim.mDelimiter)
+				"chr", "arm", "bp_start", "bp_end", "length", "gene", GeneCounter.getHeaders(fileExtDelim.mDelimiter)
 		};		
 		StringBuilder sb = new StringBuilder(2048);
 		String headerStr = StringUtils.constructColumnDelimitedString(columnHeaders, fileExtDelim.mDelimiter, sb, true).toString();
@@ -433,6 +442,7 @@ public class GeneEnrichment {
 		for (GeneCounter gene : genes) {			
 			sb.setLength(0);
 			sb.append(gene.mChrom.getCode())
+			    .append(fileExtDelim.mDelimiter).append(gene.getChrom().getArm(gene.mMaxBasePairPosition))
 				.append(fileExtDelim.mDelimiter).append(gene.mMinBasePairPosition)
 				.append(fileExtDelim.mDelimiter).append(gene.mMaxBasePairPosition)
 				.append(fileExtDelim.mDelimiter).append(gene.getRangeLength())
@@ -505,7 +515,7 @@ public class GeneEnrichment {
 			long searchUnit = TwoGenesWithEvents.Compactor.setValue(TwoGenesWithEvents.PatientCount, InitialDualEventCount, masterUnit);
 			
 			// Now search for the unit in the co-occurrences
-			int resultIndex = ArrayUtils.binarySearchValue(searchUnit, coOccurrencesOnePatient, BitSetUtils.LongExtractorWhole);
+			int resultIndex = ArrayUtils.binarySearchValue(searchUnit, coOccurrencesOnePatient, ValueExtractor.LongExtractorWhole);
 			if (resultIndex >= 0) {				
 				long masterUnitNew = TwoGenesWithEvents.Compactor.setValue(TwoGenesWithEvents.PatientCount, ++patientCount, masterUnit);
 				allDualEvents.set(i, masterUnitNew);
@@ -562,7 +572,7 @@ public class GeneEnrichment {
 			int eventCount = Integer.parseInt(countStr);
 			String newBitString = bitString; // default
 						
-			int resultIndex = ArrayUtils.binarySearchValue(compactValue, coOccurrencesOnePatient, BitSetUtils.LongExtractorWhole);
+			int resultIndex = ArrayUtils.binarySearchValue(compactValue, coOccurrencesOnePatient, ValueExtractor.LongExtractorWhole);
 			if (resultIndex >= 0) {
 				newBitString = BitSetUtils.setBit(bitString, patientIndex, true);
 				coOccurenceNotVisited.set(resultIndex, false);
@@ -729,7 +739,7 @@ public class GeneEnrichment {
 			return Long.compare(dualEvent1 >>> PatientCount.mNumBits, dualEvent2 >>> PatientCount.mNumBits);
 		}
 		
-		public static BitSetUtils.ValueExtractor Extractor = new BitSetUtils.ValueExtractor() {			
+		public static ValueExtractor Extractor = new ValueExtractor() {			
 			@Override
 			public long extractValue(long compactUnit) { return (compactUnit >>> PatientCount.mNumBits); }
 		};

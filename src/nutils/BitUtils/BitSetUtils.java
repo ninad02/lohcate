@@ -525,23 +525,6 @@ public class BitSetUtils {
 		//return ((1L << numBitsDesiredInMask) - 1);
 		return (numBitsDesiredInMask == 0 ? 0 : -1L >>> (NumBitsInLong - numBitsDesiredInMask));
 	}
-
-	// ========================================================================
-	public interface ValueExtractor {
-		public long extractValue(long compactUnit);		
-	}
-
-	public static ValueExtractor LongExtractorWhole = new ValueExtractor() {
-		public long extractValue(long compactUnit) { return compactUnit; }
-	};
-	
-	public static BitSetUtils.ValueExtractor IntExtractorLSB = new BitSetUtils.ValueExtractor() { 
-		public long extractValue(long compactUnit) { return (compactUnit & 0xFFFFFFFFL); }
-	};
-
-	public static BitSetUtils.ValueExtractor IntExtractorMSB = new BitSetUtils.ValueExtractor() { 
-		public long extractValue(long compactUnit) { return ((compactUnit >>> Integer.SIZE) & 0xFFFFFFFFL); }
-	};
 	
 
 }

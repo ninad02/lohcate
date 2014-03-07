@@ -228,16 +228,16 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	public float calcVAFTumor()  { return (float) mCovgVarTumor  / (float) mCovgTotalTumor;  }
 	public int getRsID()         { return mRsID; }
 	
-	public Chrom getChrom()  { return Chrom.getChrom((byte) bsmChrom.getValueInCompactUnit(mDataUnit_ChromProsRevVarAllelesMutType)); }
-	public int getPosition() { return                ((int)   bsmPos.getValueInCompactUnit(mDataUnit_ChromProsRevVarAllelesMutType)); }
+	public Chrom getChrom()  { return Chrom.getChrom((byte) bsmChrom.extractValue(mDataUnit_ChromProsRevVarAllelesMutType)); }
+	public int getPosition() { return                ((int)   bsmPos.extractValue(mDataUnit_ChromProsRevVarAllelesMutType)); }
 	
-	public Nuc getReferenceAllele()     { return Nuc.getAllele(bsmAlleleRef.getValueInCompactUnit(mDataUnit_ChromProsRevVarAllelesMutType));  }
-	public Nuc getVariantAlleleNormal() { return Nuc.getAllele(bsmAlleleVarN.getValueInCompactUnit(mDataUnit_ChromProsRevVarAllelesMutType)); }
-	public Nuc getVariantAlleleTumor()  { return Nuc.getAllele(bsmAlleleVarT.getValueInCompactUnit(mDataUnit_ChromProsRevVarAllelesMutType)); }
-	public Nuc getVariantAllelePopulation() { return Nuc.getAllele(bsmAlleleVarPop.getValueInCompactUnit(mDataUnit_ChromProsRevVarAllelesMutType)); }
+	public Nuc getReferenceAllele()     { return Nuc.getAllele(bsmAlleleRef.extractValue(mDataUnit_ChromProsRevVarAllelesMutType));  }
+	public Nuc getVariantAlleleNormal() { return Nuc.getAllele(bsmAlleleVarN.extractValue(mDataUnit_ChromProsRevVarAllelesMutType)); }
+	public Nuc getVariantAlleleTumor()  { return Nuc.getAllele(bsmAlleleVarT.extractValue(mDataUnit_ChromProsRevVarAllelesMutType)); }
+	public Nuc getVariantAllelePopulation() { return Nuc.getAllele(bsmAlleleVarPop.extractValue(mDataUnit_ChromProsRevVarAllelesMutType)); }
 	
 	public MutationType getMutationType() {
-		return MutationType.getMutationType((int) bsmMutType.getValueInCompactUnit(mDataUnit_ChromProsRevVarAllelesMutType));
+		return MutationType.getMutationType((int) bsmMutType.extractValue(mDataUnit_ChromProsRevVarAllelesMutType));
 	}
 
 	// ====================================================================

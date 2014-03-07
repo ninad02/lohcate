@@ -3,7 +3,7 @@ package nutils.counter;
 import nutils.ArrayUtils;
 import nutils.PrimitiveWrapper;
 import nutils.NullaryClassFactory;
-import nutils.BitUtils.BitSetUtils;
+import nutils.BitUtils.ValueExtractor;
 
 import com.carrotsearch.hppc.FloatArrayList;
 import com.carrotsearch.hppc.DoubleArrayList;
@@ -65,23 +65,23 @@ public class DynamicBucketCounter {
 	
 	// ========================================================================
 	private int getCountAtIndex(int indexOfKey) {
-		return (int) BitSetUtils.IntExtractorLSB.extractValue(mArray.get(indexOfKey));
+		return (int) ValueExtractor.IntExtractorLSB.extractValue(mArray.get(indexOfKey));
 	}
 	
 	// ========================================================================
 	private int getKeyAtIndex(int indexOfKey) {
-		return (int) BitSetUtils.IntExtractorMSB.extractValue(mArray.get(indexOfKey));
+		return (int) ValueExtractor.IntExtractorMSB.extractValue(mArray.get(indexOfKey));
 	}
 	
 	// ========================================================================
 	private int getIndexOfKey(int key) {
-		return ArrayUtils.binarySearchValue(key, mArray, BitSetUtils.IntExtractorMSB);
+		return ArrayUtils.binarySearchValue(key, mArray, ValueExtractor.IntExtractorMSB);
 	}
 	
 	// ========================================================================
 	public boolean getKeyLast(PrimitiveWrapper.WInteger key) {
 		if (mArray.isEmpty()) return false;
-		key.mInt = (int) BitSetUtils.IntExtractorMSB.extractValue(mArray.get(mArray.size() - 1));
+		key.mInt = (int) ValueExtractor.IntExtractorMSB.extractValue(mArray.get(mArray.size() - 1));
 		return true;
 	}
 	
@@ -125,12 +125,12 @@ public class DynamicBucketCounter {
 	// ========================================================================
 	public int getKeyWithMaxCount() {
 		long keyValueMax = getKeyValueWithMaxCount();
-		return (int) BitSetUtils.IntExtractorMSB.extractValue(keyValueMax);
+		return (int) ValueExtractor.IntExtractorMSB.extractValue(keyValueMax);
 	}
 	
 	// ========================================================================
 	public long getKeyValueWithMaxCount() {
-		return ArrayUtils.searchMaxValue(mArray, BitSetUtils.IntExtractorLSB);
+		return ArrayUtils.searchMaxValue(mArray, ValueExtractor.IntExtractorLSB);
 	}
 
 	// ========================================================================

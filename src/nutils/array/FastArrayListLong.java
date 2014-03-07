@@ -7,7 +7,7 @@ import java.util.Comparator;
 import nutils.ArrayUtils;
 import nutils.CompareUtils;
 import nutils.PrimitiveWrapper;
-import nutils.BitUtils.BitSetUtils;
+import nutils.BitUtils.ValueExtractor;
 
 import com.carrotsearch.hppc.LongArrayList;
 
@@ -54,12 +54,12 @@ public class FastArrayListLong {
 	}
 
 	// ========================================================================
-	public void setValueExtractor(BitSetUtils.ValueExtractor valueExtractor) {
+	public void setValueExtractor(ValueExtractor valueExtractor) {
 		mComparator.setValueExtractor(valueExtractor);
 	}
 
 	// ========================================================================
-	public FastArrayListIndex getIndex(long value, FastArrayListIndex returnIndex) {
+	public FastArrayListIndex getIndex(final long value, FastArrayListIndex returnIndex) {
 		//printDebugAllSubLists();
 		int indexSubList = getSubListIndex(value);
 		if (indexSubList < 0) {
@@ -93,7 +93,7 @@ public class FastArrayListLong {
 	}
 
 	// ========================================================================
-	public boolean replace(FastArrayListIndex arrayIndex, long value) {
+	public boolean replace(final FastArrayListIndex arrayIndex, final long newValue) {
 		LongArrayList targetList = mTopLevel.get(arrayIndex.mIndexSubList).mList;
 		
 		if (targetList.isEmpty()) {
@@ -103,23 +103,28 @@ public class FastArrayListLong {
 		int nextIndex = arrayIndex.mIndexWithinSubList + 1;
 		int prevIndex = arrayIndex.mIndexWithinSubList - 1;
 		
-		if (arrayIndex.mIndexWithinSubList == 0) {			
-			if (value > targetList.get(nextIndex)) return false;  // return because value to be set will break sorted state	
+		// Test only the relevant portion
+		ValueExtractor extractor = mComparator.mValueExtractor;
+		final long value = extractor.extractValue(newValue);
+		
+		if (arrayIndex.mIndexWithinSubList == 0) {
+			if ( (targetList.size() > 1) && (value > extractor.extractValue(targetList.get(nextIndex))) ) return false;  // return because value to be set will break sorted state	
 			
 		} else if (arrayIndex.mIndexWithinSubList == targetList.size() - 1) {
-			if (value < targetList.get(prevIndex)) return false;  // return because value to be set will break sorted state
+			if (value < extractor.extractValue(targetList.get(prevIndex))) return false;  // return because value to be set will break sorted state
 				
 		} else {
-			if ((value > targetList.get(nextIndex)) || (value < targetList.get(prevIndex))) return false; 
+			if ((value > extractor.extractValue(targetList.get(nextIndex))) || 
+				(value < extractor.extractValue(targetList.get(prevIndex)))) return false; 
 		}
 		
 		// Now we are guaranteed that we will not break the ordering
-		targetList.set(arrayIndex.mIndexWithinSubList, value);
+		targetList.set(arrayIndex.mIndexWithinSubList, newValue);
 		return true;
 	}
 	
 	// ========================================================================
-	public void add(long value) {		
+	public void add(final long value) {		
 		int subListIndex = getSubListIndex(value);
 		subListIndex = ArrayUtils.getInsertPoint(subListIndex);
 		
@@ -174,9 +179,9 @@ public class FastArrayListLong {
 	// ========================================================================	
 	protected static class SortedSubListComparator implements Comparator<SubList> {
 
-		BitSetUtils.ValueExtractor mValueExtractor = BitSetUtils.LongExtractorWhole;
+		ValueExtractor mValueExtractor = ValueExtractor.LongExtractorWhole;
 
-		public void setValueExtractor(final BitSetUtils.ValueExtractor valueExtractor) {
+		public void setValueExtractor(final ValueExtractor valueExtractor) {
 			mValueExtractor = valueExtractor;
 		}
 		
@@ -335,9 +340,8 @@ public class FastArrayListLong {
 		public long getLastElem() { return mList.get(mList.size() - 1); }
 
 		// ====================================================================
-		public int getIndexOfValue(long value, BitSetUtils.ValueExtractor valueExtractor) {
-			value = valueExtractor.extractValue(value);
-			return ArrayUtils.binarySearchValue(value, mList, valueExtractor);
+		public int getIndexOfValue(final long value, ValueExtractor valueExtractor) {			
+			return ArrayUtils.binarySearchValue(valueExtractor.extractValue(value), mList, valueExtractor);
 		}
 		
 		// ====================================================================
@@ -347,7 +351,7 @@ public class FastArrayListLong {
 		 * @param value
 		 * @return A new sublist (which follows this one), if one is to be created; else @null is returned otherwise. 
 		 */
-		public SubList add(long value, BitSetUtils.ValueExtractor valueExtractor) {
+		public SubList add(final long value, ValueExtractor valueExtractor) {
 			boolean listIsAlreadyFull = isFull();
 			
 			int resultIndex = getIndexOfValue(value, valueExtractor);

@@ -25,6 +25,9 @@ import nutils.IOUtils;
  */
 public class LOHcate {
 
+	public static final String SuffixInputFile = "germline.txt"; //".txt"; //.lohcateInput.txt";
+	public static final boolean RunOld = true;
+	
 	/**
 	 * @param args
 	 */

@@ -3,6 +3,7 @@ package nutils.BitUtils.Compactor;
 import nutils.CompareUtils;
 import nutils.EnumMapSafe;
 import nutils.BitUtils.BitShiftAndMask;
+import nutils.BitUtils.ValueExtractor;
 
 
 public abstract class Compactor<E extends Enum<E> & CompactorInf<E>> {
@@ -64,7 +65,12 @@ public abstract class Compactor<E extends Enum<E> & CompactorInf<E>> {
 	
 	// ========================================================================
 	protected long getValue(E variable, long compactUnit) {
-		return mShiftsAndMasks.get(variable).getValueInCompactUnit(compactUnit);		
+		return mShiftsAndMasks.get(variable).extractValue(compactUnit);		
+	}
+	
+	// ========================================================================
+	public ValueExtractor getValueExtractor(E variable) {
+		return mShiftsAndMasks.get(variable);
 	}
 	
 	// ========================================================================
