@@ -138,6 +138,18 @@ public class IOUtils {
 	}
 	
 	// ========================================================================
+	/** Returns a loggger for the filename. */
+	public static Logger getLogger(String outFilename) {
+		try { 
+			return new Logger(outFilename);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+			System.exit(-1);
+		}
+		return null;
+	}
+	
+	// ========================================================================
 	/** Closes the PrintStream. */
 	public static void closePrintStream(PrintStream out) {
 		out.close();

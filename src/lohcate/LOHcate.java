@@ -2,6 +2,7 @@ package lohcate;
 
 import java.io.File;
 import java.io.PrintStream;
+import java.util.Date;
 
 import lohcate.clustering.Clustering;
 import lohcate.clustering.ClusteringParams;
@@ -16,6 +17,7 @@ import nutils.ArgumentParserUtils;
 import nutils.CompareUtils;
 import nutils.EnumMapSafe;
 import nutils.IOUtils;
+import nutils.Logger;
 
 /** 
  * For now, this is just a wrapper class that serves as an entry point to LOHcate.
@@ -24,9 +26,12 @@ import nutils.IOUtils;
  *
  */
 public class LOHcate {
-
-	public static final String SuffixInputFile = "germline.txt"; //".txt"; //.lohcateInput.txt";
-	public static final boolean RunOld = true;
+	
+	public static final boolean RunOld = false;
+	public static final String SuffixInputFile = RunOld ? ".germline.txt" : ".lohcateInput_txt";	
+	
+	// Logging module
+	public static final Logger LogOutput = IOUtils.getLogger("LOHcate.Log." + ((new Date()).toString()).replace(' ', '_').replace(':', '-') + ".txt");
 	
 	/**
 	 * @param args
@@ -202,7 +207,7 @@ public class LOHcate {
 				ClusteringParams.GlobalClusteringParams.setIsSimulation(true);
 				simParams = new LOHcateSimulator.LOHcateSimulatorParams();
 				simParams.setParamsWithString(simParamsString);
-				simParams.printValues(System.out);		
+				simParams.printValues(simOutputStream);		
 			}			
 			
 			//SeqPlatform platform = SeqPlatform.getPlatform(Integer.parseInt(args[2]));

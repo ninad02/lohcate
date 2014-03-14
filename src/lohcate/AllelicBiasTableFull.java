@@ -10,7 +10,7 @@ import nutils.StringUtils;
 
 /** This table will contain values of bias in an optimized fashion. */
 
-public class AllelicBiasTableOld {
+public class AllelicBiasTableFull {
 	
 	
 	// An arraylist for each chromosome	
@@ -18,7 +18,7 @@ public class AllelicBiasTableOld {
 	PositionAndPayload mDummyPayload;
 
 	// ========================================================================
-	public AllelicBiasTableOld() {
+	public AllelicBiasTableFull() {
 		mDummyPayload = new PositionAndPayload(0, 0, 0);
 		mPositionsAndVAFs = new EnumSortedMap<Chrom, PositionAndPayload>(Chrom.class); 
 	}
@@ -57,12 +57,12 @@ public class AllelicBiasTableOld {
 	/** Given a filename that represents the vaf allelic averages, this stores the 
 	 *  contents of the file. 
 	 */	
-	public static AllelicBiasTableOld readFileAndConstructTable(String inFilename, int colNumSamples, int colAvgVAFNormal) {
+	public static AllelicBiasTableFull readFileAndConstructTable(String inFilename, int colNumSamples, int colAvgVAFNormal) {
 		BufferedReader in = IOUtils.getBufferedReader(inFilename);
 		String line;
 		String delim = StringUtils.FileExtensionTSV.mDelimiter;
 		
-		AllelicBiasTableOld allelicBiasTable = new AllelicBiasTableOld();
+		AllelicBiasTableFull allelicBiasTable = new AllelicBiasTableFull();
 		while ((line = IOUtils.getNextLineInBufferedReader(in)) != null) {
 			Chrom chrom    = Chrom.getChrom(StringUtils.extractNthColumnValue(line, 0, delim));
 			int position = Integer.parseInt(StringUtils.extractNthColumnValue(line, 1, delim));

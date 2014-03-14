@@ -41,7 +41,7 @@ public class SeqReadSimulator {
 	
 	// ========================================================================
 	// ========================================================================
-	public static final int MinReadCountThreshold = 50;
+	public static final int MinReadCountThreshold = 1;
 	
 	RandomDataGenerator mRandomGen;
 
@@ -152,13 +152,20 @@ public class SeqReadSimulator {
 	}	
 	
 	// ========================================================================
-	public void calculateReadsTissue(final InfoOneSiteSampleTissue iosst, double coverageDiploid, double copyNumberPhase0, double copyNumberPhase1, Nuc[] genotype, Nuc referenceAllele, boolean isBiAllelicChange,
-			boolean allowHemizygousGenotype, SeqReadSimulationGoldStandard goldStandard, SeqReadSimulationAdjustReads numReadAdjuster) {
+	public void calculateReadsTissue(final InfoOneSiteSampleTissue iosst, 
+			double coverageDiploid, 
+			double copyNumberPhase0, double copyNumberPhase1, 
+			Nuc[] genotype, Nuc referenceAllele, 
+			boolean isBiAllelicChange,
+			boolean allowHemizygousGenotype, 
+			final int minTotalReadCountThreshold,
+			SeqReadSimulationGoldStandard goldStandard, 
+			SeqReadSimulationAdjustReads numReadAdjuster) {
 
 		if (genotype[0] == genotype[1]) {
-			calculateReadsTissueHomozygous(iosst, coverageDiploid, copyNumberPhase0, copyNumberPhase1, isBiAllelicChange, genotype[0], referenceAllele, goldStandard, numReadAdjuster);			
+			calculateReadsTissueHomozygous(iosst, coverageDiploid, copyNumberPhase0, copyNumberPhase1, isBiAllelicChange, genotype[0], referenceAllele, minTotalReadCountThreshold, goldStandard, numReadAdjuster);			
 		} else {
-			calculateReadsTissueHeterozygous(iosst, coverageDiploid, copyNumberPhase0, copyNumberPhase1, isBiAllelicChange, genotype, referenceAllele, allowHemizygousGenotype, goldStandard, numReadAdjuster);
+			calculateReadsTissueHeterozygous(iosst, coverageDiploid, copyNumberPhase0, copyNumberPhase1, isBiAllelicChange, genotype, referenceAllele, allowHemizygousGenotype, minTotalReadCountThreshold, goldStandard, numReadAdjuster);
 		}
 	}
 	
@@ -168,6 +175,7 @@ public class SeqReadSimulator {
 												  final double copyNumberPhase0, final double copyNumberPhase1,
 												  final boolean biAllelicChange, final Nuc[] genotype, final Nuc referenceAllele,
 												  boolean allowHemizygousGenotype,
+												  int minReadCountThreshold,
 												  SeqReadSimulationGoldStandard goldStandard,
 												  SeqReadSimulationAdjustReads numReadAdjuster) {
 		
@@ -201,7 +209,7 @@ public class SeqReadSimulator {
 				numReadsB = (short) Math.max(numReadsB, 1);
 			}
 			
-		} while (iosst.calcNumReadsTotal() < MinReadCountThreshold);
+		} while (iosst.calcNumReadsTotal() < minReadCountThreshold);
 		iosst.reexamineNumReads();
 		
 		if (goldStandard != null) {
@@ -221,7 +229,8 @@ public class SeqReadSimulator {
 	private void calculateReadsTissueHomozygous(final InfoOneSiteSampleTissue iosst, 
 												final double coverageDiploid, 
 												final double copyNumberPhase0, final double copyNumberPhase1, 
-												final boolean biAllelicChange, final Nuc allele, final Nuc referenceAllele, 
+												final boolean biAllelicChange, final Nuc allele, final Nuc referenceAllele,
+												final int minReadCountThreshold,
 												SeqReadSimulationGoldStandard goldStandard,
 												SeqReadSimulationAdjustReads numReadAdjuster) {
 		
@@ -230,10 +239,10 @@ public class SeqReadSimulator {
 
 		do {
 			numReads = (short) Math.round(mRandomGen.nextPoisson(poissonMean));
-		} while (numReads < MinReadCountThreshold);
+		} while (numReads < minReadCountThreshold);
 		
 		// Adjust the reads for bias
-		numReads = (short) Math.max(MinReadCountThreshold, numReadAdjuster.adjustNumReadsBias(allele, numReads));				
+		numReads = (short) Math.max(minReadCountThreshold, numReadAdjuster.adjustNumReadsBias(allele, numReads));				
 		
 		if (referenceAllele == allele) {			
 			iosst.mGenotypeCode = Genotype.EnumHomozygous00;
@@ -314,7 +323,7 @@ public class SeqReadSimulator {
 		
 		for (int i = 0; i < numIter; i++) {
 			iosst.clear();
-			srs.calculateReadsTissue(iosst, coverageDiploid, copyNumberPhase0, copyNumberPhase1, genotype, referenceAllele, true, isBiAllelicChange, null, ReadAdjusterNoAdjustment);
+			srs.calculateReadsTissue(iosst, coverageDiploid, copyNumberPhase0, copyNumberPhase1, genotype, referenceAllele, true, isBiAllelicChange, 1, null, ReadAdjusterNoAdjustment);
 			totalReadA += iosst.mAlleleA.mNumReads;
 			totalReadB += iosst.mAlleleB.mNumReads;
 			System.out.println(iosst.mGenotypeCode);

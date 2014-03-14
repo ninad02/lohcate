@@ -64,7 +64,11 @@ public class LOHcateSimulator {
 		protected InputParameterDouble mTumorPurity  = new InputParameterDouble(0.40, "TumorPurity",  JSAP.NO_SHORTFLAG, "TumorPurity",  JSAP.NO_DEFAULT);					
 		protected InputParameterDouble mNormalPurity = new InputParameterDouble(1.00, "NormalPurity", JSAP.NO_SHORTFLAG, "NormalPurity", JSAP.NO_DEFAULT);
 		
-		
+		protected InputParameterInteger[] mMinReadDepth = new InputParameterInteger[] {
+			new InputParameterInteger(15, "MinReadDepthNormal", JSAP.NO_SHORTFLAG, "MinReadDepthNormal", JSAP.NO_DEFAULT),
+			new InputParameterInteger(0,   "MinReadDepthTumor", JSAP.NO_SHORTFLAG,  "MinReadDepthTumor", JSAP.NO_DEFAULT)
+		};
+				
 		public ArrayList<InputParameter<?>> mParams;
 		
 		// ====================================================================
@@ -146,6 +150,8 @@ public class LOHcateSimulator {
 		public int getNumCNARegions() { return mNumCNARegions.getValue(); } 
 
 		public int getNumIterations() { return mNumIterations.getValue(); }
+		
+		public int getMinReadDepth(TissueType t) { return mMinReadDepth[t.ordinal()].getValue(); }
 		
 		// ====================================================================		
 		public double getNumFractionOfReadForGCAlleles() { return 1.0; }
@@ -371,6 +377,11 @@ public class LOHcateSimulator {
 				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(GenomeConstants.DefaultDiploidCopyNumber, simParams.getTumorPurity());
 				copyNumber[TissueType.Tumor.mCode][otherPhase.mCode]    = GenotypeUtils.adjustHaploidCopyNumber(0,                                        simParams.getTumorPurity());
 				eventTypeToAssign = EventType.cnLOH;
+				
+			} else if (cnRegion.mCopyNumberEventType == EventType.DELHom) {
+				copyNumber[TissueType.Tumor.mCode][phaseToChange.mCode] = GenotypeUtils.adjustHaploidCopyNumber(0, simParams.getTumorPurity());
+				copyNumber[TissueType.Tumor.mCode][otherPhase.mCode]    = GenotypeUtils.adjustHaploidCopyNumber(0, simParams.getTumorPurity());
+				eventTypeToAssign = EventType.DELHom;
 			}
 			
 			// Finally do the gold standard assignment
@@ -378,11 +389,13 @@ public class LOHcateSimulator {
 			
 			seqSim.calculateReadsTissue(iosos.getTissueInfo(TissueType.Normal), simParams.getCoverageGenerated(TissueType.Normal), 
 					copyNumber[TissueType.Normal.mCode][Phase.p0.mCode], copyNumber[TissueType.Normal.mCode][Phase.p1.mCode], 
-					genotype, referenceAllele, allowHemizygousGenotype.getValue(), isBiAllelicChangeNormal, null, readAdjuster);
+					genotype, referenceAllele, allowHemizygousGenotype.getValue(), isBiAllelicChangeNormal, simParams.getMinReadDepth(TissueType.Normal),					
+					null, readAdjuster);
 			
 			seqSim.calculateReadsTissue(iosos.getTissueInfo(TissueType.Tumor), simParams.getCoverageGenerated(TissueType.Tumor), 
 					copyNumber[TissueType.Tumor.mCode][Phase.p0.mCode], copyNumber[TissueType.Tumor.mCode][Phase.p1.mCode], 
-					genotype, referenceAllele, allowHemizygousGenotype.getValue(), isBiAllelicChangeTumor, goldStandard, readAdjuster);
+					genotype, referenceAllele, allowHemizygousGenotype.getValue(), isBiAllelicChangeTumor, simParams.getMinReadDepth(TissueType.Tumor), 					
+					goldStandard, readAdjuster);
 			
 			// Now, contaminate the normal with the tumor
 			contaminateNormalWithTumor(iosos, simParams.getNormalPurity());

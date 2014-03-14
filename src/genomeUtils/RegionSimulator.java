@@ -4,7 +4,7 @@ import genomeEnums.Chrom;
 
 import java.util.ArrayList;
 
-import lohcate.Regions;
+import lohcate.LOHcate;
 
 import nutils.ArrayUtils;
 import nutils.CompareUtils;
@@ -36,7 +36,7 @@ public class RegionSimulator {
 			
 			// First randomly select a chromosome
 			Chrom chrom = GenotypeUtils.getRandomAutosomalChromosome();		
-			Regions.LogOutput.println("Chrom Selected: " + chrom + "\tTry: " + numChromRetries);
+			LOHcate.LogOutput.println("Chrom Selected: " + chrom + "\tTry: " + numChromRetries);
 			int indexChromFirstPosition = oneSampleInfo.getIndexChromStart(chrom);
 			if (indexChromFirstPosition < 0) {
 				// Data for this particular chromosome does not exist in this sample, so 
@@ -46,7 +46,7 @@ public class RegionSimulator {
 
 			// Now, we are guaranteed to have a chromosome that exists in the sample
 			int indexChromLastPosition = oneSampleInfo.getIndexChromEnd(chrom);
-			Regions.LogOutput.println("Index Bounds:\t" + chrom + "\t" + indexChromFirstPosition + "\t" + indexChromLastPosition);
+			LOHcate.LogOutput.println("Index Bounds:\t" + chrom + "\t" + indexChromFirstPosition + "\t" + indexChromLastPosition);
 			CompareUtils.ensureTrue(indexChromLastPosition >= indexChromFirstPosition, "ERROR: Index last position < Index first position in simulated region!");		
 			int chromPositionLast = oneSampleInfo.getSiteAtIndex(chrom, indexChromLastPosition).getPosition(); 
 

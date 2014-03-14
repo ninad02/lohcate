@@ -54,14 +54,19 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 			String[] cols = line.split(StringUtils.TabPatternStr);
 			if (++lineCounter == 1 && hasHeader) continue;  // skip the header line
 			
-			String patientName = cols[0];			
+			String patientName = cols[0];
 			Chrom chrom = Chrom.getChrom(cols[1]);
 			int regionStart = Integer.parseInt(cols[2]);
 			int regionEnd   = Integer.parseInt(cols[3]);			
-			int numMarkers  = (cols.length > 4) ? Integer.parseInt(cols[4]) : 0; 
-			EventType event = (cols.length > 6) ? EventType.valueOf(cols[6]): EventType.Ignored;
+			int numMarkers     = (cols.length > 4) ?   Integer.parseInt(cols[4]) : 0;
+			double log2CopyNum = (cols.length > 5) ? Double.parseDouble(cols[5]) : 0;
+			EventType event    = (cols.length > 6) ?  EventType.valueOf(cols[6]) : EventType.Ignored;
 			
-			CopyNumberRegionRange cnrr = new CopyNumberRegionRange(event, chrom, regionStart, regionEnd);			
+			CopyNumberRegionRange cnrr = new CopyNumberRegionRange(event, chrom, regionStart, regionEnd);		
+			cnrr.mCopyNumber = log2CopyNum;
+			cnrr.mRecurrenceScore = numMarkers;
+			cnrr.set(chrom, regionStart, regionEnd, true, numMarkers);
+			
 			ArrayList<CopyNumberRegionRange> regionsForPatient = MapUtils.getOrCreateArrayList(patientName, table.mTable);
 			regionsForPatient.add(cnrr);			
 		}
@@ -91,20 +96,8 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 					if (cnrr.overlapRange(regionOther)) {
 						
 						sb.setLength(0);
-						sb.append(patientName)
-						  .append(delim)
-						  .append(cnrr.getChromosome().getCode())
-						  .append(delim)
-						  .append(cnrr.getRangeStart())
-						  .append(delim)
-						  .append(cnrr.getRangeEnd())
-						  .append(delim)
-						  .append("0")
-						  .append(delim)
-						  .append("0")
-						  .append(delim)
-						  .append(cnrr.mCopyNumberEventType)
-						  ;
+						sb.append(patientName);
+						addRegionInfoToStringBuilder(delim, cnrr, sb);						  
 						IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 						IOUtils.flushBufferedWriter(out);
 						break;
@@ -118,6 +111,22 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 	}
 	
 
+	// ========================================================================
+	private static void addRegionInfoToStringBuilder(String delim, CopyNumberRegionRange cnrr, StringBuilder sb) {
+		sb.append(delim)
+		  .append(cnrr.getChromosome().getCode())
+		  .append(delim)
+		  .append(cnrr.getRangeStart())
+		  .append(delim)
+		  .append(cnrr.getRangeEnd())
+		  .append(delim)
+		  .append(cnrr.getNumSitesInterrogated())
+		  .append(delim)
+		  .append(cnrr.mCopyNumber)
+		  .append(delim)
+		  .append(cnrr.mCopyNumberEventType);
+	}
+	
 	// ========================================================================
 	public static void compareTables(String inFilename1, String inFilename2, boolean hasHeader1, boolean hasHeader2) {
 		CopyNumberRegionRangeTable<CopyNumberRegionRange> table1 = readTableFromFile(inFilename1, hasHeader1);
@@ -136,16 +145,9 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 			if (resultRegions == null) {
 				for (CopyNumberRegionRange cnrr : regions) {
 					sb.setLength(0);
-					sb.append(patientName)
-					  .append(delim)
-					  .append(cnrr.getChromosome().getCode())
-					  .append(delim)
-					  .append(cnrr.getRangeStart())
-					  .append(delim)
-					  .append(cnrr.getRangeEnd())
-					  .append(delim)
-					  .append(cnrr.mCopyNumberEventType)
-					  .append(delim)
+					sb.append(patientName);
+					addRegionInfoToStringBuilder(delim, cnrr, sb);
+					sb.append(delim)
 					  .append("0")
 					  .append(delim)
 					  .append("0")
@@ -170,51 +172,27 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 							
 							oneOverlapFound = true;
 							boolean eventsMatch = (cnrr.mCopyNumberEventType == cnrrOther.mCopyNumberEventType);
-							
-							
-							
+														
 							sb.setLength(0);
-							sb.append(patientName)
-							  .append(delim)
-							  .append(cnrr.getChromosome().getCode())
-							  .append(delim)
-							  .append(cnrr.getRangeStart())
-							  .append(delim)
-							  .append(cnrr.getRangeEnd())
-							  .append(delim)
-							  .append(cnrr.mCopyNumberEventType)
-							  .append(delim)
+							sb.append(patientName);
+							addRegionInfoToStringBuilder(delim, cnrr, sb);
+							sb.append(delim)
 							  .append("1")
 							  .append(delim)
 							  .append("0")
 							  .append(delim)
-							  .append(eventsMatch ? "1" : "0")
-							  .append(delim)
-							  .append(cnrrOther.getChromosome().getCode())
-							  .append(delim)
-							  .append(cnrrOther.getRangeStart())
-							  .append(delim)
-							  .append(cnrrOther.getRangeEnd())
-							  .append(delim)
-							  .append(cnrrOther.mCopyNumberEventType)
-							  ;
+							  .append(eventsMatch ? "1" : "0");
+							addRegionInfoToStringBuilder(delim, cnrrOther, sb);
 							IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 						}
 					}
 					
 					if (!oneOverlapFound) {
 						sb.setLength(0);
-						sb.append(patientName)
-						  .append(delim)
-						  .append(cnrr.getChromosome().getCode())
-						  .append(delim)
-						  .append(cnrr.getRangeStart())
-						  .append(delim)
-						  .append(cnrr.getRangeEnd())
-						  .append(delim)
-						  .append(cnrr.mCopyNumberEventType)
-						  .append(delim)
-						  .append("0")
+						sb.append(patientName);
+						addRegionInfoToStringBuilder(delim, cnrr, sb);
+						sb.append(delim)
+						  .append("1")
 						  .append(delim)
 						  .append(hadGermline ? "1" : "0")
 						  .append(delim)
@@ -235,7 +213,7 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 		if (filterStep) {
 			ArrayList<RegionRange> allRegions = readListOfRegions(args[1]);		
 			System.out.println("Read regions...\t" + allRegions.size());
-			filterTable(args[0], allRegions, true);
+			filterTable(args[0], allRegions, false);
 		} else {
 			compareTables(args[0], args[1], true, true);
 		}

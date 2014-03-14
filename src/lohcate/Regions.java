@@ -19,7 +19,6 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
 import java.util.ListIterator;
 
 import nutils.ArgumentParserUtils;
@@ -31,6 +30,7 @@ import nutils.NullaryClassFactory;
 import nutils.NumberUtils;
 import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
+import nutils.UtilsBasic;
 import nutils.counter.DynamicBucketCounter;
 
 import com.carrotsearch.hppc.IntArrayList;
@@ -77,8 +77,6 @@ public class Regions {
 	
 	public static final boolean EliminateExtremeGCSites = true;
 	public static final boolean EliminateHighDensitySNVs = true;
-	
-	public static final PrintStream LogOutput = IOUtils.getPrintStream("LOHcate.Log." + ((new Date()).toString()).replace(' ', '_').replace(':', '-') + ".txt");
 	
 	/*
 	0 1   refName              chr1
@@ -409,7 +407,7 @@ public class Regions {
 						// of regions.  We therefore take no action on this particular site.
 					} else {
 						CopyNumberRegionRange region = regionsInChr.get(regionIndexInChr.mInt);
-						region.mClusterTypeCounts.increment(clusterType);
+						region.mEventTypeCounts.increment(clusterType);
 					}
 				}
 			}
@@ -790,10 +788,10 @@ public class Regions {
 							CompareUtils.throwErrorAndExit("ERROR: Must have same cluster type!\t" + currentRegion.mCopyNumberEventType + "\t" + regionToExtend.mCopyNumberEventType);
 						}
 						
-						boolean shouldCombine = Clustering.combineTwoRegions(regionToExtend, currentRegion, oneSampleData, metaData);					
+						boolean shouldCombine = Clustering.combineTwoRegions(regionToExtend, currentRegion, oneSampleData, metaData, true);					
+						System.out.printf("RegionsCombined: %b\t%s\t%d\t%d\t%d\t%d\t%d\n", shouldCombine, eventType.name(), regionToExtend.getChromosome().getCode(), regionToExtend.getRangeStart(), regionToExtend.getRangeEnd(), currentRegion.getRangeStart(), currentRegion.getRangeEnd());
 						
-						//int maxEndIndexInclusive = regionToExtend.getRangeEnd() + maxBasePairsContiguousRegion - 1;						
-						if (shouldCombine /* currentRegion.getRangeStart() <= maxEndIndexInclusive */) {
+						if (shouldCombine) {
 							regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
 							regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());
 						} else {
@@ -801,7 +799,7 @@ public class Regions {
 							// the current region as the new region to extend.
 							regionToExtend = currentRegion.getCopy();
 							regionsInChromMerged.add(regionToExtend);  // add this to the new array
-						}
+						}						
 					}	
 				} else {
 					if (eventType.isCopyNumberChangeGermlineOrSomatic() && currentRegion.mCopyNumberEventType.isCopyNumberChangeGermlineOrSomatic()) {
@@ -809,7 +807,39 @@ public class Regions {
 						// event type (by virtue of the if-else chain) , and so we do not allow extension 
 						// from a previous region of the targeted event type.
 						regionToExtend = null;
+						
+					} else if (regionToExtend != null) {
+						
+						// Ensure we have the same targeted event type
+						CompareUtils.ensureTrue(regionToExtend.mCopyNumberEventType == eventType, "ERROR: Impossible state!");
+					
+						// Only do something if we're in a non-cna region
+						if (currentRegion.mCopyNumberEventType == EventType.HETGermline) {
+
+							boolean shouldCombine = Clustering.combineTwoRegions(regionToExtend, currentRegion, oneSampleData, metaData, false);
+							System.out.printf("RegionsCombinedHET: %b\t%s\t%d\t%d\t%d\t%d\t%d\n", shouldCombine, eventType.name(), regionToExtend.getChromosome().getCode(), regionToExtend.getRangeStart(), regionToExtend.getRangeEnd(), currentRegion.getRangeStart(), currentRegion.getRangeEnd());						
+
+							double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(currentRegion, oneSampleData, metaData);							
+							
+							switch(regionToExtend.mCopyNumberEventType) {
+								case LOH:         shouldCombine &= Clustering.isCopyNumDepleted(avgCopyNum); break;
+								case cnLOH:       shouldCombine &= Clustering.isCopyNumInDiploidRange(avgCopyNum); break;
+								case GainSomatic: shouldCombine &= Clustering.isCopyNumAmplified(avgCopyNum); break;
+								default: break;
+							}
+							
+							if (shouldCombine) {
+								regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
+								regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());								
+							} else {
+								if (regionToExtend.mCopyNumberEventType == EventType.cnLOH) {
+									regionToExtend = null;
+								}
+							}
+						}
+						
 					}
+					
 				}
 			}		
 		}
@@ -924,7 +954,7 @@ public class Regions {
 		
 		if (currentRegion != null) currentRegion.makeFinalized();
 		
-		System.out.println(oneSampleInfo.getSampleNameRoot());				
+		System.out.println("Finished initial segmentation of sites into regions for:\t" + oneSampleInfo.getSampleNameRoot());				
 		return regionsByChrom;
 
 	}

@@ -115,8 +115,7 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 					mRsID = GenotypeUtils.RsID_Unknown;
 				} else {
 					mRsID = GenotypeUtils.getNumberFromRsId(rsNumTemp);
-					
-					System.out.println(dbsnpStr);
+										
 					String[] items = dbsnpStr.split(",");  // Split on the comma
 					String[] alleles = items[2].split(";|\\|");
 					int numElementsTogether = 2;

@@ -1,6 +1,7 @@
 package lohcate.clustering;
 
 import genomeEnums.Chrom;
+import genomeUtils.RegionRange;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;

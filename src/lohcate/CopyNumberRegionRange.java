@@ -20,7 +20,7 @@ public class CopyNumberRegionRange extends RegionRange {
 	public EventType mCopyNumberEventType;
 	public float mRecurrenceScore;
 	public double mCopyNumber;
-	protected BucketCounterEnum<EventType> mClusterTypeCounts;
+	protected BucketCounterEnum<EventType> mEventTypeCounts;
 	
 	public CopyNumberRegionRange(EventType eventType, Chrom chrom, int regionStart) {
 		super(chrom, regionStart);
@@ -36,7 +36,7 @@ public class CopyNumberRegionRange extends RegionRange {
 		mCopyNumberEventType = eventType;
 		mRecurrenceScore = 1.0f;
 		mCopyNumber = GenomeConstants.DefaultDiploidCopyNumber;
-		mClusterTypeCounts = new BucketCounterEnum<EventType>(EventType.class);				
+		mEventTypeCounts = new BucketCounterEnum<EventType>(EventType.class);				
 	}
 	
 	public CopyNumberRegionRange(CopyNumberRegionRange rhs) {
@@ -44,13 +44,15 @@ public class CopyNumberRegionRange extends RegionRange {
 		mCopyNumberEventType = rhs.mCopyNumberEventType;
 		mRecurrenceScore       = rhs.mRecurrenceScore;
 		mCopyNumber            = rhs.mCopyNumber;
-		mClusterTypeCounts     = rhs.mClusterTypeCounts.getCopy();
+		mEventTypeCounts     = rhs.mEventTypeCounts.getCopy();
 	}
 	
 	public CopyNumberRegionRange() {
 		super();
 		constructorCommon(EventType.Ignored);
 	}
+	
+	public boolean shareSameEvent(CopyNumberRegionRange rhs) { return this.mCopyNumberEventType == rhs.mCopyNumberEventType; }
 	
 	public CopyNumberRegionRange getCopy() { return new CopyNumberRegionRange(this); }
 }

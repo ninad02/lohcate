@@ -57,7 +57,7 @@ public class CopyNumberRegionsByChromosome {
 	public void clearClusterCounts() {
 		for (Chrom chrom : Chrom.values()) {			
 			for (CopyNumberRegionRange oneRegionInChrom : mRegionsByChrom.get(chrom)) {
-				oneRegionInChrom.mClusterTypeCounts.clear();
+				oneRegionInChrom.mEventTypeCounts.clear();
 			}
 		}
 	}
@@ -86,12 +86,12 @@ public class CopyNumberRegionsByChromosome {
 				sb.append(delimiter).append(cnrr.getRangeEnd());
 				sb.append(delimiter).append(cnrr.getRangeLength());
 				
-				double densityClusterType =        ((double) cnrr.mClusterTypeCounts.getCount(cnrr.mCopyNumberEventType) / (double) cnrr.getRangeLength());
-				double densityClusterHetGermline = ((double) cnrr.mClusterTypeCounts.getCount(EventType.HETGermline)     / (double) cnrr.getRangeLength());
+				double densityClusterType =        ((double) cnrr.mEventTypeCounts.getCount(cnrr.mCopyNumberEventType) / (double) cnrr.getRangeLength());
+				double densityClusterHetGermline = ((double) cnrr.mEventTypeCounts.getCount(EventType.HETGermline)     / (double) cnrr.getRangeLength());
 				sb.append(delimiter).append(densityClusterType);
 				sb.append(delimiter).append(densityClusterHetGermline);
 				
-				cnrr.mClusterTypeCounts.constructString(sb, false, delimiter);		
+				cnrr.mEventTypeCounts.constructString(sb, false, delimiter);		
 				out.println(sb.toString());
 			}
 		}

@@ -29,6 +29,8 @@ import kMeans.DataPoint;
 import kMeans.JCA;
 
 import lohcate.AllelicBiasTable;
+import lohcate.AllelicBiasTableCompact;
+import lohcate.AllelicBiasTableDummy;
 import lohcate.CopyNumberRegionRange;
 import lohcate.CopyNumberRegionsByChromosome;
 import lohcate.LOHcate;
@@ -46,6 +48,7 @@ import nutils.ArrayUtils.ParallelArrayDoubleDynamic;
 import nutils.Cast;
 import nutils.CompareUtils;
 import nutils.ContingencyTable;
+import nutils.ControlFlagBool;
 import nutils.EnumMapSafe;
 import nutils.IOUtils;
 import nutils.PrimitiveWrapper;
@@ -366,7 +369,7 @@ public class Clustering {
 
 	// ========================================================================
 	public static AllelicBiasTable constructAllelicBiasTable(ArrayList<File> files, AllelicBiasTable biasTable, SNVMap snvMap, FileExtensionAndDelimiter fileExtAndDelim, SeqPlatform platform) {
-		biasTable = CompareUtils.isNull(biasTable) ? new AllelicBiasTable() : biasTable;
+		biasTable = CompareUtils.isNull(biasTable) ? new AllelicBiasTableCompact() : biasTable;
 		for (File inFile : files) {
 			ArrayList<String> allLines = readLinesFromFilesAsStringList(inFile, true, true, true);
 			for (String line : allLines) { 
@@ -422,20 +425,25 @@ public class Clustering {
 		System.out.println((new Date()).toString() + " Finished Reading sites...");
 				
 		if (correctAllelicBias()) {
-			if (allelicBiasInFile != null) {
+			if (simulatorParams != null) {
+				// We're doing a simulation
+				System.out.println((new Date()).toString() + " Constructing Dummy Allelic Bias Table...");
+				allelicBiasTable = new AllelicBiasTableDummy();
+				System.out.println((new Date()).toString() + " Finished Constructing Allelic Bias file...");
+			} else if (allelicBiasInFile != null) {
 				System.out.println((new Date()).toString() + " Reading Allelic Bias file...");
-				allelicBiasTable = AllelicBiasTable.readFileAndConstructTable(allelicBiasInFile, AllelicBiasTable_Col_NumSamples, AllelicBiasTable_Col_AvgVAFNormal);
+				allelicBiasTable = AllelicBiasTableCompact.readFileAndConstructTable(allelicBiasInFile, AllelicBiasTable_Col_NumSamples, AllelicBiasTable_Col_AvgVAFNormal);
 				System.out.println((new Date()).toString() + " Finished Reading Allelic Bias file...");
 			}
 		} else {			
 			allelicBiasTable = null;   // Reset to since we don't want to handle biases
 		}
-		
+				
 		// Create output directory
 		classifySitesHelper_MakeSubDirs(lohcateDirs);
 					
 		PrintStream simOutputStream = CompareUtils.isNull(simulatorParams) ? System.out : IOUtils.getPrintStream(lohcateDirs.getSubDirPath(SubdirsDefault.Simulation) + File.separator + simOutRootFilename + ".sim.txt");	
-		System.out.println(simOutRootFilename);
+		System.out.println("Simulation output filename root:\t" + simOutRootFilename);
 		
 		// Create counters for all events
 		EnumMapSafe<EventType, EnumMapSafe<Chrom, DynamicBucketCounter>> eventCounts = new EnumMapSafe<>(EventType.class);
@@ -513,16 +521,17 @@ public class Clustering {
 		boolean isLinearFromRegression = false;
 		boolean isLinearFromKMeans = false;
 		boolean noDenserPeaks = false;
+		int nullListLastIndex = 0;
 		
 		if (!region.spansOneSite()) {
-			String listOfListOfMeansStr = constrctListofListOfMeans();
+			String listOfListOfMeansStr = constrctListofListOfMeans(targetEventType);
 			ArrayList<DoubleArrayList> listOfListOfMeans = ArrayUtils.getListOfDoubleListsFromStringForm(listOfListOfMeansStr, true);							
 			mostLikelyList = determineCopyGainVAFMaxLikelihood(oneSampleData, metaData, region, listOfListOfMeans, TissueType.Tumor, probFromMaxLikelihood);
-			System.out.printf("ML:\t%12s\t%d\t%d\t%d\t%d\n", targetEventType, region.getChromosome().ordinal(), indexStart, indexEnd, mostLikelyList);
+			System.out.printf("ML:\t%12s\t%d\t%d\t%d\t%d\t%d\t%d\n", targetEventType, region.getChromosome().ordinal(), indexStart, indexEnd, region.getRangeStart(), region.getRangeEnd(), mostLikelyList);
 			//System.out.println("\t" + mostLikelyList);
 			
 			// Check if still considered an event
-			if (mostLikelyList > 0) {									
+			if (mostLikelyList > nullListLastIndex) {									
 				DoubleArrayList vafTumorsSorted = new DoubleArrayList();
 				for (int row = indexStart; row <= indexEnd; row++) {
 					if (metaData.mVAFNormalHetRange.inRangeLowerExclusive(oneSampleData.getSiteAtIndex(row).calcVAFNormal())) {
@@ -542,7 +551,7 @@ public class Clustering {
 				
 				// Now test via density
 				Frequency freqDist = new Frequency();
-				double multiplierFreq = 1000.0;
+				double multiplierFreq = 100.0;
 				for (int i = 0; i < vafTumorsSorted.size(); i++) {
 					int vafTumorMultiplied = Cast.toInt( Math.round(vafTumorsSorted.get(i) * multiplierFreq) );
 					freqDist.addValue(vafTumorMultiplied);
@@ -550,14 +559,16 @@ public class Clustering {
 				DoubleArrayList mostLikelyMeans = listOfListOfMeans.get(mostLikelyList);
 				int mean0 = Cast.toInt(Math.round(mostLikelyMeans.get(0) * multiplierFreq));
 				int mean1 = Cast.toInt(Math.round(mostLikelyMeans.get(1) * multiplierFreq));
-				int leeway = 4;
+				int leeway = (int) Math.round(0.04 * multiplierFreq);
 				
 				double probMean0  = NumberUtils.getCumProbInterval(freqDist, mean0, leeway); 						
 				double probMean1  = NumberUtils.getCumProbInterval(freqDist, mean1, leeway);
-				double probCenter = NumberUtils.getCumProbInterval(freqDist, 500, leeway);
+				double probCenter = NumberUtils.getCumProbInterval(freqDist, (int) Math.round(0.5 * multiplierFreq), leeway);
 				boolean denserPeaks = (probMean0 > probCenter) && (probMean1 > probCenter);
 				System.out.printf("\tFREQ: %d\t%d\t%g\t%g\t%g\n", mean0, mean1, probMean0, probMean1, probCenter);
-				noDenserPeaks = !denserPeaks;
+				if (targetEventType == EventType.cnLOH /*|| targetEventType == EventType.LOH*/) {
+					noDenserPeaks = !denserPeaks;
+				}
 				
 				
 				// Now do k-means clustering
@@ -585,7 +596,7 @@ public class Clustering {
 		} 
 		
 		// Go through VAFs
-		boolean resetToHetGermline = (mostLikelyList == 0) || isLinearFromRegression || isLinearFromKMeans || noDenserPeaks;
+		boolean resetToHetGermline = (mostLikelyList <= nullListLastIndex) || isLinearFromRegression || isLinearFromKMeans || noDenserPeaks;
 
 		if (fillRegion && (events != null)) {
 			fillRegion(events, indexStart, indexEnd, resetToHetGermline, targetEventType, oneSampleData, metaData);
@@ -618,17 +629,31 @@ public class Clustering {
 			}
 		}
 	}
+
+	// ========================================================================
+	public static double calcAverageCopyNumberOverRegion(RegionRange regionByCoordinates, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
+		int indexRegionStart = oneSampleData.getIndex(regionByCoordinates.getChromosome(), regionByCoordinates.getRangeStart()); 
+		CompareUtils.ensureTrue(indexRegionStart >= 0, "ERROR: Starting index must be > 0");
+		int indexRegionEnd   = oneSampleData.getIndex(regionByCoordinates.getChromosome(), regionByCoordinates.getRangeEnd());
+		CompareUtils.ensureTrue(indexRegionEnd >= indexRegionStart, "ERROR: Ending index must be >= starting index!");
+		
+		double copyNumTotal = 0;
+		for (int row = indexRegionStart; row <= indexRegionEnd; row++) {
+			copyNumTotal += metaData.getCopyNumberAtIndex(row);
+		}
+		return (copyNumTotal / (indexRegionEnd - indexRegionStart + 1)); 
+	}
 	
 	// ========================================================================
-	public static boolean combineTwoRegions(CopyNumberRegionRange regionPrev, CopyNumberRegionRange regionCurr, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
+	public static boolean combineTwoRegions(CopyNumberRegionRange regionPrev, CopyNumberRegionRange regionCurr, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData, boolean ensureRegionsToHaveSameEventType) {
 		
 		// Check that we have the same chromosome
 		if (regionPrev.getChromosome() != regionCurr.getChromosome()) {
 			return false;
 		}
 		
-		// Test that they have teh same event type
-		if (regionPrev.mCopyNumberEventType != regionCurr.mCopyNumberEventType) {
+		// Test that they have the same event type
+		if (ensureRegionsToHaveSameEventType && !regionPrev.shareSameEvent(regionCurr)) { 				
 			return false;
 		}
 		
@@ -649,13 +674,13 @@ public class Clustering {
 		
 		// Check how many het sites there are between regions.  If there are none, we can
 		// treat as if the regions are adjacent.		
-		if (numHetSitesMid == 0) {
+		if (regionPrev.shareSameEvent(regionCurr) && (numHetSitesMid == 0)) {
 			return true;
 			
 		} else {
 			int midRegionStartPos = oneSampleData.getSiteAtIndex(regionPrev.getChromosome(), indexRegionPrevEnd   + 1).getPosition();
 			int midRegionEndPos   = oneSampleData.getSiteAtIndex(regionPrev.getChromosome(), indexRegionCurrStart - 1).getPosition();
-			InputParameterInteger numHetSitesThreshold = new InputParameterInteger(6, "", JSAP.NO_SHORTFLAG, "", "");
+			InputParameterInteger numHetSitesThreshold = new InputParameterInteger(8, "", JSAP.NO_SHORTFLAG, "", "");
 			
 			if (numHetSitesMid < numHetSitesThreshold.getValue()) {
 				midRegionStartPos = regionPrev.getRangeStart();
@@ -671,10 +696,26 @@ public class Clustering {
 
 	
 	// ========================================================================
-	private static String constrctListofListOfMeans() {
+	private static String constrctListofListOfMeans(EventType et) {
 		StringBuilder sb = new StringBuilder(1024);
 		sb.append("({0.5}");
-		//sb.append(";{0.45,0.55}");
+//		sb.append(";{0.4,0.5,0.6}");
+//		sb.append(";{0.3333,0.5,0.6667}");		
+//		sb.append(";{0.3,0.5,0.7}");
+//		sb.append(";{0.25,0.5,0.75}");
+//		sb.append(";{0.2,0.5,0.8}");
+//		sb.append(";{0.15,0.5,0.85}");		
+//		sb.append(";{0.1,0.5,0.9}");
+//		sb.append(";{0.05,0.5,0.95}");
+//		sb.append(";{0.005,0.5,0.995}");
+//		sb.append(";{0.0001,0.5,0.9999}");
+		
+		if (et == EventType.GainSomatic || et == EventType.LOH) {
+			sb.append(";{0.48,0.52}");
+			sb.append(";{0.45,0.55}"); // contentious
+				
+		}
+		
 		sb.append(";{0.4,0.6}");
 		sb.append(";{0.3333,0.6667}");		
 		sb.append(";{0.3,0.7}");
@@ -767,8 +808,11 @@ public class Clustering {
 			// BEGIN POST-PROCESSING
 			boolean doOverride = true;
 			if (doOverride) {
-				CopyNumberRegionsByChromosome regionsByChrom = Regions.segmentRegionsOneSample(oneSampleData, events, null, null);						
-			
+				CopyNumberRegionsByChromosome regionsByChrom = Regions.segmentRegionsOneSample(oneSampleData, events, null, null);
+				System.out.println("------------------------------\nRegions");
+				regionsByChrom.print(System.out, StringUtils.TabStr);
+				System.out.println("------------------------------");
+				
 				//EnumMapSafe<EventType, CopyNumberRegionsByChromosome> regionsInSamplePerEventType = 
 				//		new EnumMapSafe<EventType, CopyNumberRegionsByChromosome>(EventType.class);
 
@@ -793,9 +837,10 @@ public class Clustering {
 							fillRegionBasedOnVAFMaxLikelihood(region, oneSampleData, metaData, events, eventType, probFromMaxLikelihood, true);							
 							//System.out.println("CURR\t" + region.toString());
 							
-							boolean fillMid = false;
+							ControlFlagBool fillMid = new ControlFlagBool(false);
+
 							// Fill in the gap between regions if it exists
-							if (regionPrev != null && fillMid) {
+							if (regionPrev != null && fillMid.getValue()) {
 								int indexEndPrev   = oneSampleData.getIndex(regionPrev.getChromosome(), regionPrev.getRangeEnd());
 								int indexStartCurr = oneSampleData.getIndex(    region.getChromosome(),     region.getRangeStart());
 								
@@ -951,7 +996,7 @@ public class Clustering {
 			out.printf("\t%d\t%d", table.getTotalTruthPositive(), table.getTotalTruthNegative());
 
 			// Print the contingency table calcuated values
-			out.printf("\tSensitivity:\t%g\tSpecificity:\t%g\tF-Measure:\t%g", table.getSensitivity(), table.getSpecificity(), table.getFMeasure());
+			out.printf("\tSens:\t%g\tSpec:\t%g\tPPV:\t%g\tF1:\t%g", table.getSensitivity(), table.getSpecificity(), table.getPPV(), table.getFMeasure());
 
 			// Now print the distributed counts 
 			out.printf("\t|");
@@ -1072,7 +1117,7 @@ public class Clustering {
 	private static void smoothCopyNumbers(SiteList<ClusteringInputOneSite> sites, ClusteringInputOneSampleMetaData metaData) {
 		
 		ArrayList<CopyNumberRegionRange> setOfRegions = new ArrayList<CopyNumberRegionRange>();
-		int positionDiffThreshold = 5_000_000;
+		int positionDiffThreshold = LOHcate.RunOld ? 3_000_000 : 150_000;
 		
 		for (Chrom chrom : Chrom.values()) {
 			if (chrom.isInvalid()) continue;
@@ -1342,7 +1387,7 @@ public class Clustering {
 		indexChromEnd = Math.min(indexChromEnd, oneSampleInfo.getNumSites() - 1);
 		
 		// Construct our lists
-		int multiplier = 10000;
+		int multiplier = 100;
 		ArrayList<PoissonDistributionList> pdListofLists = new ArrayList<PoissonDistributionList>();				
 		for (DoubleArrayList doubleArray : listOfListOfMeans) {
 			PoissonDistributionList pdList = new PoissonDistributionList();
@@ -1718,18 +1763,23 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	private static boolean isCopyNumAmplified(float copyNum) {
+	public static boolean isCopyNumDepleted(double copyNum) {
+		return (copyNum <= ClusteringParams.GlobalClusteringParams.mDeletionThreshold.getValue());
+	}
+	
+	// ========================================================================
+	public static boolean isCopyNumAmplified(double copyNum) {
 		return (copyNum >= ClusteringParams.GlobalClusteringParams.mAmplificationThreshold.getValue()); 				
 	}
 	
 	// ========================================================================
-	private static boolean isCopyNumInDiploidRange(float copyNum) {
+	public static boolean isCopyNumInDiploidRange(double copyNum) {
 		return (ClusteringParams.GlobalClusteringParams.mDeletionThreshold.getValue() < copyNum) && 
 			   (copyNum < ClusteringParams.GlobalClusteringParams.mAmplificationThreshold.getValue());		
 	}
 	
 	// ========================================================================
-	private static boolean isCopyNumRatioInDiploidRange(float copyNumRatio) {
+	public static boolean isCopyNumRatioInDiploidRange(float copyNumRatio) {
 		float copyNum = copyNumRatio * Regions.DefaultDiploidCopyNumber;
 		return isCopyNumInDiploidRange(copyNum);
 	}
