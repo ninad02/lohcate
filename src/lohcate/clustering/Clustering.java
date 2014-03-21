@@ -491,14 +491,14 @@ public class Clustering {
 	
 		// Now do the GISTIC processing
 		String jisticCovertSEGOutputFilename = lohcateDirs.getSubDirPath(SubdirsDefault.Regions_GISTIC) + File.separator + "Regions.Matrix.JISTIC.txt";
-		convertSEG.main(new String[] {outFilenameGISTIC, outFilenameProbeFile, "outputfile=" + jisticCovertSEGOutputFilename});
-		ArrayList<String> sortedLines = SortUtils.sortLines(jisticCovertSEGOutputFilename, new int[] { 1, 2 }, new boolean[] { true, true }, new boolean[] { false, false }, StringUtils.TabStr, 1);
-		StringUtils.removeDuplicates(sortedLines, null);
-		IOUtils.writeOutputFile(jisticCovertSEGOutputFilename, sortedLines);
+		//convertSEG.main(new String[] {outFilenameGISTIC, outFilenameProbeFile, "outputfile=" + jisticCovertSEGOutputFilename});
+		//ArrayList<String> sortedLines = SortUtils.sortLines(jisticCovertSEGOutputFilename, new int[] { 1, 2 }, new boolean[] { true, true }, new boolean[] { false, false }, StringUtils.TabStr, 1);
+		//StringUtils.removeDuplicates(sortedLines, null);
+		//IOUtils.writeOutputFile(jisticCovertSEGOutputFilename, sortedLines);
 
 		boolean doFocal = false;
-		JISTICWrapper.callJISTIC(jisticCovertSEGOutputFilename, false);
-		JISTICWrapper.callJISTIC(jisticCovertSEGOutputFilename, true);
+		//JISTICWrapper.callJISTIC(jisticCovertSEGOutputFilename, false);
+		//JISTICWrapper.callJISTIC(jisticCovertSEGOutputFilename, true);
 	}
 	
 	// ========================================================================
@@ -606,8 +606,9 @@ public class Clustering {
 	}
 	
 	// ========================================================================
-	private static void fillRegion( ArrayList<EventType> events, 
-			int indexStartIncl, int indexEndIncl, boolean resetToHetGermline, 
+	public static void fillRegion( ArrayList<EventType> events, 
+			int indexStartIncl, int indexEndIncl, 
+			boolean resetToHetGermline, 
 			EventType targetEventType,  
 			ClusteringInputOneSample oneSampleData, 
 			ClusteringInputOneSampleMetaData metaData) {
@@ -622,9 +623,9 @@ public class Clustering {
 				}
 			} else {
 				if (event == EventType.HETGermline || event == EventType.Noise || event == EventType.Ignored) {
-					if (metaData.mVAFNormalHetRange.inRangeLowerExclusive(oneSampleData.getSiteAtIndex(row).calcVAFNormal())) {
+					//if (metaData.mVAFNormalHetRange.inRangeLowerExclusive(oneSampleData.getSiteAtIndex(row).calcVAFNormal())) {
 						events.set(row, targetEventType);
-					}
+					//}
 				}
 			}
 		}
@@ -642,6 +643,44 @@ public class Clustering {
 			copyNumTotal += metaData.getCopyNumberAtIndex(row);
 		}
 		return (copyNumTotal / (indexRegionEnd - indexRegionStart + 1)); 
+	}
+
+	// ========================================================================
+	public static CopyNumberRegionRange getMiddleRegion(CopyNumberRegionRange regionPrev, CopyNumberRegionRange regionCurr, ClusteringInputOneSample oneSampleData, boolean regionByIndex) {
+		
+		// Check that we have the same chromosome
+		if (regionPrev.getChromosome() != regionCurr.getChromosome()) {
+			return null;
+		}
+		
+		int indexRegionPrevStart = oneSampleData.getIndex(regionPrev.getChromosome(), regionPrev.getRangeStart()); 
+		CompareUtils.ensureTrue(indexRegionPrevStart >= 0, "ERROR: Starting index must be > 0");
+		int indexRegionPrevEnd   = oneSampleData.getIndex(regionPrev.getChromosome(), regionPrev.getRangeEnd());
+		CompareUtils.ensureTrue(indexRegionPrevStart >= indexRegionPrevStart, "ERROR: Ending index must be >= starting index!");
+		
+		int indexRegionCurrStart = oneSampleData.getIndex(regionCurr.getChromosome(), regionCurr.getRangeStart()); 
+		CompareUtils.ensureTrue(indexRegionCurrStart >= 0, "ERROR: Starting index must be > 0");
+		int indexRegionCurrEnd   = oneSampleData.getIndex(regionCurr.getChromosome(), regionCurr.getRangeEnd());
+		CompareUtils.ensureTrue(indexRegionCurrStart >= indexRegionCurrStart, "ERROR: Ending index must be >= starting index!");
+		
+		int indexMidRangeStart = indexRegionPrevEnd   + 1;
+		int indexMidRangeEnd   = indexRegionCurrStart - 1;
+		
+		if (indexMidRangeEnd < indexMidRangeStart) {
+			return null;
+		}
+		
+		CopyNumberRegionRange midRange = new CopyNumberRegionRange(regionPrev);
+		
+		if (regionByIndex) {
+			midRange.set(regionPrev.getChromosome(), indexMidRangeStart, indexMidRangeEnd, false, indexMidRangeEnd - indexMidRangeStart + 1);
+		} else {
+			int midRegionStartPos = oneSampleData.getSiteAtIndex(regionPrev.getChromosome(), indexMidRangeStart).getPosition();
+			int midRegionEndPos   = oneSampleData.getSiteAtIndex(regionPrev.getChromosome(), indexMidRangeEnd).getPosition();
+			midRange.set(regionPrev.getChromosome(), midRegionStartPos, midRegionEndPos, false,  indexMidRangeEnd - indexMidRangeStart + 1);
+		}
+				
+		return midRange;
 	}
 	
 	// ========================================================================
@@ -669,8 +708,7 @@ public class Clustering {
 		CompareUtils.ensureTrue(indexRegionCurrStart >= indexRegionCurrStart, "ERROR: Ending index must be >= starting index!");
 
 		int numHetSitesMid = oneSampleData.getNumHetSitesInRangeByIndex(indexRegionPrevEnd + 1, indexRegionCurrStart - 1, metaData.mVAFNormalHetRange);
-		PrimitiveWrapper.WDouble probFromMaxLikelihood = new PrimitiveWrapper.WDouble(0);
-		CopyNumberRegionRange midRange = new CopyNumberRegionRange(regionPrev);
+		PrimitiveWrapper.WDouble probFromMaxLikelihood = new PrimitiveWrapper.WDouble(0);		
 		
 		// Check how many het sites there are between regions.  If there are none, we can
 		// treat as if the regions are adjacent.		
@@ -682,11 +720,12 @@ public class Clustering {
 			int midRegionEndPos   = oneSampleData.getSiteAtIndex(regionPrev.getChromosome(), indexRegionCurrStart - 1).getPosition();
 			InputParameterInteger numHetSitesThreshold = new InputParameterInteger(8, "", JSAP.NO_SHORTFLAG, "", "");
 			
-			if (numHetSitesMid < numHetSitesThreshold.getValue()) {
+			if ((numHetSitesMid < numHetSitesThreshold.getValue()) || (numHetSitesMid == 0)) {
 				midRegionStartPos = regionPrev.getRangeStart();
 				midRegionEndPos   = regionCurr.getRangeEnd();
 			}
 							
+			CopyNumberRegionRange midRange = new CopyNumberRegionRange(regionPrev);
 			midRange.set(regionPrev.getChromosome(), midRegionStartPos, midRegionEndPos, false, indexRegionCurrStart - indexRegionPrevEnd - 1);
 			CompareUtils.ensureTrue(!midRange.spansOneSite(), "Must always span more than one site!");
 			boolean isEventRegion = fillRegionBasedOnVAFMaxLikelihood(midRange, oneSampleData, metaData, null, regionPrev.mCopyNumberEventType, probFromMaxLikelihood, false);
@@ -822,81 +861,31 @@ public class Clustering {
 //				double[] probMLMidPossibilities = new double[numMidPossibilities];
 //				int[] midRegionStart = new int[numMidPossibilities];
 //				int[] midRegionEnd   = new int[numMidPossibilities];
-				
-				for (EventType eventType : EventType.AmpLOHcnLOH) {
-					CopyNumberRegionsByChromosome regionsInOneSampleMerged = Regions.mergeRegionsWithConstraints(regionsByChrom, eventType, Regions.REGION_SEGMENTATION_DIST_THRESHOLD, oneSampleData, metaData);
-					//regionsInOneSampleMerged.removeSingletonRegions();
-					//regionsInSamplePerEventType.put(eventType, regionsInOneSampleMerged);
-					//regionsInOneSampleMerged.print(System.out, StringUtils.FileExtensionTSV.mDelimiter);
-										
-					for (Chrom chrom : Chrom.values()) {
-						ArrayList<CopyNumberRegionRange> regionsOnChrom = regionsInOneSampleMerged.getRegions(chrom);
-						CopyNumberRegionRange regionPrev = null;
-						for (CopyNumberRegionRange region : regionsOnChrom) {							
-							CompareUtils.ensureTrue(region.getChromosome() == chrom, "ERROR: Chromosomes should match!");							
-							fillRegionBasedOnVAFMaxLikelihood(region, oneSampleData, metaData, events, eventType, probFromMaxLikelihood, true);							
-							//System.out.println("CURR\t" + region.toString());
-							
-							ControlFlagBool fillMid = new ControlFlagBool(false);
 
-							// Fill in the gap between regions if it exists
-							if (regionPrev != null && fillMid.getValue()) {
-								int indexEndPrev   = oneSampleData.getIndex(regionPrev.getChromosome(), regionPrev.getRangeEnd());
-								int indexStartCurr = oneSampleData.getIndex(    region.getChromosome(),     region.getRangeStart());
-								
-								// Ensure we aren't comparing index-adjacent regions.  
-								if (indexStartCurr > indexEndPrev + 1) {
-									
-									// Test whether the middle region has enough sites on its own to be checked
-									int numHetSitesMid = oneSampleData.getNumHetSitesInRangeByIndex(indexEndPrev + 1, indexStartCurr - 1, metaData.mVAFNormalHetRange);
-									int sufficientNumHetSitesMid = 8;
-									
-									if (numHetSitesMid >= sufficientNumHetSitesMid) {
-										int midRegionStartPos = oneSampleData.getSiteAtIndex(chrom, indexEndPrev   + 1).getPosition();
-										int midRegionEndPos   = oneSampleData.getSiteAtIndex(chrom, indexStartCurr - 1).getPosition();
-										midRange.set(chrom, midRegionStartPos, midRegionEndPos, false, indexStartCurr - indexEndPrev - 1);
-										fillRegionBasedOnVAFMaxLikelihood(midRange, oneSampleData, metaData, events, eventType, probFromMaxLikelihood, true);
-										
-									} else {
-										/*
-										Arrays.fill(probMLMidPossibilities, 0);
-										
-										for (int pIndex = 0; pIndex < numMidPossibilities; pIndex++) {
-											switch(pIndex) {
-											case 0: 
-												midRegionStart[pIndex] = regionPrev.getRangeStart();   
-												midRegionEnd[pIndex] = region.getRangeEnd();   
-												break;
-											case 1: 
-												midRegionStart[pIndex] = oneSampleData.getSiteAtIndex(chrom, indexEndPrev + 1).getPosition();   
-												midRegionEnd[pIndex] = region.getRangeEnd();   
-												break;
-											default: CompareUtils.ensureTrue(false, "ERROR: Invalid mid-range possibility!"); break;
-											}
-											
-											midRange.set(chrom, midRegionStart[pIndex], midRegionEnd[pIndex], false, indexStartCurr - indexEndPrev - 1);
-										}*/
-										
-										int midRegionStartPos = regionPrev.getRangeStart(); //;								
-										int midRegionEndPos   = region.getRangeEnd(); //;
-										midRange.set(chrom, midRegionStartPos, midRegionEndPos, false, indexStartCurr - indexEndPrev - 1);
-										boolean result = fillRegionBasedOnVAFMaxLikelihood(midRange, oneSampleData, metaData, events, eventType, probFromMaxLikelihood, false);
-										if (result) {											
-											fillRegionBasedOnVAFMaxLikelihood(midRange, oneSampleData, metaData, events, eventType, probFromMaxLikelihood, true);
-										}
-											//System.out.println("MID\t" + midRange.toString());										
-									}									
-								}
+				for (int pass = 0; pass < 3; pass++) {
+					for (EventType eventType : EventType.AmpLOHcnLOH) {
+						regionsByChrom = Regions.segmentRegionsOneSample(oneSampleData, events, null, null);
+						CopyNumberRegionsByChromosome regionsInOneSampleMerged = Regions.mergeRegionsWithConstraints(regionsByChrom, eventType, Regions.REGION_SEGMENTATION_DIST_THRESHOLD, oneSampleData, metaData);
+						//regionsInOneSampleMerged.removeSingletonRegions();
+						//regionsInSamplePerEventType.put(eventType, regionsInOneSampleMerged);
+						//regionsInOneSampleMerged.print(System.out, StringUtils.FileExtensionTSV.mDelimiter);
+
+						for (Chrom chrom : Chrom.values()) {
+							ArrayList<CopyNumberRegionRange> regionsOnChrom = regionsInOneSampleMerged.getRegions(chrom);
+							for (CopyNumberRegionRange region : regionsOnChrom) {							
+								CompareUtils.ensureTrue(region.getChromosome() == chrom, "ERROR: Chromosomes should match!");							
+								fillRegionBasedOnVAFMaxLikelihood(region, oneSampleData, metaData, events, eventType, probFromMaxLikelihood, true);							
+								//System.out.println("CURR\t" + region.toString());
 							}
-							
-							
-							regionPrev = region;
 						}
-					}
-					
-					// Now outout					
-					
-				}			
+
+						//Regions.reassignRegionsByCopyNumber(regionsByChrom, events, oneSampleData, metaData);
+						// Now outout					
+
+					}	
+				}
+				
+				
 				
 				// Now, we segment the sample again since now all the sites have been 
 				// processed, and any unassigned sites between CNA regions have been filled in
@@ -1650,6 +1639,11 @@ public class Clustering {
 		return clusterResults;
 	}
 
+	// ========================================================================
+	private static void tallyClusteringResults(ClusteringResults<EventType> clusteringResults) {
+		
+	}
+	
 	// ========================================================================
 	// Convenience private function to break up caller function
 	private static void assignClustersToNonClusteredSites(SiteList<ClusteringInputOneSite> sites, 

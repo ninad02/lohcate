@@ -23,7 +23,9 @@ import java.util.ListIterator;
 
 import nutils.ArgumentParserUtils;
 import nutils.ArrayUtils;
+import nutils.Cast;
 import nutils.CompareUtils;
+import nutils.ControlFlagBool;
 import nutils.EnumMapSafe;
 import nutils.IOUtils;
 import nutils.NullaryClassFactory;
@@ -31,6 +33,7 @@ import nutils.NumberUtils;
 import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
 import nutils.UtilsBasic;
+import nutils.BitUtils.Compactor.CompactorIntoLong;
 import nutils.counter.DynamicBucketCounter;
 
 import com.carrotsearch.hppc.IntArrayList;
@@ -246,13 +249,15 @@ public class Regions {
 		
 		for (EventType clusterType : EventType.AmpLOHHetG) { 						
 			ArrayList<CopyNumberRegionsByChromosome> regionsInSamplesForOneClusterType = regionsInSamplesPerEventType.get(clusterType);	
-			
+			/*
 			for (CopyNumberRegionsByChromosome regionsInOneSample : regionsInSamples) {
-				CopyNumberRegionsByChromosome regionsInOneSampleMerged = mergeRegionsWithConstraintsOld(regionsInOneSample, clusterType, maxBasePairsContiguousRegion.get(clusterType));
+				CopyNumberRegionsByChromosome regionsInOneSampleMerged = mergeRegionsWithConstraintsOld(regionsInOneSample, events, oneSampleData, metaData) 
+						mergeRegionsWithConstraintsOld(regionsInOneSample, clusterType, maxBasePairsContiguousRegion.get(clusterType));
 				regionsInOneSampleMerged.removeSingletonRegions();
 				regionsInSamplesForOneClusterType.add(regionsInOneSampleMerged);
 				printSegmentedRegionsToFile(outDir, regionsInOneSampleMerged, clusterType, snvMap);
 			}
+			*/
 		}
 
 		PrintStream out = IOUtils.getPrintStream(outDir + File.separator + "testOut.txt");
@@ -708,51 +713,52 @@ public class Regions {
 	/** Given the segmented regions in one sample, this method merges the regions of one type (LOH, Amp, etc) 
 	 *  in the following manner.  LOH/Amp regions cannot be longer than maxLengthContiguousRegion long. 
 	 */
-	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraintsOld(CopyNumberRegionsByChromosome regionsInSample, EventType clusterType, int maxBasePairsContiguousRegion) {
+	public static CopyNumberRegionsByChromosome reassignRegionsByCopyNumber(CopyNumberRegionsByChromosome regionsInSample, ArrayList<EventType> events, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
 		
 		// Create an empty return object
 		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName);
 		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(EventType.Ignored, Chrom.c0, 0);
 		
+		PrimitiveWrapper.WDouble probFromMaxLikelihood = new PrimitiveWrapper.WDouble(0);
 		// Go chromosome by chromosome
 		for (Chrom chrom : Chrom.Autosomes) {				
 			ArrayList<CopyNumberRegionRange> regionsInChromOriginal =       regionsInSample.getRegions(chrom);
 			ArrayList<CopyNumberRegionRange> regionsInChromMerged   = regionsInSampleMerged.getRegions(chrom);
-						
+			
 			// We declare a stored region that can be extended.  Initialize to null for now
 			CopyNumberRegionRange regionToExtend = null;
 			
 			// Iterate through the regions for this chromosome
 			for (CopyNumberRegionRange currentRegion : regionsInChromOriginal) {
+				
+				if (currentRegion.mCopyNumberEventType == EventType.HETGermline) {
+					double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(currentRegion, oneSampleData, metaData);	
 
-				if (currentRegion.mCopyNumberEventType == clusterType) {
-					// Check if there's a region already waiting for extension.  
-					// If not, create a new one (and a copy at that), and add to array
-					if (regionToExtend == null) {
-						regionToExtend = currentRegion.getCopy();
-						regionsInChromMerged.add(regionToExtend);  // add this to the new array
-						
-					} else {
-						if (currentRegion.mCopyNumberEventType != regionToExtend.mCopyNumberEventType) {
-							CompareUtils.throwErrorAndExit("ERROR: Must have same cluster type!\t" + currentRegion.mCopyNumberEventType + "\t" + regionToExtend.mCopyNumberEventType);
-						}
-						
-						int maxEndIndexInclusive = regionToExtend.getRangeEnd() + maxBasePairsContiguousRegion - 1;						
-						if (currentRegion.getRangeStart() <= maxEndIndexInclusive) {
-							regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
-							regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());
-						} else {
-							// The current region is out of bounds.  We simply set
-							// the current region as the new region to extend.
-							regionToExtend = currentRegion.getCopy();
-							regionsInChromMerged.add(regionToExtend);  // add this to the new array
-						}
-					}	
+					if (Clustering.isCopyNumDepleted(avgCopyNum)) {
+						currentRegion.mCopyNumberEventType = EventType.LOH;
+					} else if (Clustering.isCopyNumAmplified(avgCopyNum)) {
+						currentRegion.mCopyNumberEventType = EventType.GainSomatic;
+					} else if (Clustering.isCopyNumAmplified(avgCopyNum)) {
+						currentRegion.mCopyNumberEventType = EventType.cnLOH;						
+					}
+					
+					long compactUnit = oneSampleData.getIndicesForRegion(currentRegion);
+					int indexStart = Cast.toInt(CompactorIntoLong.TwoIntsIntoLong.Compactor.getValue(CompactorIntoLong.TwoIntsIntoLong.IntMSB, compactUnit));
+					int indexEnd   = Cast.toInt(CompactorIntoLong.TwoIntsIntoLong.Compactor.getValue(CompactorIntoLong.TwoIntsIntoLong.IntLSB, compactUnit));
+					
+					// First fill the region
+					Clustering.fillRegion(events, indexStart, indexEnd, false, currentRegion.mCopyNumberEventType, oneSampleData, metaData);
+					
+					// Now, if we had a cnLOH event, we test
+					if (currentRegion.mCopyNumberEventType == EventType.cnLOH) {
+						Clustering.fillRegionBasedOnVAFMaxLikelihood(currentRegion, oneSampleData, metaData, events, currentRegion.mCopyNumberEventType, probFromMaxLikelihood, true);
+					}
+					
 				}
-			}		
+			}
 		}
 		
-		return regionsInSampleMerged;
+		return regionsInSample;
 	}
 	
 	// ========================================================================
@@ -791,6 +797,18 @@ public class Regions {
 						boolean shouldCombine = Clustering.combineTwoRegions(regionToExtend, currentRegion, oneSampleData, metaData, true);					
 						System.out.printf("RegionsCombined: %b\t%s\t%d\t%d\t%d\t%d\t%d\n", shouldCombine, eventType.name(), regionToExtend.getChromosome().getCode(), regionToExtend.getRangeStart(), regionToExtend.getRangeEnd(), currentRegion.getRangeStart(), currentRegion.getRangeEnd());
 						
+						CopyNumberRegionRange midRegion = Clustering.getMiddleRegion(regionToExtend, currentRegion, oneSampleData, false);
+						if (midRegion != null) {
+							double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(midRegion, oneSampleData, metaData);	
+
+							switch(regionToExtend.mCopyNumberEventType) {
+							case LOH:         shouldCombine &= Clustering.isCopyNumDepleted(avgCopyNum); break;
+							case cnLOH:       shouldCombine &= Clustering.isCopyNumInDiploidRange(avgCopyNum); break;
+							case GainSomatic: shouldCombine &= Clustering.isCopyNumAmplified(avgCopyNum); break;
+							default: break;
+							}
+						}
+						
 						if (shouldCombine) {
 							regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
 							regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());
@@ -828,12 +846,15 @@ public class Regions {
 								default: break;
 							}
 							
-							if (shouldCombine) {
-								regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
-								regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());								
-							} else {
-								if (regionToExtend.mCopyNumberEventType == EventType.cnLOH) {
-									regionToExtend = null;
+							ControlFlagBool performExtendedSmoothing = new ControlFlagBool(true);							
+							if (performExtendedSmoothing.getValue()) {
+								if (shouldCombine) {
+									regionToExtend.setRangeEnd(currentRegion.getRangeEnd());	
+									regionToExtend.incrementSitesInterrogated(currentRegion.getNumSitesInterrogated());								
+								} else {
+									//if (regionToExtend.mCopyNumberEventType == EventType.cnLOH) {
+									//	regionToExtend = null;
+									//}
 								}
 							}
 						}

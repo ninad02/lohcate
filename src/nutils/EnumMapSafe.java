@@ -1,7 +1,5 @@
 package nutils;
 
-import genomeEnums.Nuc;
-
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Map;
@@ -70,22 +68,27 @@ public class EnumMapSafe<K extends Enum<K>, V> extends EnumMap<K, V> {
 	}
 
 	// ========================================================================
+	/** An inner static enum class for testing purposes. */
+	private static enum MyNuc {
+		A, B, C, D;
+	}
+	
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-		EnumMapSafe<Nuc, Integer> map = new EnumMapSafe<>(Nuc.class);
-		for (Nuc nuc : Nuc.values()) {
+		EnumMapSafe<MyNuc, Integer> map = new EnumMapSafe<>(MyNuc.class);
+		for (MyNuc nuc : MyNuc.values()) {
 			map.put(nuc, nuc.ordinal() * 2);
 		}
 		
-		for (Nuc nuc : Nuc.values()) {
+		for (MyNuc nuc : MyNuc.values()) {
 			System.out.println(map.get(nuc));
 		}
 
 		System.out.println(map.equals(map));
-		//EnumMapSafe<Nuc, Integer> map2 = map.clone();
+		//EnumMapSafe<MyNuc, Integer> map2 = map.clone();
 
 
 	}

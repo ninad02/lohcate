@@ -278,6 +278,18 @@ public class ArrayUtils {
 		}
 		return minIndex;
 	}
+	
+	public static int getIndexOfMinElement(int[] theArray, int indexToStartSearch) {
+		int minIndex = -1;
+		int minElement = Integer.MAX_VALUE; 
+		for (int i = indexToStartSearch; i < theArray.length; i++) {
+			if (theArray[i] < minElement) {
+				minElement = theArray[i];
+				minIndex = i;
+			}
+		}
+		return minIndex;
+	}
 
 	/** Given an array, this normalizes all the values in the array with the given normalizing constant. */
 	public static double[] normalizeArray(double[] theArray, double normalizingFactor) {

@@ -153,6 +153,8 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 					  .append("0")
 					  .append(delim)
 					  .append("0")
+					  .append(delim)
+					  .append("0")
 					  ;
 					IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 				}
@@ -171,7 +173,13 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 							}
 							
 							oneOverlapFound = true;
-							boolean eventsMatch = (cnrr.mCopyNumberEventType == cnrrOther.mCopyNumberEventType);
+							EventType et1 = cnrr.mCopyNumberEventType;
+							EventType et2 = cnrrOther.mCopyNumberEventType;
+							
+							boolean eventsMatch =
+									((et1 == EventType.LOH) && (et2 == EventType.LOH || et2 == EventType.DELHom))
+								 || (et1 == EventType.GainSomatic && et2 == EventType.GainSomatic); 
+									
 														
 							sb.setLength(0);
 							sb.append(patientName);
@@ -180,6 +188,8 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 							  .append("1")
 							  .append(delim)
 							  .append("0")
+							  .append(delim)
+							  .append("1")
 							  .append(delim)
 							  .append(eventsMatch ? "1" : "0");
 							addRegionInfoToStringBuilder(delim, cnrrOther, sb);
@@ -195,6 +205,8 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 						  .append("1")
 						  .append(delim)
 						  .append(hadGermline ? "1" : "0")
+						  .append(delim)
+						  .append("0")
 						  .append(delim)
 						  .append("0")
 						  ;

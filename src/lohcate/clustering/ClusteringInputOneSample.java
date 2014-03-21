@@ -1,11 +1,17 @@
 package lohcate.clustering;
 
+import genomeUtils.RegionRange;
 import genomeUtils.RegionSimulator;
 import genomeUtils.SiteList;
 
 import java.util.ArrayList;
 
+import com.google.common.primitives.Primitives;
+
+import nutils.CompareUtils;
+import nutils.PrimitiveWrapper;
 import nutils.RangeDouble;
+import nutils.BitUtils.Compactor.CompactorIntoLong;
 import lohcateEnums.SeqPlatform;
 
 /**
@@ -57,6 +63,20 @@ public class ClusteringInputOneSample extends SiteList<ClusteringInputOneSite> i
 			}			
 		}
 		return numHetSites;
+	}
+	
+	// ========================================================================
+	public long getIndicesForRegion(RegionRange range) {
+		int indexStart = getIndex(range.getChromosome(), range.getRangeStart()); 
+		CompareUtils.ensureTrue(indexStart >= 0, "ERROR: Starting index must be > 0");
+		
+		int indexEnd = getIndex(range.getChromosome(), range.getRangeEnd());		
+		CompareUtils.ensureTrue(indexEnd >= indexStart, "ERROR: Ending index must be >= starting index!");
+		
+		long compactUnit = 0;
+		compactUnit = CompactorIntoLong.TwoIntsIntoLong.Compactor.setValue(CompactorIntoLong.TwoIntsIntoLong.IntMSB, indexStart, compactUnit);
+		compactUnit = CompactorIntoLong.TwoIntsIntoLong.Compactor.setValue(CompactorIntoLong.TwoIntsIntoLong.IntLSB, indexEnd,   compactUnit);
+		return compactUnit;
 	}
 	
 	// ========================================================================

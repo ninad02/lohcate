@@ -54,6 +54,7 @@ public enum Chrom {
 
 	// ========================================================================
 	// MEMBER VARIABLE
+	protected String mName;
 	protected int mLength;
 	protected int mLengthArmP; 
 	protected long mGenomeWidePositionStart;
@@ -63,7 +64,11 @@ public enum Chrom {
 		mLength = length;
 		mLengthArmP = lengthPArm;
 		mGenomeWidePositionStart = -1;
+		mName = name().substring(1);
 	}
+
+	// ========================================================================
+	public String getName() { return mName; }
 	
 	// ========================================================================
 	public byte getCode() { return (byte) ordinal(); }

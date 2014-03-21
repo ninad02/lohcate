@@ -64,6 +64,8 @@ public class ClusteringPlotting {
 	public static final double GenomeWidePositionDivisor = 1_000_000; 
 	private static final String GenomeWideXAxisLabel = "Genomic Position (MB)";
 	
+	private static final int CopyNumberVAFPlotPointSize = 4;
+	
 	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of the normal tissue comapred to the tumor tissue. */
 	public static void plotVAFComparison(XYDataset xyDataset, String outFilenameRoot, String sampleName) {
@@ -75,7 +77,7 @@ public class ClusteringPlotting {
 				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, true, false, false);
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
 		
-		XYItemRenderer itemRenderer = getXYItemRendererHelper(5);		
+		XYItemRenderer itemRenderer = getXYItemRendererHelper(CopyNumberVAFPlotPointSize);		
 		setSeriesPaintPerCluster(itemRenderer);
 		xyPlot.setRenderer(itemRenderer);		
 		
@@ -271,7 +273,7 @@ public class ClusteringPlotting {
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
 		//theChart.addSubtitle(getChromSubtitle());
 		
-		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(5);		
+		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(CopyNumberVAFPlotPointSize);		
 		setSeriesPaintPerCluster(itemRenderer);
 		xyPlot.setRenderer(itemRenderer);		
 		xyPlot.addRangeMarker(new ValueMarker(2.0));
@@ -280,7 +282,7 @@ public class ClusteringPlotting {
 		xyPlot.setDomainGridlinePaint(Color.white);
 		xyPlot.setRangeGridlinePaint(Color.white);		
 		
-		double maxCopyNumber = getMaxY(xyDataset);
+		double maxCopyNumber = Math.max(4, getMaxY(xyDataset));
 		formatXYPlotBackground(xyPlot, maxCopyNumber, false, 0, 0.10);
 		
 		formatLegendItems(xyPlot);
@@ -431,7 +433,7 @@ public class ClusteringPlotting {
 		theChart.getTitle().setMargin(0, 0, 10, 0);
 		theChart.getTitle().setFont(new Font("Arial", Font.BOLD, 32));
 		
-		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(5);		
+		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(CopyNumberVAFPlotPointSize);		
 		setSeriesPaintPerCluster(itemRenderer);
 		xyPlot.setRenderer(itemRenderer);		
 		

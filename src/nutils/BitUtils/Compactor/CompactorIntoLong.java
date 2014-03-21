@@ -25,6 +25,22 @@ public class CompactorIntoLong<E extends Enum<E> & CompactorInf<E>> extends Comp
 	}
 	
 	// ========================================================================
+	public static enum TwoIntsIntoLong implements CompactorInf<TwoIntsIntoLong> {
+		IntMSB(32),
+		IntLSB(32);
+
+		public static CompactorIntoLong<TwoIntsIntoLong> Compactor = new CompactorIntoLong<>(TwoIntsIntoLong.class, true);
+		
+		private int mNumBits;
+		private TwoIntsIntoLong(int numBits) {
+			mNumBits = numBits;
+		}
+		
+		@Override
+		public int getNumBits() { return mNumBits; }		
+	}
+	
+	// ========================================================================
 	/**
 	 * @param args
 	 */

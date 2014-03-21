@@ -24,11 +24,11 @@ public class ClusteringParams {
 	// ====================================================================
 	
 	protected InputParameterDouble mAmplificationThreshold   = new InputParameterDouble(2.2,  "AmplificationThreshold",   JSAP.NO_SHORTFLAG, "ampThresh", "Copy_Number_Threshold_for_Amplification");
-	protected InputParameterDouble mDeletionThreshold        = new InputParameterDouble(1.8,  "DeletionThreshold",        JSAP.NO_SHORTFLAG, "delThresh", "Copy_Number_Threshold_for_Deletion");
+	protected InputParameterDouble mDeletionThreshold        = new InputParameterDouble(1.85,  "DeletionThreshold",        JSAP.NO_SHORTFLAG, "delThresh", "Copy_Number_Threshold_for_Deletion");
 	protected InputParameterDouble mGermlineTrisomyThreshold = new InputParameterDouble(1.4, "GermlineTrisomyThreshold", JSAP.NO_SHORTFLAG, "germlineAneuploidyGainThreshold", "Copy_Number_Threshold_for_Germline_Chromosomal_Gain");
 	protected InputParameterDouble mFDRAlpha                 = new InputParameterDouble(0.01, "mFDRAlpha",                JSAP.NO_SHORTFLAG, "FDR_Alpha", "FDR_Alpha_Value_for_Allelic_Fraction_Imbalance");
 	protected InputParameterInteger mAllelicBiasMinNumSamples = new InputParameterInteger(2, "AllelicBiasMinNumSamples", JSAP.NO_SHORTFLAG, "allelicBiasNumSites", "Minimum_Number_of_Samples_at_Site_for_Allelic_Bias_Correction");
-	protected InputParameterInteger mNumReadsMinNormal        = new InputParameterInteger(50, "NumReadsMinForNormal", JSAP.NO_SHORTFLAG, "numReadsMinNormal", "Minimum_Number_of_Reads_in_Matched_Normal_to_Include_Site");
+	protected InputParameterInteger mNumReadsMinNormal        = new InputParameterInteger(15, "NumReadsMinForNormal", JSAP.NO_SHORTFLAG, "numReadsMinNormal", "Minimum_Number_of_Reads_in_Matched_Normal_to_Include_Site");
 
 	protected InputParameterBoolean mIgnoreAllelicBias     = new InputParameterBoolean(false, "IgnoreAllelicBias",     JSAP.NO_SHORTFLAG, "ignoreAllelicBias", "Specifies whether allelic bias is to be ignored and not corrected");
 	protected InputParameterBoolean mIgnoreMultipleTesting = new InputParameterBoolean(false, "IgnoreMultipleTesting", JSAP.NO_SHORTFLAG, "ignoreMultipleTesting", "Specifies whether multiple testing correction is not to be done");
