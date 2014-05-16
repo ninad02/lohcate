@@ -119,7 +119,8 @@ public class Clustering {
 	
 	public static final String GISTIC_Input_HeaderString = "SampleID\tchrom\tposStart\tposEnd\tnumMarkers\tSegmentMean";
 	
-	public static final String SitesClassifiedOutputSuffix = ".withCopyNum"; //".sitesClassified.lohcate";
+	//public static final String SitesClassifiedOutputSuffix = ".withCopyNum"; //".sitesClassified.lohcate";
+	public static final String SitesClassifiedOutputSuffix = ".sitesClassified.lohcate";
 	
 	public static boolean correctAllelicBias() { return !ClusteringParams.GlobalClusteringParams.mIgnoreAllelicBias.getValue(); }	
 	public static double[] sigPValues = BinomialTestPermutationValues.initialize(new double[65000], -1);
@@ -448,10 +449,12 @@ public class Clustering {
 		// Create counters for all events
 		EnumMapSafe<EventType, EnumMapSafe<Chrom, DynamicBucketCounter>> eventCounts = new EnumMapSafe<>(EventType.class);
 		EnumMapSafe<EventType, ParallelArrayDoubleDynamic> eventCoordinates = new EnumMapSafe<>(EventType.class);
+		EnumMapSafe<EventType, ParallelArrayDoubleDynamic> copyNumAllCases = new EnumMapSafe<>(EventType.class);
 		
 		for (EventType event : EventType.values()) {			
 			eventCounts.put(event, DynamicBucketCounter.ClassFactory.newEnumMap(Chrom.class));
 			eventCoordinates.put(event, new ParallelArrayDoubleDynamic(10000));
+			copyNumAllCases.put(event, new ParallelArrayDoubleDynamic(10000));
 		}		
 		
 		EnumMapSafe<EventType, ContingencyTable> eventTablesTotal = ContingencyTable.ClassFactory.newEnumMap(EventType.class);
@@ -471,9 +474,9 @@ public class Clustering {
 			String sampleNameRoot = filename.substring(0, file.getName().indexOf(LOHcate.SuffixInputFile));  	
 			String extension = filename.substring(filename.lastIndexOf(StringUtils.DotStr), filename.length());
 			System.out.println("Processing (" + ++fileIndex + " / " + validFiles.size() + "): " + file.getName());				
-			classifySitesOneSample(file, sampleNameRoot, extension, fileIndex, allelicBiasTable, allSitesMap, eventCounts, eventCoordinates, eventTablesTotal, countBreakdownPerEventTotal, simulatorParams, simOutputStream, maxPosOnChrom, lohcateDirs, platform, outGISTIC);
+			classifySitesOneSample(file, sampleNameRoot, extension, fileIndex, allelicBiasTable, allSitesMap, eventCounts, eventCoordinates, copyNumAllCases, eventTablesTotal, countBreakdownPerEventTotal, simulatorParams, simOutputStream, maxPosOnChrom, lohcateDirs, platform, outGISTIC);
 		}
-				
+		
 		// Write out the stats
 		printContingencyTableInfo("SIMALL", simOutputStream, 0, eventTablesTotal, countBreakdownPerEventTotal);
 
@@ -488,6 +491,9 @@ public class Clustering {
 		ClusteringPlotting.plotRecurrenceGenomeWide(eventCounts, lohcateDirs.getSubDirPath(SubdirsDefault.Plots_Recurrence));
 		ClusteringPlotting.plotEventsByCoordinateAcrossSamples(eventCoordinates, maxPosOnChrom, validFiles.size(), lohcateDirs.getSubDirPath(SubdirsDefault.Plots_Recurrence));
 		
+		DefaultXYDataset xyDatasetCopyNumber = classifySitesHelper_createAndFillXYData(copyNumAllCases);
+		String outFilenameCopyNumber = lohcateDirs.getSubDirPath(SubdirsDefault.Plots_CopyNumber) + File.separator + "All Cases.CopyNumber_GenomeWide";
+		ClusteringPlotting.plotCopyNumGenomeWide(xyDatasetCopyNumber, outFilenameCopyNumber, "LCH Patients ARAF+, BRAF+, or MAP2K1+.");
 	
 		// Now do the GISTIC processing
 		String jisticCovertSEGOutputFilename = lohcateDirs.getSubDirPath(SubdirsDefault.Regions_GISTIC) + File.separator + "Regions.Matrix.JISTIC.txt";
@@ -566,7 +572,10 @@ public class Clustering {
 				double probCenter = NumberUtils.getCumProbInterval(freqDist, (int) Math.round(0.5 * multiplierFreq), leeway);
 				boolean denserPeaks = (probMean0 > probCenter) && (probMean1 > probCenter);
 				System.out.printf("\tFREQ: %d\t%d\t%g\t%g\t%g\n", mean0, mean1, probMean0, probMean1, probCenter);
+				
+				double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(region, oneSampleData, metaData);
 				if (targetEventType == EventType.cnLOH /*|| targetEventType == EventType.LOH*/) {
+				//if (avgCopyNum < 3) {
 					noDenserPeaks = !denserPeaks;
 				}
 				
@@ -633,6 +642,11 @@ public class Clustering {
 
 	// ========================================================================
 	public static double calcAverageCopyNumberOverRegion(RegionRange regionByCoordinates, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
+		return calcAverageCopyNumberOverRegion(regionByCoordinates, oneSampleData, metaData, false);		
+	}
+	
+	// ========================================================================
+	public static double calcAverageCopyNumberOverRegion(RegionRange regionByCoordinates, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData, boolean applyAvgCopyNum) {
 		int indexRegionStart = oneSampleData.getIndex(regionByCoordinates.getChromosome(), regionByCoordinates.getRangeStart()); 
 		CompareUtils.ensureTrue(indexRegionStart >= 0, "ERROR: Starting index must be > 0");
 		int indexRegionEnd   = oneSampleData.getIndex(regionByCoordinates.getChromosome(), regionByCoordinates.getRangeEnd());
@@ -642,7 +656,15 @@ public class Clustering {
 		for (int row = indexRegionStart; row <= indexRegionEnd; row++) {
 			copyNumTotal += metaData.getCopyNumberAtIndex(row);
 		}
-		return (copyNumTotal / (indexRegionEnd - indexRegionStart + 1)); 
+		double avgCopyNum = (copyNumTotal / (indexRegionEnd - indexRegionStart + 1));
+		
+		if (applyAvgCopyNum) {
+			for (int row = indexRegionStart; row <= indexRegionEnd; row++) {
+				metaData.setCopyNumberAtIndex(row, avgCopyNum);
+			}
+		}
+		
+		return avgCopyNum;
 	}
 
 	// ========================================================================
@@ -776,6 +798,7 @@ public class Clustering {
 			SNVMap allSitesMap,
 			EnumMapSafe<EventType, EnumMapSafe<Chrom, DynamicBucketCounter>> eventCountsByCoordinate, 
 			EnumMapSafe<EventType, ParallelArrayDoubleDynamic> eventsByCoordinate,
+			EnumMapSafe<EventType, ParallelArrayDoubleDynamic> copyNumAllCases, 
 			EnumMapSafe<EventType, ContingencyTable> eventTablesTotal,
 			BucketCounterEnumMatrix<EventType> countBreakdownPerEventTotal,
 			LOHcateSimulatorParams simulatorParams, PrintStream simOutputStream,
@@ -890,7 +913,15 @@ public class Clustering {
 				// Now, we segment the sample again since now all the sites have been 
 				// processed, and any unassigned sites between CNA regions have been filled in
 				CopyNumberRegionsByChromosome regionsByChromPostFill = Regions.segmentRegionsOneSample(oneSampleData, events, null, null);
-				Regions.ActionerGISTIC actionerGistic = new Regions.ActionerGISTIC(outGISTIC, regionsByChromPostFill, events, oneSampleData, metaData, allSitesMap);				
+				Regions.ActionerGISTIC actionerGistic = new Regions.ActionerGISTIC(outGISTIC, regionsByChromPostFill, events, oneSampleData, metaData, allSitesMap);
+				
+				// Smooth out the copy numbers even further
+				for (Chrom chrom : Chrom.values()) {
+					ArrayList<CopyNumberRegionRange> regions = regionsByChromPostFill.getRegions(chrom);
+					for (CopyNumberRegionRange region : regions) {
+						Clustering.calcAverageCopyNumberOverRegion(region, oneSampleData, metaData, true);						
+					}
+				}
 			}
 			
 			// Now initialize the data structure needed to plot
@@ -940,7 +971,9 @@ public class Clustering {
 				clusterCoordinates .get(eventType).add( metaData.mAdjustedVAFTumor[row],         metaData.mAdjustedVAFNormal[row] );
 				waterfallPlotTumor .get(eventType).add( chromPosTracker.getPositionGenomeWide() / divisor, metaData.mAdjustedVAFTumor[row]);
 				waterfallPlotNormal.get(eventType).add( chromPosTracker.getPositionGenomeWide() / divisor, metaData.mAdjustedVAFNormal[row]);
-				copyNumPlot        .get(eventType).add( chromPosTracker.getPositionGenomeWide() / divisor, metaData.getCopyNumberAtIndex(row)); 						
+				copyNumPlot        .get(eventType).add( chromPosTracker.getPositionGenomeWide() / divisor, metaData.getCopyNumberAtIndex(row));
+				
+				copyNumAllCases.get(eventType).add(chromPosTracker.getPositionGenomeWide() / divisor, metaData.getCopyNumberAtIndex(row));
 			}									
 
 			// Now let's create the datasets needed to			
@@ -1000,13 +1033,30 @@ public class Clustering {
 	// ========================================================================
 	// ========================================================================
 	private static DefaultXYDataset classifySitesHelper_createAndFillXYData(
+			EnumMapSafe<EventType, ParallelArrayDoubleDynamic> coordinatesByEvent) {
+		
+		DefaultXYDataset xyDataset = new DefaultXYDataset();
+		
+		for (EventType eventType : EventType.values()) {
+			xyDataset.addSeries(eventType.name(), coordinatesByEvent.get(eventType).toArrays());			
+		}
+		
+		return xyDataset;
+	}
+
+	
+	// ========================================================================
+	private static DefaultXYDataset classifySitesHelper_createAndFillXYData(
 			EnumMapSafe<EventType, ParallelArrayDouble> coordinatesByEvent, 
 			double[][] boundaryArrays) {
 		
 		DefaultXYDataset xyDataset = new DefaultXYDataset();
 		
 		for (EventType eventType : EventType.values()) {
-			xyDataset.addSeries(eventType.name(), coordinatesByEvent.get(eventType).mArray);			
+			ParallelArrayDouble pad = coordinatesByEvent.get(eventType);
+			if (pad.size() >= 0) {
+				xyDataset.addSeries(eventType.name(), pad.toArrays());
+			}
 		}
 		
 		if (boundaryArrays != null) {
@@ -1141,11 +1191,16 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	private static void smoothCopyNumbersHelper_applyCopyNumberToSites(double copyNumber, ArrayList<CopyNumberRegionRange> setOfRegions, ClusteringInputOneSampleMetaData metaData) {
-		for (CopyNumberRegionRange cnrr : setOfRegions) {
-			for (int index = cnrr.getRangeStart(); index <= cnrr.getRangeEnd(); index++) {
-				metaData.mTumorCopyNumRatiosPerGene[index] = (float) copyNumber / GenomeConstants.DefaultDiploidCopyNumber;
-			}
+	private static<E extends RegionRange> void applyCopyNumberToSitesInRegion(double copyNumber, E targetRegion, ClusteringInputOneSampleMetaData metaData) {
+		for (int index = targetRegion.getRangeStart(); index <= targetRegion.getRangeEnd(); index++) {
+			metaData.mTumorCopyNumRatiosPerGene[index] = (float) copyNumber / GenomeConstants.DefaultDiploidCopyNumber;
+		}
+	}
+	
+	// ========================================================================
+	private static<E extends RegionRange> void smoothCopyNumbersHelper_applyCopyNumberToSites(double copyNumber, ArrayList<E> setOfRegions, ClusteringInputOneSampleMetaData metaData) {
+		for (E cnrr : setOfRegions) {
+			applyCopyNumberToSitesInRegion(copyNumber, cnrr, metaData);
 		}
 	}
 	

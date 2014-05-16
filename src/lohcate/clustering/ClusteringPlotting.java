@@ -64,7 +64,7 @@ public class ClusteringPlotting {
 	public static final double GenomeWidePositionDivisor = 1_000_000; 
 	private static final String GenomeWideXAxisLabel = "Genomic Position (MB)";
 	
-	private static final int CopyNumberVAFPlotPointSize = 4;
+	private static final int CopyNumberVAFPlotPointSize = 5;
 	
 	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of the normal tissue comapred to the tumor tissue. */
@@ -266,12 +266,13 @@ public class ClusteringPlotting {
 	public static void plotCopyNumGenomeWide(XYDataset xyDataset, String outFilenameRoot, String sampleName) {
 		String xAxisLabel = GenomeWideXAxisLabel;
 		String yAxisLabel = "Total Copy Number [Tumor]";
-		String title = "Total Copy Number [Tumor]: " + sampleName;				
+		String title = sampleName.substring(0, sampleName.indexOf(".")); //"Total Copy Number [Tumor]: " + sampleName;				
 				
 		JFreeChart theChart = 
 				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, true, false, false);
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
 		//theChart.addSubtitle(getChromSubtitle());
+		theChart.getTitle().setFont(new Font("Arial", Font.BOLD, 32));
 		
 		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(CopyNumberVAFPlotPointSize);		
 		setSeriesPaintPerCluster(itemRenderer);
@@ -403,6 +404,15 @@ public class ClusteringPlotting {
 			chromNumber.setFont(new Font("Arial", Font.BOLD, 24));
 			xyPlot.addAnnotation(chromNumber);
 		}
+		
+		XYTextAnnotation annotGeneBRAF = new XYTextAnnotation("|BRAF", Chrom.c7.getGenomeWidePositionStart() / GenomeWidePositionDivisor + 140, 1);
+		annotGeneBRAF.setFont(new Font("Arial", Font.BOLD, 16));
+		annotGeneBRAF.setTextAnchor(org.jfree.ui.TextAnchor.CENTER_LEFT);
+		xyPlot.addAnnotation(annotGeneBRAF);
+		XYTextAnnotation annotGeneMAP2K1 = new XYTextAnnotation("|MAP2K1", Chrom.c15.getGenomeWidePositionStart() / GenomeWidePositionDivisor + 67, 1);
+		annotGeneMAP2K1.setFont(new Font("Arial", Font.BOLD, 16));
+		annotGeneMAP2K1.setTextAnchor(org.jfree.ui.TextAnchor.CENTER_LEFT);
+		xyPlot.addAnnotation(annotGeneMAP2K1);		
 	}
 
 	// ========================================================================
@@ -513,7 +523,7 @@ public class ClusteringPlotting {
 		case GainGermline: return ColorPastel.Violet;
 		case GainSomatic:  return ColorPastel.Dark_Red;
 		case LOH:          return ColorPastel.RGB_Blue;
-		case cnLOH:        return ColorPastel.Dark_Yellow;
+		case cnLOH:        return ColorPastel.Gray_60; //Dark_Yellow;
 		case HETGermline:  return ColorPastel.Gray_60;
 		case HETSomatic:   return ColorPastel.Red_Orange;
 		case DELHom:       return ColorPastel.Light_Cyan_Blue;

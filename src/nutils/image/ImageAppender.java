@@ -162,12 +162,34 @@ public class ImageAppender {
 	// ========================================================================
 	public static void main(String[] args) {
 		//ImageAppender.appendImages(args);
-		String[] inFilenames = new String[] {
-				IOUtils.pathConcat(new String[] { "E:", "Research", "Data", "tcga-acc", "plots", "copyNumber",     "TCGA-OR-A5J2-01A-11D-A29I-10.01A-vs-10A.CopyNumber_GenomeWide.png"}),
-				IOUtils.pathConcat(new String[] { "E:", "Research", "Data", "tcga-acc", "plots", "VAF_Genomewide", "TCGA-OR-A5J2-01A-11D-A29I-10.01A-vs-10A.VAF_GenomeWide_Normal.png"}),
-				IOUtils.pathConcat(new String[] { "E:", "Research", "Data", "tcga-acc", "plots", "VAF_Genomewide", "TCGA-OR-A5J2-01A-11D-A29I-10.01A-vs-10A.VAF_GenomeWide_Tumor.png"}),
+		String project = "target-aml.hq";
+		String[] samples = new String[] { 
+				"PAEEYP",
+				"PAKKBK",
+				"PAMYAS",
+				"PANLIZ",
+				"PANSBH",
+				"PANVGP",
+				"PARGVC",
+				"PARGVC",
+				"PARIEG",
+				"PARUCB",
+				"PARUNX",
+				"PARVUA",
+				"PARWXU",
+				"PASFEW",
+				"PATABB"
 		};
-		String outFilename = IOUtils.pathConcat(new String[] { "E:", "Research", "Data", "tcga-acc", "plots", "VAF_Genomewide", "TCGA-OR-A5J2-01A-11D-A29I-10.01A-vs-10A.VAF_GenomeWide_Tumor.CONCAT.png"});
-		ImageAppender.appendImages(3, 1, true, outFilename, inFilenames);
+		
+		for (String sample : samples) {
+		String[] inFilenames = new String[] {
+				IOUtils.pathConcat(new String[] { "E:", "Research", "Data", project, "plots", "copyNumber",     "TARGET-20-" + sample + "-03A-01D.03-vs-1.CopyNumber_GenomeWide.png"}),
+				IOUtils.pathConcat(new String[] { "E:", "Research", "Data", project, "plots", "VAF_Genomewide", "TARGET-20-" + sample + "-03A-01D.03-vs-1.VAF_GenomeWide_Tumor.png"}),
+				IOUtils.pathConcat(new String[] { "E:", "Research", "Data", project, "plots", "copyNumber",     "TARGET-20-" + sample + "-04A-01D.04-vs-1.CopyNumber_GenomeWide.png"}),
+				IOUtils.pathConcat(new String[] { "E:", "Research", "Data", project, "plots", "VAF_Genomewide", "TARGET-20-" + sample + "-04A-01D.04-vs-1.VAF_GenomeWide_Tumor.png"}),
+		};
+		String outFilename = IOUtils.pathConcat(new String[] { "E:", "Research", "Data", project, "plots", "VAF_Genomewide", "TARGET-20-" + sample + "-04A-01D.04-vs-1.VAF_GenomeWide_Tumor.CONCAT.png"});
+		ImageAppender.appendImages(4, 1, true, outFilename, inFilenames);
+		}
 	}
 }

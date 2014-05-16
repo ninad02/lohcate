@@ -177,7 +177,7 @@ public class GeneEnrichment {
 				if (numEvents > 1) {
 					sb.setLength(0);
 					sb.append(patientName);
-					appendGeneCoordinates(gene, sb);
+					appendGeneCoordinates(gene, sb, true);
 					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(numEvents);
 					for (EventType event : events) {
 						sb.append(StringUtils.FileExtensionTSV.mDelimiter)
@@ -384,8 +384,8 @@ public class GeneEnrichment {
 	}
 
 	// ========================================================================
-	private static StringBuilder appendGeneCoordinates(GeneCounter gene, StringBuilder sb) {
-		sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(gene.getChrom().ordinal())
+	private static StringBuilder appendGeneCoordinates(GeneCounter gene, StringBuilder sb, boolean insertInitialTab) {
+		sb.append(insertInitialTab ? StringUtils.FileExtensionTSV.mDelimiter : "").append(gene.getChrom().ordinal())
 		  .append(StringUtils.FileExtensionTSV.mDelimiter).append(gene.getChrom().getArm(gene.mMaxBasePairPosition).name())							  
 		  .append(StringUtils.FileExtensionTSV.mDelimiter).append(gene.mMinBasePairPosition)
 		  .append(StringUtils.FileExtensionTSV.mDelimiter).append(gene.mMaxBasePairPosition)
@@ -408,7 +408,7 @@ public class GeneEnrichment {
 				ArrayList<String> patientsForEvent = gene.getPatientsForEventType(eventType);
 				for (String patientForEvent : patientsForEvent) {					
 					sb.setLength(0);
-					appendGeneCoordinates(gene, sb);
+					appendGeneCoordinates(gene, sb, false);
 					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(eventType.name());
 					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(patientForEvent);
 					IOUtils.writeToBufferedWriter(outBreakdown, sb.toString(), true);
@@ -419,7 +419,7 @@ public class GeneEnrichment {
 				ArrayList<String> patientsForEvent = gene.getPatientsForAlleleEventType(eta);
 				for (String patientForEvent : patientsForEvent) {
 					sb.setLength(0);
-					appendGeneCoordinates(gene, sb);
+					appendGeneCoordinates(gene, sb, false);
 					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(eta.name());					
 					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(patientForEvent);
 					IOUtils.writeToBufferedWriter(outBreakdown, sb.toString(), true);

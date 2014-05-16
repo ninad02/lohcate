@@ -79,6 +79,11 @@ public class DynamicBucketCounter {
 	}
 	
 	// ========================================================================
+	private float calcProportionAtIndex(int indexOfKey) {
+		return (float) getCountAtIndex(indexOfKey) / (float) mSumOfCounts;
+	}
+	
+	// ========================================================================
 	public boolean getKeyLast(PrimitiveWrapper.WInteger key) {
 		if (mArray.isEmpty()) return false;
 		key.mInt = (int) ValueExtractor.IntExtractorMSB.extractValue(mArray.get(mArray.size() - 1));
@@ -134,14 +139,23 @@ public class DynamicBucketCounter {
 	}
 
 	// ========================================================================
+	public void getKeys(IntArrayList keysBuffer) {
+		keysBuffer.clear();
+		int numKeys = getNumKeys();
+		keysBuffer.ensureCapacity(numKeys);
+		for (int i = 0; i < numKeys; i++) {
+			keysBuffer.add(getKeyAtIndex(i));
+		}
+	}
+	
+	// ========================================================================
 	public void getProportions(FloatArrayList proportionsBuffer) {
 		proportionsBuffer.clear();
 		
 		int numKeys = getNumKeys();
 		proportionsBuffer.ensureCapacity(numKeys);
-		for (int i = 0; i < numKeys; i++) {
-			float fraction = (float) getCountAtIndex(i) / (float) mSumOfCounts;
-			proportionsBuffer.add(fraction);
+		for (int i = 0; i < numKeys; i++) {			
+			proportionsBuffer.add(calcProportionAtIndex(i));
 		}
 	}
 	

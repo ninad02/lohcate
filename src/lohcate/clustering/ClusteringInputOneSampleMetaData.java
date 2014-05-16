@@ -10,6 +10,7 @@ import java.util.Arrays;
 import lohcate.CopyNumberRegionRange;
 import lohcate.CopyNumberRegionsByChromosome;
 import lohcate.Regions;
+import nutils.Cast;
 import nutils.PrimitiveWrapper;
 import nutils.RangeDouble;
 import nutils.counter.DynamicBucketCounter;
@@ -83,6 +84,10 @@ public class ClusteringInputOneSampleMetaData {
 	
 	public float getCopyNumberAtIndex(int row) {
 		return mTumorCopyNumRatiosPerGene[row] * Regions.DefaultDiploidCopyNumber;
+	}
+	
+	public void setCopyNumberAtIndex(int row, double copyNum) {
+		mTumorCopyNumRatiosPerGene[row] = Cast.toFloat(copyNum / Regions.DefaultDiploidCopyNumber);
 	}
 	
 	public void printSiteInformation(PrintWriter out, int row, boolean printNewLine) {

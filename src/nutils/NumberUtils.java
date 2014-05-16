@@ -1,8 +1,11 @@
 package nutils;
 
+import genomeEnums.Nuc;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.Random;
 
 import org.apache.commons.math3.distribution.BinomialDistribution;
@@ -418,6 +421,36 @@ public class NumberUtils {
 	public static boolean isEven(long num) { return ((num & 0x01L) == 0); }
 	
 	// ========================================================================
+	public static <E extends Enum<E>> ArrayList<EnumSet<E>> powerSetEnum(Class<E> enumClass, boolean allowEmptySet) {
+		EnumSet<E> emptySet = EnumSet.noneOf(enumClass);
+		E[] enumConstants = enumClass.getEnumConstants();		
+		int maxValue = ((int) Math.round(Math.pow(2, enumConstants.length))) - 1;
+		
+		// Set the bits for each enum		
+		int[] bitRepresentationEnumOrdinal = new int[enumConstants.length];		
+		for (int i = 0; i < enumConstants.length; i++) {
+			bitRepresentationEnumOrdinal[i] = (1 << enumConstants[i].ordinal());			
+		}
+
+		// The return value
+		ArrayList<EnumSet<E>> allSets = new ArrayList<>(maxValue);
+		for (int value = 0; value <= maxValue; value++) {
+			EnumSet<E> tempSet = EnumSet.copyOf(emptySet);
+			for (int i = 0; i < bitRepresentationEnumOrdinal.length; i++) {
+				if ((value & bitRepresentationEnumOrdinal[i]) == bitRepresentationEnumOrdinal[i]) {
+					tempSet.add(enumConstants[i]);
+				}
+			}
+			
+			if (allowEmptySet || !tempSet.isEmpty()) {
+				allSets.add(tempSet);
+			}
+		}
+		
+		return allSets;		
+	}
+	
+	// ========================================================================
 	/** This function adds two log-base-10 numbers, with the added boolean condition.  
 	 *  The boolean parameter, if true, makes the function just return the first 
 	 *  number.  If false, the function actually returns the sum of both numbers
@@ -460,7 +493,13 @@ public class NumberUtils {
 		}
 		System.out.println("");
 	}
+	
+	
 
+	// ========================================================================
+	private static enum TestEnum { A, B, C, D };
+	
+	
 	// ========================================================================
 	/**
 	 * @param args
@@ -470,6 +509,10 @@ public class NumberUtils {
 		//TestAddLog10Numbers();
 		//TestDoubleListFromString();
 		//TestIntListFromString();;
+		
+		powerSetEnum(TestEnum.class, false);
+		
+		/*
 		String dd = "2,3,4,5";
 		System.out.println(ArrayUtils.stripBraces(dd));
 		
@@ -482,6 +525,7 @@ public class NumberUtils {
 		for (int i = 0; i < 10000; i++) {
 		//	System.out.println(getRandomInteger(0, 1));
 		}
+		*/
 	}
 	
 }

@@ -27,10 +27,15 @@ import nutils.Logger;
  */
 public class LOHcate {
 	
-	public static final boolean RunOld = false;
+	public static enum Sensitivity {
+		Low, High;
+	}
+	
+	public static final boolean RunOld = true;
 	public static final String SuffixInputFile = RunOld ? ".germline.txt" :  
 		// ".txt";  
 		".lohcateInput_txt";	
+	public static final Sensitivity LOHcateSensitivity = Sensitivity.High;
 	
 	// Logging module
 	public static final Logger LogOutput = IOUtils.getLogger("LOHcate.Log." + ((new Date()).toString()).replace(' ', '_').replace(':', '-') + ".txt");

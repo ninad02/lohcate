@@ -802,9 +802,9 @@ public class Regions {
 							double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(midRegion, oneSampleData, metaData);	
 
 							switch(regionToExtend.mCopyNumberEventType) {
-							case LOH:         shouldCombine &= Clustering.isCopyNumDepleted(avgCopyNum); break;
+							case LOH:         shouldCombine = Clustering.isCopyNumDepleted(avgCopyNum); break;
 							case cnLOH:       shouldCombine &= Clustering.isCopyNumInDiploidRange(avgCopyNum); break;
-							case GainSomatic: shouldCombine &= Clustering.isCopyNumAmplified(avgCopyNum); break;
+							case GainSomatic: shouldCombine = Clustering.isCopyNumAmplified(avgCopyNum); break;
 							default: break;
 							}
 						}
@@ -840,9 +840,9 @@ public class Regions {
 							double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(currentRegion, oneSampleData, metaData);							
 							
 							switch(regionToExtend.mCopyNumberEventType) {
-								case LOH:         shouldCombine &= Clustering.isCopyNumDepleted(avgCopyNum); break;
+								case LOH:         shouldCombine = Clustering.isCopyNumDepleted(avgCopyNum); break;
 								case cnLOH:       shouldCombine &= Clustering.isCopyNumInDiploidRange(avgCopyNum); break;
-								case GainSomatic: shouldCombine &= Clustering.isCopyNumAmplified(avgCopyNum); break;
+								case GainSomatic: shouldCombine = Clustering.isCopyNumAmplified(avgCopyNum); break;
 								default: break;
 							}
 							

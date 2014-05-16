@@ -23,8 +23,10 @@ public class ClusteringParams {
 	// MEMBER VARIABLES
 	// ====================================================================
 	
-	protected InputParameterDouble mAmplificationThreshold   = new InputParameterDouble(2.2,  "AmplificationThreshold",   JSAP.NO_SHORTFLAG, "ampThresh", "Copy_Number_Threshold_for_Amplification");
-	protected InputParameterDouble mDeletionThreshold        = new InputParameterDouble(1.85,  "DeletionThreshold",        JSAP.NO_SHORTFLAG, "delThresh", "Copy_Number_Threshold_for_Deletion");
+	//protected InputParameterDouble mAmplificationThreshold   = new InputParameterDouble(2.2 /*2.5*/,  "AmplificationThreshold",   JSAP.NO_SHORTFLAG, "ampThresh", "Copy_Number_Threshold_for_Amplification");
+	//protected InputParameterDouble mDeletionThreshold        = new InputParameterDouble(1.85 /*1.5*/,  "DeletionThreshold",        JSAP.NO_SHORTFLAG, "delThresh", "Copy_Number_Threshold_for_Deletion");
+	protected InputParameterDouble mAmplificationThreshold   = new InputParameterDouble(2.5,  "AmplificationThreshold",   JSAP.NO_SHORTFLAG, "ampThresh", "Copy_Number_Threshold_for_Amplification");
+	protected InputParameterDouble mDeletionThreshold        = new InputParameterDouble(1.5,  "DeletionThreshold",        JSAP.NO_SHORTFLAG, "delThresh", "Copy_Number_Threshold_for_Deletion");
 	protected InputParameterDouble mGermlineTrisomyThreshold = new InputParameterDouble(1.4, "GermlineTrisomyThreshold", JSAP.NO_SHORTFLAG, "germlineAneuploidyGainThreshold", "Copy_Number_Threshold_for_Germline_Chromosomal_Gain");
 	protected InputParameterDouble mFDRAlpha                 = new InputParameterDouble(0.01, "mFDRAlpha",                JSAP.NO_SHORTFLAG, "FDR_Alpha", "FDR_Alpha_Value_for_Allelic_Fraction_Imbalance");
 	protected InputParameterInteger mAllelicBiasMinNumSamples = new InputParameterInteger(2, "AllelicBiasMinNumSamples", JSAP.NO_SHORTFLAG, "allelicBiasNumSites", "Minimum_Number_of_Samples_at_Site_for_Allelic_Bias_Correction");

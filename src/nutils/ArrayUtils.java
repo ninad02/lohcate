@@ -412,6 +412,10 @@ public class ArrayUtils {
 			mArray[1][mArraySize] = numY;
 			return  ++mArraySize; 
 		}
+		
+		public double[][] toArrays() {
+			return mArray;
+		}
 	}
 	
 	// ========================================================================
@@ -996,13 +1000,13 @@ public class ArrayUtils {
 		return enumCounts;
 	}
 	
+	// ========================================================================
 	/** This linearly searches the aray for the integer value.  
 	 * 
 	 * @param theArray The input array
 	 * @param elem The target object
 	 * @return The index of the target value in the input array, or -1 if not found.
-	 */
-	// ========================================================================
+	 */	
 	public static<E> int linearSearch(ArrayList<E> theArray, E elem) {
 		return theArray.indexOf(elem);
 	}
