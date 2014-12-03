@@ -34,6 +34,7 @@ public class FastArrayListLong {
 	protected PrimitiveWrapper.WBoolean mWasFound;
 	protected SubList mDummySubList;
 	protected SortedSubListComparator mComparator;
+	protected FastArrayListIndex mDummyIndex;
 	
 	// ========================================================================
 	public FastArrayListLong() {
@@ -43,6 +44,7 @@ public class FastArrayListLong {
 		mSublistIndex = new PrimitiveWrapper.WInteger(0);
 		mDummySubList = new SubList();
 		mComparator = new SortedSubListComparator();
+		mDummyIndex = getNewIndexToken();
 	}
 	
 	// ========================================================================
@@ -121,6 +123,21 @@ public class FastArrayListLong {
 		// Now we are guaranteed that we will not break the ordering
 		targetList.set(arrayIndex.mIndexWithinSubList, newValue);
 		return true;
+	}
+
+	// ========================================================================
+	/** If the value argument is unique in the list (with respect to the extractor), the value
+	 *  is added, and true is returned.  Otherwise, no change is made to the list, and false is returned. 
+	 */
+	public synchronized boolean addIfUnique(final long value, PrimitiveWrapper.WLong existingValue) {
+		FastArrayListIndex resultIndex = getIndex(value, mDummyIndex);
+		if (resultIndex == null) {
+			add(value);
+			return true;
+		} else {		
+			existingValue.mLong = get(resultIndex);
+			return false;
+		}
 	}
 	
 	// ========================================================================

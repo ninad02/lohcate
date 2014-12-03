@@ -61,7 +61,7 @@ public class LOHcateSimulator {
 		protected InputParameterInteger mNumCNARegions = new InputParameterInteger(5, "NumCNARegions", JSAP.NO_SHORTFLAG, "NumCNARegions", JSAP.NO_DEFAULT);
 		protected InputParameterInteger mNumIterations = new InputParameterInteger(1, "NumIterations", JSAP.NO_SHORTFLAG, "NumIterations", JSAP.NO_DEFAULT);
 		
-		protected InputParameterDouble mTumorPurity  = new InputParameterDouble(0.40, "TumorPurity",  JSAP.NO_SHORTFLAG, "TumorPurity",  JSAP.NO_DEFAULT);					
+		protected InputParameterDouble mTumorPurity  = new InputParameterDouble(0.25, "TumorPurity",  JSAP.NO_SHORTFLAG, "TumorPurity",  JSAP.NO_DEFAULT);					
 		protected InputParameterDouble mNormalPurity = new InputParameterDouble(1.00, "NormalPurity", JSAP.NO_SHORTFLAG, "NormalPurity", JSAP.NO_DEFAULT);
 		
 		protected InputParameterInteger[] mMinReadDepth = new InputParameterInteger[] {
@@ -159,6 +159,8 @@ public class LOHcateSimulator {
 		public double getCopyNumberTotal()               { return 2.5; }	
 		public boolean isCopyNumberChangeBiAllelic()     { return false; }
 		public boolean allowHemizygousOrHomozygousDeletionGenotypes() { return true; }
+		
+		public void setCoverageGenerated(TissueType t, double coverage) { mCoverageGenerated[t.ordinal()].setValue(coverage); }
 	}
 	
 	// ========================================================================
@@ -300,6 +302,35 @@ public class LOHcateSimulator {
 		// Flush and close the output stream
 		//outStream.flush();
 		//outStream.close();
+
+	// ========================================================================	
+	public void simulateMatchedNormal(LOHcateSimulatorParams simParams, ClusteringInputOneSample infoSample) {
+		
+		Nuc[] genotype = new Nuc[2];
+		SeqReadSimulator seqSim = new SeqReadSimulator();
+		InfoOneSiteOneSample iosos = new InfoOneSiteOneSample();
+		
+		for (int row = 0; row < infoSample.getNumSites(); row++) {
+			iosos.clear();
+			ClusteringInputOneSite infoOneSite = infoSample.getSiteAtIndex(row);
+			Nuc referenceAllele     = infoOneSite.getReferenceAllele();
+			Nuc variantAlleleNormal = infoOneSite.getVariantAlleleNormal();			
+			
+			ControlFlagBool allowHemizygousGenotype = new ControlFlagBool(true);
+			
+			Genotype genotypeEnum = deduceGenotype(infoOneSite.calcVAFNormal());
+			GenotypeUtils.defineGenotypeAlleles(genotypeEnum, referenceAllele, variantAlleleNormal, genotype);
+			
+			seqSim.calculateReadsTissue(iosos.mNormal, simParams.getCoverageGenerated(TissueType.Normal), 
+					GenomeConstants.DefaultHaploidCopyNumber, GenomeConstants.DefaultHaploidCopyNumber, 
+					genotype, referenceAllele, false, 
+					allowHemizygousGenotype.getValue(), simParams.getMinReadDepth(TissueType.Normal), 
+					null, SeqReadSimulator.ReadAdjusterNoAdjustment);
+			
+			infoOneSite.setCovgVarNormal(          iosos.mNormal.mAlleleB.mNumReads);		
+			infoOneSite.setCovgTotalNormal((short) iosos.mNormal.calcNumReadsTotal());			
+		}
+	}
 	
 	// ========================================================================	
 	public void simulateReadsInRegion(LOHcateSimulatorParams simParams, ClusteringInputOneSample infoSample, CopyNumberRegionRange cnRegion, LOHcateSimulatorGoldStandard goldStandard) {
@@ -309,6 +340,8 @@ public class LOHcateSimulator {
 		InfoOneSiteOneSample iosos = new InfoOneSiteOneSample();
 		SeqReadSimulator.SeqReadSimulationAdjustReads readAdjuster = SeqReadSimulator.ReadAdjusterNoAdjustment; 		
 		StringBuilder sb = new StringBuilder(2048);
+		
+		System.out.println("Assigned Tumor Purity:\t" + simParams.getTumorPurity());
 		
 		// Set the indices to default values (to cover the entire sample, unless a region is specified
 		int indexStart = 0;
@@ -422,7 +455,7 @@ public class LOHcateSimulator {
 	
 	// ========================================================================
 	/** Based on the variant allele frequency, this determines the genotype. */
-	private Genotype deduceGenotype(double vaf) {
+	public static Genotype deduceGenotype(double vaf) {
 		if (vaf <= AlleleFractionStatsForSample.VAFNormalFrameLower) {
 			return Genotype.EnumHomozygous00;
 		} else if (vaf > AlleleFractionStatsForSample.VAFNormalFrameUpper) {

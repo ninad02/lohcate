@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import org.apache.commons.math3.util.MathArrays;
 
 import nutils.ArrayUtils;
+import nutils.Cast;
 import nutils.EnumMapSafe;
 import nutils.NumberUtils;
 import nutils.counter.BucketCounterEnum;
@@ -29,7 +30,7 @@ public class GeneCounter implements Comparable<GeneCounter> {
 	public String mLabel;
 	public Chrom mChrom;
 	public int mNumericID;
-	public EnumMapSafe<EventType, ArrayList<String>> mPatients; 	
+	public EnumMapSafe<EventType, ArrayList<PatientNameAndCopyNumber>> mPatients; 	
 	
 	public BucketCounterEnum<MutationType> mMutationTypeCounts;	
 	public BucketCounterEnum<EventType> mEventTypeCounts;	
@@ -40,9 +41,9 @@ public class GeneCounter implements Comparable<GeneCounter> {
 	public int mCountLOHreferenceLost;
 	public int mMinBasePairPosition, mMaxBasePairPosition;
 	
-	EnumMapSafe<EventTypeAllele, DynamicBucketCounter> mVariantAlleleCounts;
+	public EnumMapSafe<EventTypeAllele, DynamicBucketCounter> mVariantAlleleCounts;
 	
-	
+	public PatientNameAndCopyNumber mDummy;
 	
 	public GeneCounter(String name, Chrom chrom, int numericID) {		
 		mLabel = name;
@@ -62,6 +63,8 @@ public class GeneCounter implements Comparable<GeneCounter> {
 				
 		mMinBasePairPosition = Integer.MAX_VALUE;
 		mMaxBasePairPosition = Integer.MIN_VALUE;
+		
+		setNewDummy();
 	}
 	
 	public void clearCounts() {
@@ -76,8 +79,12 @@ public class GeneCounter implements Comparable<GeneCounter> {
 	
 	public int getNumericID() { return mNumericID; }
 	
+	private void setNewDummy() { 
+		mDummy = new PatientNameAndCopyNumber("", 0); 
+	}
+	
 	private void initializePatients() {
-		mPatients = EnumMapSafe.createEnumMapOfArrayLists(EventType.class, String.class);		
+		mPatients = EnumMapSafe.createEnumMapOfArrayLists(EventType.class, PatientNameAndCopyNumber.class);		
 	}
 	
 	/** Adds a patient to the reference-lost list in the case of LOH. */
@@ -87,17 +94,22 @@ public class GeneCounter implements Comparable<GeneCounter> {
 	}
 	
 	/** Returns true if the patient was already existing for the clustertype, false otherwise. */
-	public boolean addPatientIfNotAlreadyAdded(String patientName, EventType eventType) {		
-		ArrayList<String> patientList = getPatientsForEventType(eventType);		
-		return ArrayUtils.checkInListAndInsertIfMissing(patientList, patientName);
+	public boolean addPatientIfNotAlreadyAdded(String patientName, double copyNumber, EventType eventType) {
+		mDummy.set(patientName, Cast.toFloat(copyNumber));
+		ArrayList<PatientNameAndCopyNumber> patientList = getPatientsForEventType(eventType);
+		boolean exists = ArrayUtils.checkInListAndInsertIfMissing(patientList, mDummy);
+		if (!exists) {
+			setNewDummy();
+		}
+		return exists;
 	}
 	
 	public int getNumPatientsForEventType(EventType eventType) {
-		ArrayList<String> patientList = getPatientsForEventType(eventType);
+		ArrayList<PatientNameAndCopyNumber> patientList = getPatientsForEventType(eventType);
 		return patientList.size();
 	}
 	
-	public ArrayList<String> getPatientsForEventType(EventType eventType) {
+	public ArrayList<PatientNameAndCopyNumber> getPatientsForEventType(EventType eventType) {
 		return mPatients.get(eventType);
 	}
 	
@@ -279,6 +291,63 @@ public class GeneCounter implements Comparable<GeneCounter> {
 			return false;
 		} 
 		return true;
+	}
+	
+	
+	// ========================================================================
+	public static class PatientNameAndCopyNumber implements Comparable<PatientNameAndCopyNumber>{
+
+		String mPatient;
+		float mCopyNumber;
+		
+		public PatientNameAndCopyNumber(String patient, float copyNumber) {
+			super();
+			set(patient, copyNumber);
+		}
+		
+		public void set(String patient, float copyNumber)  {
+			this.mPatient = patient;
+			this.mCopyNumber = copyNumber;
+		}
+		
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + Float.floatToIntBits(mCopyNumber);
+			result = prime * result
+					+ ((mPatient == null) ? 0 : mPatient.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			PatientNameAndCopyNumber other = (PatientNameAndCopyNumber) obj;
+			if (Float.floatToIntBits(mCopyNumber) != Float
+					.floatToIntBits(other.mCopyNumber))
+				return false;
+			if (mPatient == null) {
+				if (other.mPatient != null)
+					return false;
+			} else if (!mPatient.equals(other.mPatient))
+				return false;
+			return true;
+		}
+
+		@Override
+		public int compareTo(PatientNameAndCopyNumber rhs) {
+			int result = mPatient.compareTo(rhs.mPatient);
+			if (result == 0) {
+				result = Float.compare(mCopyNumber, rhs.mCopyNumber);
+			}
+			return result;
+		}
 	}
 	
 }

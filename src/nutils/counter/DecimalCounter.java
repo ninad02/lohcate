@@ -1,12 +1,16 @@
 package nutils.counter;
 
 import java.io.BufferedReader;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.LinkedList;
+
+import org.apache.commons.math3.stat.inference.ChiSquareTest;
+import org.apache.commons.math3.stat.inference.GTest;
 
 import nutils.ArrayUtils;
 import nutils.CompareUtils;
@@ -105,6 +109,16 @@ public class DecimalCounter {
 			return (++(pValueCounts[index]));
 		}						
 		
+		/** Returns the sum of the counts. */
+		public int getTotalCount() {
+			int sum = 0;
+			for (int i = 0; i < pValueCounts.length; i++) {
+				sum += pValueCounts[i];
+			}
+			return sum;
+		}
+		
+		
 		/** Returns the cumulative counts of the p values over the buckets. */
 		public int[] getPValueCountsCumulative() {
 			int[] cumCounts = (int[]) pValueCounts.clone();
@@ -114,6 +128,47 @@ public class DecimalCounter {
 			}
 			
 			return cumCounts;
+		}
+		
+		/** Returns the cumulative counts of the p values over the buckets and tests against a uniform distribution. */
+		public double performChiSquareWithUniformExpected(PrintStream out) {
+			double[] observed = getProportions();
+			int multiplier = 100;					
+			
+			double expectedValue = Math.max(1, (1.0 / (double) getNumBins()) * multiplier);
+			double[] expected = new double[observed.length];
+			Arrays.fill(expected, expectedValue);
+			
+			long[] observedLong = new long[observed.length];
+			for (int i = 0; i < observed.length; i++) {
+				observedLong[i] = Math.round((observed[i] * multiplier));
+			}
+			
+			if (nutils.CompareUtils.isNotNull(out)) {
+				out.println("-----\nChi Square or G Test\n-----\n");
+				for (int i = 0; i < expected.length; i++) {
+					out.printf("%d\t%g\t%g\n", i, expected[i], observed[i]);
+				}
+			}
+			
+			GTest gTest = new GTest();			
+			//org.apache.commons.math3.stat.inference.ChiSquareTest
+			ChiSquareTest csTest = new ChiSquareTest();			
+			double pVal = csTest.chiSquareTest(expected, observedLong);
+			//double pVal = gTest.gTest(expected, observedLong);
+			return pVal;
+		}
+		
+		/** Returns the proportions of the counts. */
+		public double[] getProportions() {
+			double[] proportions = new double[pValueCounts.length];
+			int sumOfCounts = getTotalCount();
+			
+			for (int i = 0; i < proportions.length; i++) {
+				proportions[i] = pValueCounts[i] / (double) sumOfCounts;
+			}
+			
+			return proportions;
 		}
 		
 		/** Returns the cumulative log counts of the p values over the buckets. */
@@ -164,6 +219,27 @@ public class DecimalCounter {
 			
 			for (int i = 0; i < counts.length; i++) {
 				System.out.println(counts[i] + "\t" + cumCounts[i]);
+			}
+		}
+		
+		private static void Test2() {
+			PValueCounter pvc = new PValueCounter(1);
+			
+			for (double d = 0; d <= 1.0; d += 0.1) {
+				int maxIter = (int) Math.round(d * 10);
+				System.out.printf("Val: %g\t%d\n", d, maxIter);
+				for (int j = 0; j < maxIter; j++) {					
+					pvc.submitPValue((float) d, true);
+				}
+			}
+			
+			System.out.println("Total count: " + pvc.getTotalCount());
+			
+			double[] proportions = pvc.getProportions();
+			int[] counts = pvc.getPValueCounts();
+			
+			for (int i = 0; i < counts.length; i++) {
+				System.out.println(counts[i] + "\t" + proportions[i]);
 			}
 		}
 	}
@@ -283,7 +359,7 @@ public class DecimalCounter {
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-
+		PValueCounter.Test2();
 	}
 
 }

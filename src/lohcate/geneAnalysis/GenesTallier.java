@@ -126,7 +126,7 @@ public class GenesTallier {
 
 			double vafTumor = Double.parseDouble(components[Regions.ColCuratedTSV_VafTumor]);
 			tallyAlleleSpecificBreakdown(currentGene, eventType, vafTumor, varFreq, patientName, position);
-			currentGene.addPatientIfNotAlreadyAdded(patientName, eventType);
+			currentGene.addPatientIfNotAlreadyAdded(patientName, Double.parseDouble(components[Regions.ColCuratedTSV_CopyNumber]), eventType);
 		}		
 	}
 	

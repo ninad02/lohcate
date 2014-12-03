@@ -183,6 +183,29 @@ public class RegionRange {
 		}		
 	}
 	
+	// ========================================================================
+	//@Override
+	public int compareTo(RegionRange rhs) {
+		RegionRangeOverlap result = testAndCharacterizeOverlap(rhs);
+		
+		switch(result) {
+		case Equals: 
+			return 0;
+		case BeforeWithoutOverlap: case BeforeViaDiffChromosome: case AdjacentBefore: 
+			return -1;
+		case SubsumesTotal: case SubsumesAlignedRight: case BeforeWithOverlap: case ConsumedByAlignedLeft:
+			return -1;		
+		case AfterWithoutOverlap:  case AfterViaDiffChromosome:  case AdjacentAfter:  
+			return 1;
+		case ConsumedByTotal: case ConsumedByAlignedRight: case AfterWithOverlap: case SubsumesAlignedLeft:
+			return 1;
+		default:
+			throwErrorAndExit("ERROR: Impossible state!");
+			return 0;
+		}		
+	}
+
+	// ========================================================================
 	public static void throwErrorAndExit(String errorString) {
 		Exception e = new Exception(errorString);
 		e.printStackTrace();
@@ -335,6 +358,7 @@ public class RegionRange {
 			}
 		}
 	}
+
 	
 	// ========================================================================
 	// END INNER CLASS

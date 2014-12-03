@@ -1,13 +1,9 @@
 package lohcate.clustering;
 
 import genomeEnums.Chrom;
-import genomeUtils.RegionRange;
-
 import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.Arrays;
 
-import lohcate.CopyNumberRegionRange;
 import lohcate.CopyNumberRegionsByChromosome;
 import lohcate.Regions;
 import nutils.Cast;
@@ -29,10 +25,13 @@ public class ClusteringInputOneSampleMetaData {
 	DynamicBucketCounter mReadCountTalliesTumor;
 	DynamicBucketCounter mReadCountTalliesNormal;
 	
+	float mAvgCoverageNormal;
+	float mAvgCoverageTumor;
+	
 	int[]   mNumSitesPerChrom;
 	float[] mAvgReadCountPerChromNormal;
 	float[] mCopyNumRatioPerChromNormal;
-	float[] mTumorCopyNumRatiosPerGene;	
+	private float[] mTumorCopyNumRatiosPerGene;	
 	boolean[] mIsSomaticSite;
 	boolean[] mChromHasGermlineGain;
 	boolean[] mPossibleSampleContamination;
@@ -82,6 +81,11 @@ public class ClusteringInputOneSampleMetaData {
 		return mTumorCopyNumRatiosPerGene[row];
 	}
 	
+	public void setTumorNormalCopyNumRatioAtIndex(int row, double copyNumRatio) {
+		mTumorCopyNumRatiosPerGene[row] = Cast.toFloat(copyNumRatio);
+	}
+
+	
 	public float getCopyNumberAtIndex(int row) {
 		return mTumorCopyNumRatiosPerGene[row] * Regions.DefaultDiploidCopyNumber;
 	}
@@ -89,6 +93,18 @@ public class ClusteringInputOneSampleMetaData {
 	public void setCopyNumberAtIndex(int row, double copyNum) {
 		mTumorCopyNumRatiosPerGene[row] = Cast.toFloat(copyNum / Regions.DefaultDiploidCopyNumber);
 	}
+	
+	public void adjustTumorCopyNumRatio(int row, double diffFactor) {		
+		mTumorCopyNumRatiosPerGene[row] += Cast.toFloat(diffFactor);
+	}
+		
+	public void setCopyNumberAllSites(double copyNum) {
+		for (int i = 0; i < mTumorCopyNumRatiosPerGene.length; i++) {
+			setCopyNumberAtIndex(i, copyNum);
+		}
+	}
+	
+	public int getNumSites() { return mTumorCopyNumRatiosPerGene.length; }
 	
 	public void printSiteInformation(PrintWriter out, int row, boolean printNewLine) {
 		out.printf(  "%g\t%g", mTumorCopyNumRatiosPerGene[row], getCopyNumberAtIndex(row));  

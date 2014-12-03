@@ -96,10 +96,11 @@ public class DynamicRoundedDoubleCounter {
 	
 	// ========================================================================	
 	public static enum CompactDecimal implements CompactorInf<CompactDecimal> {
-		BelowZero(1),
-		Base(15),
+		BelowZero(1),		
 		ExponentNegative(1),
-		Exponent_Base10(14);
+		Exponent_Base10(14),
+		Base(15),
+		;
 
 		public static CompactorIntoInt<CompactDecimal> Compactor = new CompactorIntoInt<>(CompactDecimal.class, false);
 		
@@ -109,7 +110,7 @@ public class DynamicRoundedDoubleCounter {
 	}
 
 	// ========================================================================
-	private static double roundAndUnround(double num, int numSigFigs) {
+	public static double roundToNumSigFigs(double num, int numSigFigs) {
 		return getDoubleValueFromCompactForm(roundToSignificantFiguresCompact(num, numSigFigs));
 	}
 	
@@ -134,28 +135,30 @@ public class DynamicRoundedDoubleCounter {
 		
 		System.out.println(lodCounter.getValueWithMaxCount());
 		
-		System.out.println(roundAndUnround(2, 2));
-		System.out.println(roundAndUnround(2.1, 2));
-		System.out.println(roundAndUnround(2.14, 2));
-		System.out.println(roundAndUnround(2.16, 2));
-		System.out.println(roundAndUnround(2.163, 2));
-		System.out.println(roundAndUnround(21, 2));
-		System.out.println(roundAndUnround(21.4, 2));
-		System.out.println(roundAndUnround(21.6, 2));
-		System.out.println(roundAndUnround(0.2, 2));
-		System.out.println(roundAndUnround(0.21, 2));
-		System.out.println(roundAndUnround(0.214, 2));
-		System.out.println(roundAndUnround(0.216, 2));
-		System.out.println(roundAndUnround(0.02, 2));
-		System.out.println(roundAndUnround(0.021, 2));
-		System.out.println(roundAndUnround(0.0214, 2));
-		System.out.println(roundAndUnround(0.0216, 2));
-		System.out.println(roundAndUnround(0.002, 2));
-		System.out.println(roundAndUnround(0.0021, 2));
-		System.out.println(roundAndUnround(0.00214, 2));
-		System.out.println(roundAndUnround(0.00216, 2));
-		System.out.println(roundAndUnround(0.00021, 2));
+		System.out.println(roundToNumSigFigs(2, 2));
+		System.out.println(roundToNumSigFigs(2.1, 2));
+		System.out.println(roundToNumSigFigs(2.14, 2));
+		System.out.println(roundToNumSigFigs(2.16, 2));
+		System.out.println(roundToNumSigFigs(2.163, 2));
+		System.out.println(roundToNumSigFigs(21, 2));
+		System.out.println(roundToNumSigFigs(21.4, 2));
+		System.out.println(roundToNumSigFigs(21.6, 2));
+		System.out.println(roundToNumSigFigs(0.2, 2));
+		System.out.println(roundToNumSigFigs(0.21, 2));
+		System.out.println(roundToNumSigFigs(0.214, 2));
+		System.out.println(roundToNumSigFigs(0.216, 2));
+		System.out.println(roundToNumSigFigs(0.02, 2));
+		System.out.println(roundToNumSigFigs(0.021, 2));
+		System.out.println(roundToNumSigFigs(0.0214, 2));
+		System.out.println(roundToNumSigFigs(0.0216, 2));
+		System.out.println(roundToNumSigFigs(0.002, 2));
+		System.out.println(roundToNumSigFigs(0.0021, 2));
+		System.out.println(roundToNumSigFigs(0.00214, 2));
+		System.out.println(roundToNumSigFigs(0.00216, 2));
+		System.out.println(roundToNumSigFigs(0.00021, 2));
 		
+		
+
 		
 		/*
 		ValueDoubleCounterPackage llwc = ValueDoubleCounterPackage();
@@ -165,10 +168,35 @@ public class DynamicRoundedDoubleCounter {
 			System.out.println("" + llwc.mLodScores[i] + "\t" + llwc.mCounts[i] + "\t" + llwc.mCumulativeCountsForward[i] + "\t" + llwc.mCumulativeCountsBackward[i]);
 		}*/
 	}
+	
+	// ========================================================================
+	private static void Test2() {
+		int numSigFig = 1;
+		DynamicRoundedDoubleCounter theCounter = new DynamicRoundedDoubleCounter(numSigFig);
+		for (double d = 0; d <= 1.0; d += 0.05) {
+			int repeatCount = (int) (Math.round(d * 10) + 1);
+			System.out.println(roundToNumSigFigs(d, numSigFig));
+			for (int j = 0; j <= repeatCount; j++) {				
+				theCounter.register(d);
+			}
+		}
+		
+		DoubleArrayList values = new DoubleArrayList();
+		FloatArrayList proportions = new FloatArrayList();
+		
+		theCounter.getValuesWithProportions(values, proportions);
+		
+		double totalProportion = 0;
+		for (int i = 0; i < values.size(); i++) {
+			System.out.printf("Value: %g\t%g\n", values.get(i), proportions.get(i));
+			totalProportion += proportions.get(i);
+		}
+		System.out.println(totalProportion);
+	}
 
 	// ========================================================================
 	public static void main(String[] args) {
-		Test();
+		Test2();
 	}
 			
 	

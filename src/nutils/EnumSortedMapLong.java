@@ -76,6 +76,18 @@ public class EnumSortedMapLong<E extends Enum<E>> {
 		ifNotSortedThenSort();
 		return ArrayUtils.binarySearchValue(mExtractorForSorting.extractValue(key), mMap.get(theEnum), mExtractorForSorting);		
 	}
+
+	// ========================================================================
+	public int size(final E theEnum) { return mMap.get(theEnum).size(); }
+	
+	// ========================================================================
+	public int size() {
+		int sum = 0;
+		for (E theEnum : mEnumClass.getEnumConstants()) {
+			sum += size(theEnum);
+		}
+		return sum;
+	}	
 	
 	// ========================================================================
 	public long get(final E theEnum, final int index) {		
@@ -135,9 +147,14 @@ public class EnumSortedMapLong<E extends Enum<E>> {
 		if (resultIndex < 0) {						
 			mMap.get(theEnum).beforeInsert(ArrayUtils.getInsertPoint(resultIndex), theElement);			
 		} else {
-			value.mLong = mMap.get(theEnum).get(resultIndex);			
+			value.mLong = get(theEnum, resultIndex);			
 		}
 		return resultIndex;
+	}
+
+	// ========================================================================
+	public void ensureCapacity(final E theEnum, int theSize) {
+		mMap.get(theEnum).ensureCapacity(theSize);
 	}
 	
 	// ========================================================================
@@ -170,8 +187,11 @@ public class EnumSortedMapLong<E extends Enum<E>> {
 				LongArrayList theList = mMap.get(enumValue); 
 				theList.quickSortFromTo(0, theList.size() - 1, mComparator);
 				mIsSorted.put(enumValue, Boolean.TRUE);
+				
+				System.out.println("SORTING! " + enumValue);
 			}
 		}		
+		
 		
 		mEntireMapSorted = true; // Set that the map is sorted now
 	}

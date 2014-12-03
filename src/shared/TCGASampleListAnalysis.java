@@ -100,7 +100,15 @@ public class TCGASampleListAnalysis {
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-
+		int a = 1;
+		TestSyntax(++a, a++, a++);
+		//System.out.println(a++ + "\t" + a++);
+	}
+	
+	public static void TestSyntax(int a, int b, int c) {
+		System.out.println(a);
+		System.out.println(b);
+		System.out.println(c);
 	}
 
 	// ========================================================================

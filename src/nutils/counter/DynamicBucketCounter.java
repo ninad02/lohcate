@@ -1,5 +1,7 @@
 package nutils.counter;
 
+import java.util.HashMap;
+
 import nutils.ArrayUtils;
 import nutils.PrimitiveWrapper;
 import nutils.NullaryClassFactory;
@@ -238,6 +240,11 @@ public class DynamicBucketCounter {
 		System.out.println("Key with max count: " + dbc.getKeyWithMaxCount());
 		System.out.println("Sum of counts: " + dbc.mSumOfCounts);
 		System.out.println("Total counts: " + dbc.mWeightedTotalSum);
+	}
+	
+	// ========================================================================
+	private static void TestDBC2() {
+		
 	}
 
 	// ========================================================================

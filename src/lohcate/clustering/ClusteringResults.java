@@ -48,6 +48,9 @@ public class ClusteringResults<E> {
 	}
 
 	// ========================================================================
+	public int getNumPoints() { return mClassificationForPoint.size(); }
+	
+	// ========================================================================
 	public E getClassificationSecond(int index) { return mClassificationForPoint2.get(index); }
 	
 	// ========================================================================

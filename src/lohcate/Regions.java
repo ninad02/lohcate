@@ -19,6 +19,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.ListIterator;
 
 import nutils.ArgumentParserUtils;
@@ -34,6 +35,7 @@ import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
 import nutils.UtilsBasic;
 import nutils.BitUtils.Compactor.CompactorIntoLong;
+import nutils.collectionsSorted.ArrayListSortedComparable;
 import nutils.counter.DynamicBucketCounter;
 
 import com.carrotsearch.hppc.IntArrayList;
@@ -43,6 +45,7 @@ import com.martiansoftware.jsap.JSAPResult;
 import com.martiansoftware.jsap.StringParser;
 
 import lohcate.LOHcate.SubdirsDefault;
+import lohcate.clustering.AlleleFractionStatsForSample;
 import lohcate.clustering.Clustering;
 import lohcate.clustering.ClusteringInputOneSample;
 import lohcate.clustering.ClusteringInputOneSampleMetaData;
@@ -77,10 +80,7 @@ public class Regions {
 	public static final char   MissingAllele = '.';
 	public static final float MaxVariantAlleleFrequency = 1.0f;
 	public static final String GenBrowserTrack = ".genBrowserTrack";
-	
-	public static final boolean EliminateExtremeGCSites = true;
-	public static final boolean EliminateHighDensitySNVs = true;
-	
+		
 	/*
 	0 1   refName              chr1
 	1 2   coordinate           883918
@@ -134,9 +134,10 @@ public class Regions {
 	public static final int ColCuratedTSV_VafTumor     = Col_NAFTAFInput_VariantRatioTumor;
 	public static final int ColCuratedTSV_dbSNP        = Col_NAFTAFInput_DbSNPString;	
 	public static final int ColCuratedTSV_MutationType = Col_NAFTAFInput_MutationType;
-	public static final int ColCuratedTSV_Gene         = Col_NAFTAFInput_HugoSymbol;
+	public static final int ColCuratedTSV_Gene         = Col_NAFTAFInput_HugoSymbol;	        
 	//private static final int ColCuratedTSV_VariantLocation = 7;
 	public static final int ColCuratedTSV_Cluster      = 17; //8;
+	public static final int ColCuratedTSV_CopyNumber   = 19;
 	
 	public static final GenotypeUtils.GenomicCoordinateComparatorInTextFileLine LineComparatorTab = new GenotypeUtils.GenomicCoordinateComparatorInTextFileLine();
 	public static final NullaryClassFactory<ArrayList> NullClassFactoryArrayList = new NullaryClassFactory<ArrayList>(ArrayList.class);
@@ -145,26 +146,26 @@ public class Regions {
 	/** This removes the header lines and filters out sites. */
 	public static ArrayList<String> curateSNPCalls_removeHeaderLinesFromRows(ArrayList<String> rows, boolean removeHighDensitySNVSites, boolean removeExtremeGCSites) {
 		int windowPositionStart = 0;
-		int windowRowStart = 0;
-		Chrom chromPrev = Chrom.c0;
+		int windowRowStart = 0;		
 		int numSitesRemoved = 0;
 		int numSitesRemovedGC = 0;
+		int numVariantSitesSpanned = 0;
+		ChromPositionTracker chromTracker = new ChromPositionTracker();
 		
 		for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
 			String row = rows.get(rowIndex);
-			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0 || row.indexOf("chrX") >= 0 || row.indexOf("chrY") >= 0 || row.indexOf("chrM") >= 0 /*|| row.indexOf("intergenic") >= 0 */) {
+			if (row.indexOf("refName") >= 0 && row.indexOf("coord") >= 0 || /*row.indexOf("chrX") >= 0 ||*/ row.indexOf("chrY") >= 0 || row.indexOf("chrM") >= 0 /*|| row.indexOf("intergenic") >= 0 */) {
 				rows.set(rowIndex, null);
 			} else {
 				// Do some light GC filtering
 				Chrom chrom = Chrom.getChrom(    StringUtils.extractNthColumnValue(row, Regions.Col_NAFTAFInput_Chrom,               StringUtils.FileExtensionTSV.mDelimiter));
 				int position = Integer.parseInt( StringUtils.extractNthColumnValue(row, Regions.Col_NAFTAFInput_Position,            StringUtils.FileExtensionTSV.mDelimiter));
-				String gcString =                StringUtils.extractNthColumnValue(row,        Col_NAFTAFInput_FlankingStringTumor, StringUtils.FileExtensionTSV.mDelimiter);
+				String gcString =                StringUtils.extractNthColumnValue(row, Regions.Col_NAFTAFInput_FlankingStringTumor, StringUtils.FileExtensionTSV.mDelimiter);				
 				
 				int posDiff = position - windowPositionStart;
 				
-				if ((chrom != chromPrev) || (posDiff >= MaxWindowLength)) {
-					int numSitesSpanned = (rowIndex - 1) - windowRowStart + 1;
-					if (numSitesSpanned > MaxSitesInWindowAllowed) {
+				if (chromTracker.chromCrossedWithCurrentCoordinates(chrom, position) || (posDiff >= MaxWindowLength)) {					
+					if (numVariantSitesSpanned > MaxSitesInWindowAllowed) {
 						for (int rowToClean = windowRowStart; rowToClean < rowIndex; rowToClean++) {
 							//System.out.println("Removing:\t" + rows.get(rowToClean));
 							if (removeHighDensitySNVSites) {
@@ -176,13 +177,22 @@ public class Regions {
 
 					windowPositionStart = position;
 					windowRowStart = rowIndex;
-					chromPrev = chrom;
-				} 
+					numVariantSitesSpanned = 0;
+				}
+				
+				// Now check the vaf normal and see whether it's an outlier.
+				Double vafNormal = Double.parseDouble(StringUtils.extractNthColumnValue(row, Regions.Col_NAFTAFInput_VariantRatioNormal, StringUtils.FileExtensionTSV.mDelimiter));
+				if (vafNormal > AlleleFractionStatsForSample.VAFNormalRange.getBoundLower()) {						
+					numVariantSitesSpanned++;
+				}
 				
 				double fractionGCNormal = GenotypeUtils.calcFractionGC(gcString);
-				if (removeExtremeGCSites && (fractionGCNormal < GCContentThresholdLow) || (fractionGCNormal >= GCContentThresholdHigh)) {
-					rows.set(rowIndex, null);
-					numSitesRemovedGC++;
+				if (fractionGCNormal >= 0) {
+					// We know we have a valid GC fraction
+					if (removeExtremeGCSites && (fractionGCNormal < GCContentThresholdLow) || (fractionGCNormal >= GCContentThresholdHigh)) {
+						rows.set(rowIndex, null);
+						numSitesRemovedGC++;
+					}
 				}
 			}
 		}
@@ -503,7 +513,7 @@ public class Regions {
 
 				
 				sb.append(regionsInSample.mSampleName)
-				  .append(delim).append(chrom.ordinal())
+				  .append(delim).append(chrom.getName())
 				  .append(delim).append(cnrr.getRangeStart())
 				  .append(delim).append(cnrr.getRangeEnd())
 				  .append(delim).append(cnrr.getNumSitesInterrogated())
@@ -530,6 +540,9 @@ public class Regions {
 		ClusteringInputOneSampleMetaData mMetaData;
 		BufferedWriter mOut;
 		
+		// Variables used in methods
+		ArrayListSortedComparable<String> mHugoSymbols;
+		
 		public ActionerGISTIC(
 				BufferedWriter outputWriter, 
 				CopyNumberRegionsByChromosome regionsInSample, 
@@ -543,6 +556,8 @@ public class Regions {
 			mOneSampleInfo = oneSampleInfo;
 			mMetaData = metaData;
 			mOut = outputWriter;
+			mHugoSymbols = new ArrayListSortedComparable<String>();
+			
 			
 			for (Chrom chrom : Chrom.Autosomes) {
 				ArrayList<CopyNumberRegionRange> reigonsInChrom = new ArrayList<CopyNumberRegionRange>(regionsInSample.getRegions(chrom));				
@@ -554,19 +569,31 @@ public class Regions {
 		@Override
 		public void takeAction(ArrayList<Boolean> rangeInTargetSet, ArrayList<CopyNumberRegionRange> regions, CopyNumberRegionRange regionLatest) {
 			
-			int indexOfSite = mOneSampleInfo.getIndex(regionLatest.getChromosome(), regionLatest.getRangeStart());			
+			int indexOfStart = mOneSampleInfo.getIndex(regionLatest.getChromosome(), regionLatest.getRangeStart());
+			int indexOfEnd   = mOneSampleInfo.getIndex(regionLatest.getChromosome(), regionLatest.getRangeEnd());
+			
 			boolean regionLatestInTargetSet = rangeInTargetSet.get(rangeInTargetSet.size() - 1).booleanValue();
 			
 			// Test if the latest range is in the target set of ranges.  In that case, we use
 			// the copy number in the target range, otherwise we assume the diploid default
 			double log2CopyNumRatio = NumberUtils.MathLog2(Regions.DefaultTumorNormalRatio);
+			mHugoSymbols.clear();
+						
 			if (regionLatestInTargetSet) {
-				CompareUtils.ensureTrue(indexOfSite >= 0, "ERROR: Site must exist in sample!");
-				double copyNumRatio = mMetaData.getTumorNormalCopyNumRatioAtIndex(indexOfSite);
+				CompareUtils.ensureTrue(indexOfStart >= 0, "ERROR: Site must exist in sample!");
+				double copyNumRatio = mMetaData.getTumorNormalCopyNumRatioAtIndex(indexOfStart);
 				log2CopyNumRatio = NumberUtils.MathLog2(copyNumRatio);
 				//copyNumber = mMetaData.getCopyNumberAtIndex(indexOfSite);
+								
+				for (int row = indexOfStart; row <= indexOfEnd; row++) { 
+					ClusteringInputOneSite oneSiteInfo = mOneSampleInfo.getSiteAtIndex(regionLatest.getChromosome(), row);
+					String hugoSymbol = oneSiteInfo.getHugoSymbol();					
+					if (mHugoSymbols.get(hugoSymbol) == null) {
+						mHugoSymbols.add(hugoSymbol);
+					}
+				}
 			}
-
+			
 			// Reset the string builder
 			mSB.setLength(0);
 			mSB.append(mOneSampleInfo.getSampleNameRoot())
@@ -575,8 +602,14 @@ public class Regions {
 			  .append(Delim).append(regionLatest.getRangeEnd())
 			  .append(Delim).append(regionLatest.getNumSitesInterrogated())
 			  .append(Delim).append(log2CopyNumRatio)
-			  .append(Delim).append(regionLatest.mCopyNumberEventType)
-			  ;
+			  .append(Delim).append(regionLatest.mCopyNumberEventType);
+			
+			// Append the hugo symbols string
+			mSB.append(Delim);			
+			for (int i = 0; i < mHugoSymbols.size(); i++) {
+				if (i > 0) mSB.append(";");
+				mSB.append(mHugoSymbols.get(i));
+			}
 			
 			IOUtils.writeToBufferedWriter(mOut, mSB.toString(), true);			
 		}
@@ -734,8 +767,10 @@ public class Regions {
 				if (currentRegion.mCopyNumberEventType == EventType.HETGermline) {
 					double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(currentRegion, oneSampleData, metaData);	
 
-					if (Clustering.isCopyNumDepleted(avgCopyNum)) {
+					if (Clustering.isCopyNumDepletedHemizygous(avgCopyNum)) {
 						currentRegion.mCopyNumberEventType = EventType.LOH;
+					} else if (Clustering.isCopyNumDepletedHomozygous(avgCopyNum)) {
+						currentRegion.mCopyNumberEventType = EventType.DELHom;
 					} else if (Clustering.isCopyNumAmplified(avgCopyNum)) {
 						currentRegion.mCopyNumberEventType = EventType.GainSomatic;
 					} else if (Clustering.isCopyNumAmplified(avgCopyNum)) {
@@ -759,6 +794,28 @@ public class Regions {
 		}
 		
 		return regionsInSample;
+	}
+	
+	// ========================================================================
+	private static boolean mergeRegionsWithConstraints_Helper_ShouldCombine(EventType et, double avgCopyNum, boolean shouldCombineInitialCondition) {
+		if (LOHcate.LOHcateSensitivity.isHighOrMore()) {
+			switch(et) {
+			case LOH:         shouldCombineInitialCondition  = Clustering.isCopyNumDepletedHemizygous(avgCopyNum); break;
+			case DELHom:      shouldCombineInitialCondition  = Clustering.isCopyNumDepletedHomozygous(avgCopyNum); break;
+			case cnLOH:       shouldCombineInitialCondition &= Clustering.isCopyNumInDiploidRange(avgCopyNum); break;
+			case GainSomatic: shouldCombineInitialCondition  = Clustering.isCopyNumAmplified(avgCopyNum); break;
+			default: break;
+			}
+		} else if (LOHcate.LOHcateSensitivity.isLow()) {
+			switch(et) {
+			case LOH:         shouldCombineInitialCondition &= Clustering.isCopyNumDepletedHemizygous(avgCopyNum); break;
+			case DELHom:      shouldCombineInitialCondition &= Clustering.isCopyNumDepletedHomozygous(avgCopyNum); break;
+			case cnLOH:       shouldCombineInitialCondition &= Clustering.isCopyNumInDiploidRange(avgCopyNum); break;
+			case GainSomatic: shouldCombineInitialCondition &= Clustering.isCopyNumAmplified(avgCopyNum); break;
+			default: break;
+			}
+		}
+		return shouldCombineInitialCondition;
 	}
 	
 	// ========================================================================
@@ -800,13 +857,7 @@ public class Regions {
 						CopyNumberRegionRange midRegion = Clustering.getMiddleRegion(regionToExtend, currentRegion, oneSampleData, false);
 						if (midRegion != null) {
 							double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(midRegion, oneSampleData, metaData);	
-
-							switch(regionToExtend.mCopyNumberEventType) {
-							case LOH:         shouldCombine = Clustering.isCopyNumDepleted(avgCopyNum); break;
-							case cnLOH:       shouldCombine &= Clustering.isCopyNumInDiploidRange(avgCopyNum); break;
-							case GainSomatic: shouldCombine = Clustering.isCopyNumAmplified(avgCopyNum); break;
-							default: break;
-							}
+							shouldCombine = mergeRegionsWithConstraints_Helper_ShouldCombine(regionToExtend.mCopyNumberEventType, avgCopyNum, shouldCombine);
 						}
 						
 						if (shouldCombine) {
@@ -838,13 +889,7 @@ public class Regions {
 							System.out.printf("RegionsCombinedHET: %b\t%s\t%d\t%d\t%d\t%d\t%d\n", shouldCombine, eventType.name(), regionToExtend.getChromosome().getCode(), regionToExtend.getRangeStart(), regionToExtend.getRangeEnd(), currentRegion.getRangeStart(), currentRegion.getRangeEnd());						
 
 							double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(currentRegion, oneSampleData, metaData);							
-							
-							switch(regionToExtend.mCopyNumberEventType) {
-								case LOH:         shouldCombine = Clustering.isCopyNumDepleted(avgCopyNum); break;
-								case cnLOH:       shouldCombine &= Clustering.isCopyNumInDiploidRange(avgCopyNum); break;
-								case GainSomatic: shouldCombine = Clustering.isCopyNumAmplified(avgCopyNum); break;
-								default: break;
-							}
+							shouldCombine = mergeRegionsWithConstraints_Helper_ShouldCombine(regionToExtend.mCopyNumberEventType, avgCopyNum, shouldCombine);
 							
 							ControlFlagBool performExtendedSmoothing = new ControlFlagBool(true);							
 							if (performExtendedSmoothing.getValue()) {

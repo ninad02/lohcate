@@ -6,6 +6,7 @@ public class GenomeConstants {
 	/** The default (copy neutral) copy number of a diploid human individual. */
 	public static final int DefaultDiploidCopyNumber = 2;
 	public static final int DefaultHaploidCopyNumber = 1;
+	public static final int DefaultSingleCopyGainCopyNumber = 3;
 	
 	// ========================================================================
 	public static boolean isAmplification(double copyNumberTotal) {

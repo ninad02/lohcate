@@ -23,10 +23,12 @@ import nutils.ArrayUtils;
 import nutils.ArgumentParserUtils.InputParameterBoolean;
 import nutils.ArrayUtils.ParallelArrayDoubleDynamic;
 import nutils.ArgumentParserUtils;
+import nutils.Cast;
 import nutils.ControlFlagBool;
 import nutils.EnumMapSafe;
 import nutils.GraphUtils;
 import nutils.PrimitiveWrapper;
+import nutils.UtilsBasic;
 import nutils.PrimitiveWrapper.WInteger;
 import nutils.counter.DynamicBucketCounter;
 
@@ -46,8 +48,11 @@ import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.StackedXYAreaRenderer;
 import org.jfree.chart.renderer.xy.StackedXYAreaRenderer2;
 import org.jfree.chart.renderer.xy.StackedXYBarRenderer;
+import org.jfree.chart.renderer.xy.XYAreaRenderer;
+import org.jfree.chart.renderer.xy.XYBarRenderer;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYShapeRenderer;
+import org.jfree.chart.renderer.xy.XYSplineRenderer;
 import org.jfree.chart.title.LegendTitle;
 import org.jfree.chart.title.TextTitle;
 import org.jfree.data.xy.DefaultXYDataset;
@@ -78,7 +83,7 @@ public class ClusteringPlotting {
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
 		
 		XYItemRenderer itemRenderer = getXYItemRendererHelper(CopyNumberVAFPlotPointSize);		
-		setSeriesPaintPerCluster(itemRenderer);
+		setSeriesPaintPerCluster(itemRenderer, xyDataset, EventType.class, ColorPastelForEnumEventType);
 		xyPlot.setRenderer(itemRenderer);		
 		
 		xyPlot.setBackgroundPaint(ColorPastel.Gray_15.getColor());
@@ -134,7 +139,7 @@ public class ClusteringPlotting {
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
 		
 		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(1);		
-		setSeriesPaintPerCluster(itemRenderer);
+		setSeriesPaintPerCluster(itemRenderer, xyDataset, EventType.class, ColorPastelForEnumEventType);
 		xyPlot.setRenderer(itemRenderer);		
 		
 		xyPlot.setBackgroundPaint(ColorPastel.White.getColor());
@@ -157,7 +162,7 @@ public class ClusteringPlotting {
 		xyPlot.getRangeAxis().setStandardTickUnits(tickUnits);
 		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
 		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);	
-		GraphUtils.saveChartAsPNG(outDir + File.separator + "HeapMap.AllEvents.AllSamples", theChart, 2400, 1000);
+		GraphUtils.saveChartAsPNG(outDir + File.separator + "HeatMap.AllEvents.AllSamples", theChart, 2400, 1000);
 
 
 	}
@@ -175,7 +180,7 @@ public class ClusteringPlotting {
 		}
 		
 		for (Chrom chrom : Chrom.values()) {
-			if (chrom.isAutosomal()) {				
+			if (Chrom.Autosomes.contains(chrom)) {		
 				DoubleArrayList[] positionAndCount = eventCount.get(chrom).toArrayListDouble();
 				for (int i = 0; i < positionAndCount[0].size(); i++) {
 					double newPosAdj = (positionAndCount[0].get(i) + chrom.getGenomeWidePositionStart()) / GenomeWidePositionDivisor; 
@@ -188,7 +193,7 @@ public class ClusteringPlotting {
 		}
 		DefaultXYDataset posAndEventCountDataset = new DefaultXYDataset();
 		posAndEventCountDataset.addSeries(eventType.name(), ArrayUtils.combineTwoDynamicArraysIntoOneStatic(positionsGenomeWideAllSamples, eventCountAllSamples));
-		ClusteringPlotting.plotEventSampleRecurrence(posAndEventCountDataset, outDir + File.separator + "All_Samples." + eventType.name(), getColorForEvent(eventType).getColor(), maxCountAllChromosomes);
+		ClusteringPlotting.plotEventSampleRecurrence(posAndEventCountDataset, outDir + File.separator + "All_Samples." + eventType.name(), ColorPastelForEnumEventType.getColorForEvent(eventType).getColor(), maxCountAllChromosomes);
 	}
 	
 	// ========================================================================
@@ -209,9 +214,19 @@ public class ClusteringPlotting {
 		XYPlot xyPlot = (XYPlot) theChart.getPlot();
 		//theChart.addSubtitle(getChromSubtitle());
 		
-		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(5);		
+		XYSplineRenderer splineRenderer = new XYSplineRenderer(5, XYSplineRenderer.FillType.TO_ZERO);		
+		splineRenderer.setSeriesLinesVisible(0, Boolean.TRUE);
+		splineRenderer.setSeriesFillPaint(0, seriesColor);
+		
+		XYAreaRenderer areaRenderer = new XYAreaRenderer(XYAreaRenderer.AREA);
+		areaRenderer.setOutline(true);		
+		
+		XYItemRenderer itemRenderer = areaRenderer;		
+		
+		//ClusteringPlotting.getXYItemRendererHelper(5);		
 		//setSeriesPaintPerCluster(itemRenderer);
 		itemRenderer.setSeriesPaint(0, seriesColor);		
+		itemRenderer.setSeriesOutlinePaint(0, seriesColor);
 		xyPlot.setRenderer(itemRenderer);		
 		
 		xyPlot.setBackgroundPaint(ColorPastel.White.getColor());
@@ -266,7 +281,9 @@ public class ClusteringPlotting {
 	public static void plotCopyNumGenomeWide(XYDataset xyDataset, String outFilenameRoot, String sampleName) {
 		String xAxisLabel = GenomeWideXAxisLabel;
 		String yAxisLabel = "Total Copy Number [Tumor]";
-		String title = sampleName.substring(0, sampleName.indexOf(".")); //"Total Copy Number [Tumor]: " + sampleName;				
+		
+		int periodIndex = sampleName.indexOf(".");				
+		String title = ((periodIndex >= 0) ? sampleName.substring(0, periodIndex) : sampleName);
 				
 		JFreeChart theChart = 
 				ChartFactory.createScatterPlot(title, xAxisLabel, yAxisLabel, xyDataset, PlotOrientation.VERTICAL, true, false, false);
@@ -275,7 +292,7 @@ public class ClusteringPlotting {
 		theChart.getTitle().setFont(new Font("Arial", Font.BOLD, 32));
 		
 		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(CopyNumberVAFPlotPointSize);		
-		setSeriesPaintPerCluster(itemRenderer);
+		setSeriesPaintPerCluster(itemRenderer, xyDataset, EventType.class, ColorPastelForEnumEventType);
 		xyPlot.setRenderer(itemRenderer);		
 		xyPlot.addRangeMarker(new ValueMarker(2.0));
 		
@@ -300,7 +317,7 @@ public class ClusteringPlotting {
 		xyPlot.getRangeAxis().setRange(0, maxCopyNumber + 0.25);
 		xyPlot.getDomainAxis().setLabelFont(rangeAxisLabelFont);
 		xyPlot.getDomainAxis().setTickLabelFont(rangeAxisTickFont);	
-		xyPlot.getDomainAxis().setRange(0, Chrom.c22.calculateGenomeWidePositionEnd() / GenomeWidePositionDivisor);
+		xyPlot.getDomainAxis().setRange(0, ArrayUtils.getLastElement(Chrom.Autosomes).calculateGenomeWidePositionEnd() / GenomeWidePositionDivisor);
 		GraphUtils.saveChartAsPNG(outFilenameRoot, theChart, 2400, 800);
 	}
 
@@ -359,6 +376,7 @@ public class ClusteringPlotting {
 				3,  //19 
 				3,  //20
 				3,  //21 
+				2,  //22
 				2
 				
 		};
@@ -400,19 +418,19 @@ public class ClusteringPlotting {
 			}
 			xyPlot.addDomainMarker(new IntervalMarker(posStartAdj, posEndPArmAdj, backgroundGreyArmP), Layer.BACKGROUND);
 			xyPlot.addDomainMarker(new ValueMarker(posStartAdj, ColorPastel.Gray_90.getColor(), new BasicStroke()));
-			XYTextAnnotation chromNumber = new XYTextAnnotation("" + chrom.ordinal(), posMidAdj, chromLabelHeightBuffer);
-			chromNumber.setFont(new Font("Arial", Font.BOLD, 24));
+			XYTextAnnotation chromNumber = new XYTextAnnotation("" + chrom.getName(), posMidAdj, chromLabelHeightBuffer);
+			chromNumber.setFont(new Font("Arial", Font.BOLD, 32));
 			xyPlot.addAnnotation(chromNumber);
 		}
 		
-		XYTextAnnotation annotGeneBRAF = new XYTextAnnotation("|BRAF", Chrom.c7.getGenomeWidePositionStart() / GenomeWidePositionDivisor + 140, 1);
-		annotGeneBRAF.setFont(new Font("Arial", Font.BOLD, 16));
-		annotGeneBRAF.setTextAnchor(org.jfree.ui.TextAnchor.CENTER_LEFT);
-		xyPlot.addAnnotation(annotGeneBRAF);
-		XYTextAnnotation annotGeneMAP2K1 = new XYTextAnnotation("|MAP2K1", Chrom.c15.getGenomeWidePositionStart() / GenomeWidePositionDivisor + 67, 1);
-		annotGeneMAP2K1.setFont(new Font("Arial", Font.BOLD, 16));
-		annotGeneMAP2K1.setTextAnchor(org.jfree.ui.TextAnchor.CENTER_LEFT);
-		xyPlot.addAnnotation(annotGeneMAP2K1);		
+//		XYTextAnnotation annotGeneBRAF = new XYTextAnnotation("|BRAF", Chrom.c7.getGenomeWidePositionStart() / GenomeWidePositionDivisor + 140, 1);
+//		annotGeneBRAF.setFont(new Font("Arial", Font.BOLD, 16));
+//		annotGeneBRAF.setTextAnchor(org.jfree.ui.TextAnchor.CENTER_LEFT);
+//		xyPlot.addAnnotation(annotGeneBRAF);
+//		XYTextAnnotation annotGeneMAP2K1 = new XYTextAnnotation("|MAP2K1", Chrom.c15.getGenomeWidePositionStart() / GenomeWidePositionDivisor + 67, 1);
+//		annotGeneMAP2K1.setFont(new Font("Arial", Font.BOLD, 16));
+//		annotGeneMAP2K1.setTextAnchor(org.jfree.ui.TextAnchor.CENTER_LEFT);
+//		xyPlot.addAnnotation(annotGeneMAP2K1);		
 	}
 
 	// ========================================================================
@@ -425,13 +443,15 @@ public class ClusteringPlotting {
 		}
 		xyPlot.setFixedLegendItems(legendItemCollection);
 	}
-	
+		
 	// ========================================================================
 	/** Plots the VAF (variant allele frequency) of a tissue vs the genomic position. */
 	public static void plotVAFGenomeWide(XYDataset xyDataset, String outFilenameRoot, String sampleName, boolean isTumor) {
 		String xAxisLabel = GenomeWideXAxisLabel;
 		String yAxisLabel = "Variant Allele Fraction (VAF)";
-		String title = sampleName.substring(0, sampleName.indexOf(".")) + (isTumor ? " [Tumor]" : " [Normal]");
+		
+		int periodIndex = sampleName.indexOf(".");				
+		String title = ((periodIndex >= 0) ? sampleName.substring(0, periodIndex) : sampleName) + (isTumor ? " [Tumor]" : " [Normal]");
 		
 		//+ "\n" + ChromTitleString;
 		
@@ -444,8 +464,9 @@ public class ClusteringPlotting {
 		theChart.getTitle().setFont(new Font("Arial", Font.BOLD, 32));
 		
 		XYItemRenderer itemRenderer = ClusteringPlotting.getXYItemRendererHelper(CopyNumberVAFPlotPointSize);		
-		setSeriesPaintPerCluster(itemRenderer);
+		setSeriesPaintPerCluster(itemRenderer, xyDataset, EventType.class, ColorPastelForEnumEventType);
 		xyPlot.setRenderer(itemRenderer);		
+		xyPlot.addRangeMarker(new ValueMarker(0.5));
 		
 		xyPlot.setBackgroundPaint(ColorPastel.White.getColor());
 		xyPlot.setDomainGridlinePaint(Color.white);
@@ -463,7 +484,7 @@ public class ClusteringPlotting {
 		}
 	
 		xyPlot.getRangeAxis().setRange(0, 1.04);		
-		xyPlot.getDomainAxis().setRange(0, Chrom.c22.calculateGenomeWidePositionEnd() / GenomeWidePositionDivisor);
+		xyPlot.getDomainAxis().setRange(0, ArrayUtils.getLastElement(Chrom.Autosomes).calculateGenomeWidePositionEnd() / GenomeWidePositionDivisor);
 		
 		Font rangeAxisLabelFont = new Font("Arial", Font.BOLD, 32);
 		Font rangeAxisTickFont = new Font("Arial", Font.BOLD, 20);
@@ -493,43 +514,64 @@ public class ClusteringPlotting {
 	}
 
 	// ========================================================================
-	static void setSeriesPaintPerCluster(XYItemRenderer itemRenderer) {
-		
-		ControlFlagBool allGray                = new ControlFlagBool(false);
-		ControlFlagBool makeNonEventsInvisible = new ControlFlagBool(false);
-			
-		if (allGray.getValue()) {
-			for (EventType eventType : EventType.values()) {
-				itemRenderer.setSeriesPaint(eventType.ordinal(), ColorPastel.Gray_50.getColor());
+	static<E extends Enum<E>> void setSeriesPaintPerCluster(XYItemRenderer itemRenderer, XYDataset xyDataset, Class<E> enumType, ColorPastelForEnum<E> colorPastelMap) {
+
+		int numSeries = xyDataset.getSeriesCount();
+		for (int i = 0; i < numSeries; i++) {
+			E theEnum = UtilsBasic.getEnumValue(Cast.downcast(xyDataset.getSeriesKey(i), String.class), enumType);
+			if (theEnum != null) {					
+				itemRenderer.setSeriesPaint(i, colorPastelMap.getColorForEvent(theEnum).getColor());
+			} else {
+				itemRenderer.setSeriesPaint(i, ColorPastel.Black.getColor());
 			}
-			if (makeNonEventsInvisible.getValue()) {
-				itemRenderer.setSeriesPaint(EventType.HETGermline.ordinal(), ColorPastel.Gray_15.getColor());
-				itemRenderer.setSeriesPaint(EventType.HETSomatic.ordinal(),  ColorPastel.Gray_15.getColor());
-				itemRenderer.setSeriesPaint(EventType.Noise.ordinal(),       ColorPastel.Gray_15.getColor());
-				itemRenderer.setSeriesPaint(EventType.Ignored.ordinal(),     ColorPastel.Gray_15.getColor());
-			}
-		} else {
-			for (EventType eventType : EventType.values()) {
-				itemRenderer.setSeriesPaint(eventType.ordinal(), getColorForEvent(eventType).getColor());
-			}
+
 		}
 		//itemRenderer.setSeriesPaint(EventType.HETSomatic.ordinal(), getColorForEvent(EventType.HETSomatic).getColor());			
 	}
 
 	// ========================================================================
-	public static ColorPastel getColorForEvent(EventType eventType) {
-		System.out.println("EV:\t" + eventType);
-		switch(eventType) {
-		case GainGermline: return ColorPastel.Violet;
-		case GainSomatic:  return ColorPastel.Dark_Red;
-		case LOH:          return ColorPastel.RGB_Blue;
-		case cnLOH:        return ColorPastel.Gray_60; //Dark_Yellow;
-		case HETGermline:  return ColorPastel.Gray_60;
-		case HETSomatic:   return ColorPastel.Red_Orange;
-		case DELHom:       return ColorPastel.Light_Cyan_Blue;
-		case Noise:        return ColorPastel.Dark_Pea_Green;
-		case Ignored:      return ColorPastel.Gray_30;			
-		default:           return null;
-		}
+	public static interface ColorPastelForEnum<E extends Enum<E>> {
+		public ColorPastel getColorForEvent(E enumValue);
 	}
+	
+	// ========================================================================
+	public static ColorPastelForEnum<EventType> ColorPastelForEnumEventType = new ColorPastelForEnum<EventType>() {
+		ControlFlagBool mAllGray                = new ControlFlagBool(false);
+		ControlFlagBool mMakeNonEventsInvisible = new ControlFlagBool(false);
+		
+		@Override
+		public ColorPastel getColorForEvent(EventType enumValue) {
+			if (mAllGray.getValue()) {
+				if (mMakeNonEventsInvisible.getValue()) {
+					switch(enumValue) {
+						case HETGermline: 
+						case HETSomatic: 
+						case Noise: 
+						case Ignored: 
+							return ColorPastel.Gray_15;
+						default: break;
+					}
+				}
+				return ColorPastel.Gray_50;
+				
+			} else {			
+				switch(enumValue) {
+				case GainGermline: return ColorPastel.Violet;
+				case GainSomatic:  return ColorPastel.Dark_Red;
+				case LOH:          return ColorPastel.RGB_Blue;
+				//case cnLOH:        return ColorPastel.Gray_60;
+				case cnLOH:        return ColorPastel.Dark_Yellow;
+				case HETGermline:  return ColorPastel.Gray_60;
+				case HETSomatic:   return ColorPastel.Red_Orange;
+				case DELHom:       return ColorPastel.Light_Cyan_Blue;
+				case Noise:        return ColorPastel.Dark_Pea_Green;
+				case Ignored:      return ColorPastel.Gray_30;			
+				default:           return null;
+				}
+			}
+		}
+		
+	};
+
+	// ========================================================================
 }

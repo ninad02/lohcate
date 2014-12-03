@@ -49,6 +49,7 @@ public enum Chrom {
 		for (int i = 0; i < NumAutosomes; i++) {
 			autosomes.add(Chrom.values()[i + IndexAutosomalStart]);
 		}
+		autosomes.add(cX);
 		return autosomes;
 	}
 

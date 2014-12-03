@@ -2,6 +2,10 @@ package nutils;
 
 public class CompareUtils {
 
+	public static final int LESS_THAN    = -1;
+	public static final int EQUALS       =  0;
+	public static final int GREATER_THAN =  1;
+	
 	/**
 	 * @param args
 	 */

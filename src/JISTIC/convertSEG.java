@@ -32,7 +32,7 @@ public class convertSEG {
 			int maxsegsize=-1;
 			int minsegsize=-1;
 			String sample_list_file = null;
-			for(int i=2; i < args.length; i++)
+			for(int i=2; i < args.length; i++) {
 				if(args[i].equalsIgnoreCase("excluderemovedmarkers"))
 					remove_zero = true;
 				else if(args[i].equalsIgnoreCase("includeremovedmarkers"))
@@ -62,6 +62,7 @@ public class convertSEG {
 					System.err.println("Invalid command-line argument: " + args[i]);
 					System.exit(1);
 				}
+			}
 
 			
 			PrintStream fout = new PrintStream(new FileOutputStream(logfile));

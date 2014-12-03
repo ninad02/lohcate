@@ -29,6 +29,7 @@ import lohcate.EventTypeAllele;
 import lohcate.Regions;
 import lohcate.clustering.AlleleFractionStatsForSample;
 import lohcate.clustering.Clustering;
+import lohcate.geneAnalysis.GeneCounter.PatientNameAndCopyNumber;
 import lohcateEnums.EventType;
 import lohcateEnums.MutationType;
 import nutils.ArrayUtils;
@@ -141,7 +142,8 @@ public class GeneEnrichment {
 		
 		ArrayList<String> allPatients = new ArrayList<String>(files.length);
 		ArrayList<File> mValidFiles = new ArrayList<File>(files.length);		
-		String targetSuffix = Clustering.SitesClassifiedOutputSuffix + ".lohcateInput_txt" ; // fileExtDelim.mExtension;
+		//String targetSuffix = Clustering.SitesClassifiedOutputSuffix + fileExtDelim.mExtension; // ".lohcateInput_txt";
+		String targetSuffix = Clustering.SitesClassifiedOutputSuffix + ".lohcateInput_txt";
 		System.out.println("Reading Patients...");
 		for (File file : files) {  // Iterate through clustering/smoothing results			
 			if (file.getName().endsWith(targetSuffix)) {
@@ -204,7 +206,7 @@ public class GeneEnrichment {
 
 						twoGenesTwoEventsCompactDummy.mLong = compactIntoUnitLong(gene1.getNumericID(), gene2.getNumericID(), keyValueIter1.getValue(), keyValueIter2.getValue(), Cast.toShort(InitialDualEventCount));
 						numCombos++;
-						allPairsOnePatient.add(twoGenesTwoEventsCompactDummy.mLong);
+						//allPairsOnePatient.add(twoGenesTwoEventsCompactDummy.mLong);
 						/*
 							BitSet patients = coOcurrenceWithPatients.get(twoGenesTwoEventsCompactDummy);
 							if (patients == null) {
@@ -405,12 +407,13 @@ public class GeneEnrichment {
 			for (EventType eventType : EventType.values()) {
 				if (isEventToIgnore(eventType)) continue;
 				
-				ArrayList<String> patientsForEvent = gene.getPatientsForEventType(eventType);
-				for (String patientForEvent : patientsForEvent) {					
+				ArrayList<PatientNameAndCopyNumber> patientsForEvent = gene.getPatientsForEventType(eventType);
+				for (PatientNameAndCopyNumber patientForEvent : patientsForEvent) {					
 					sb.setLength(0);
 					appendGeneCoordinates(gene, sb, false);
 					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(eventType.name());
-					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(patientForEvent);
+					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(patientForEvent.mPatient);
+					sb.append(StringUtils.FileExtensionTSV.mDelimiter).append(patientForEvent.mCopyNumber);
 					IOUtils.writeToBufferedWriter(outBreakdown, sb.toString(), true);
 				}
 			}

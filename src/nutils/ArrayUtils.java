@@ -233,6 +233,13 @@ public class ArrayUtils {
 	public static void sort(com.carrotsearch.hppc.FloatArrayList theArray)  { Arrays.sort(theArray.buffer, 0, theArray.size()); }
 
 
+	/** Returns the last element of an ArrayList. */
+	public static<E> E getLastElement(ArrayList<E> theList) {		
+		if (!theList.isEmpty()) {
+			return theList.get(theList.size() - 1);
+		}
+		return null;
+	}
 	
 	/** Given an array of doubles, this returns the index of the maximum element.  If there
 	 *  are multiple maximal elements, this returns the index of the first one.  The second
@@ -443,6 +450,8 @@ public class ArrayUtils {
 			}
 			return rV;
 		}
+		
+		public int size() { return mLists[0].size(); }
 	}
 	
 	
@@ -787,6 +796,15 @@ public class ArrayUtils {
 		Arrays.fill(newArray, fillValue);
 		return newArray;
 	}
+	
+	// ========================================================================
+	/** This returns a new double[] array with the specified length and initialized to the specified values. */
+	public static double[] newDoubleArray(int numElements, double fillValue) {
+		double[] newArray = new double[numElements];
+		Arrays.fill(newArray, fillValue);
+		return newArray;
+	}
+
 
 	// ========================================================================
 	/** This returns a new int[][] array with the specified dimensions and with all elements

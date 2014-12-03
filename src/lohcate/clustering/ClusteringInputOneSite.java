@@ -7,6 +7,7 @@ import genomeUtils.GenotypeUtils;
 import genomeUtils.SiteInformation;
 
 import java.util.Comparator;
+import java.util.HashSet;
 
 import lohcate.Regions;
 import lohcateEnums.MutationType;
@@ -16,10 +17,13 @@ import nutils.NumberUtils;
 import nutils.StringUtils;
 import nutils.BitUtils.BitSetUtils;
 import nutils.BitUtils.BitShiftAndMask;
+import nutils.collectionsSorted.ArrayListSortedComparable;
 import shared.Utils;
 
 public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite>, SiteInformation.Writeable {
 
+	protected static ArrayListSortedComparable<String> HugoSymbolArray = new ArrayListSortedComparable<String>();
+	
 	// ========================================================================
 	public static Comparator<ClusteringInputOneSite> ClusteringInputOneSiteComparator = new Comparator<ClusteringInputOneSite>() {
 		public int compare(ClusteringInputOneSite site1, ClusteringInputOneSite site2) {
@@ -55,6 +59,37 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	public short mCovgVarTumor;
 	public int mRsID; 
 	public VariantFrequency mVarFrequency;
+
+	// ========================================================================
+	/** Switches the tumor data with the normal data. */
+	public void switchTumorAndNormal() {
+		
+		// Swap the coverages		
+		short tempCovg = mCovgTotalNormal;
+		mCovgTotalNormal = mCovgTotalTumor;
+		mCovgTotalTumor = tempCovg;
+		
+		tempCovg = mCovgVarNormal;
+		mCovgVarNormal = mCovgVarTumor;
+		mCovgVarTumor = tempCovg;
+		
+		String tempFlanking = mFlankingNormal;
+		mFlankingNormal = mFlankingTumor;
+		mFlankingTumor = tempFlanking;
+		
+		Nuc tempNucVarNormal = getVariantAlleleNormal();
+		Nuc tempNucVarTumor  = getVariantAlleleTumor();
+		setVariantAlleleNormal(tempNucVarTumor);
+		setVariantAlleleTumor(tempNucVarNormal);
+	}
+	
+	public void copyNormalIntoTumor() {
+		mCovgTotalTumor = mCovgTotalNormal;
+		mCovgVarTumor   = mCovgVarNormal;
+		mFlankingTumor  = mFlankingNormal;
+		
+		setVariantAlleleTumor(getVariantAlleleNormal());
+	}
 	
 	// ========================================================================
 	public ClusteringInputOneSite() {
@@ -89,10 +124,10 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 		
 		setChrom(chrom);
 		setPosition(position);			
-		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleRef.setValueInCompactUnit( aRef.getCode(),  mDataUnit_ChromProsRevVarAllelesMutType);
-		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarN.setValueInCompactUnit(aVarN.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
-		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarT.setValueInCompactUnit(aVarT.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
-		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarPop.setValueInCompactUnit(aVarPop.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
+		setReferenceAllele(aRef);
+		setVariantAlleleNormal(aVarN);
+		setVariantAlleleTumor(aVarT);
+		setVariantAllelePopulation(aVarPop);
 		
 		// Now for rsID
 		mVarFrequency = VariantFrequency.Unknown;
@@ -175,7 +210,8 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 			int mutTypeCode = MutationType.getSNVType(mutationTypeStr).ordinal();
 			mDataUnit_ChromProsRevVarAllelesMutType = bsmMutType.setValueInCompactUnit(mutTypeCode, mDataUnit_ChromProsRevVarAllelesMutType);
 			
-			mHugoSymbol     = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_HugoSymbol, StringUtils.FileExtensionTSV.mDelimiter);
+			mHugoSymbol = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_HugoSymbol, StringUtils.FileExtensionTSV.mDelimiter);
+			mHugoSymbol = findAndAddHugoSymbol(mHugoSymbol); 
 			
 		}
 	
@@ -198,8 +234,8 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	}
 	
 	// ====================================================================
-	public void setCovgTotalNormal(short mCovgTotalNormal) {
-		this.mCovgTotalNormal = mCovgTotalNormal;
+	public void setCovgTotalNormal(short covgTotalNormal) {
+		this.mCovgTotalNormal = covgTotalNormal;
 	}
 
 	// ====================================================================
@@ -208,8 +244,8 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	}
 
 	// ====================================================================
-	public void setCovgVarNormal(short mCovgVarNormal) {
-		this.mCovgVarNormal = mCovgVarNormal;
+	public void setCovgVarNormal(short covgVarNormal) {
+		this.mCovgVarNormal = covgVarNormal;
 	}
 
 	// ====================================================================
@@ -230,10 +266,28 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	public Chrom getChrom()  { return Chrom.getChrom((byte) bsmChrom.extractValue(mDataUnit_ChromProsRevVarAllelesMutType)); }
 	public int getPosition() { return                ((int)   bsmPos.extractValue(mDataUnit_ChromProsRevVarAllelesMutType)); }
 	
+	public String getHugoSymbol() { return mHugoSymbol; }
+	
 	public Nuc getReferenceAllele()     { return Nuc.getAllele(bsmAlleleRef.extractValue(mDataUnit_ChromProsRevVarAllelesMutType));  }
 	public Nuc getVariantAlleleNormal() { return Nuc.getAllele(bsmAlleleVarN.extractValue(mDataUnit_ChromProsRevVarAllelesMutType)); }
 	public Nuc getVariantAlleleTumor()  { return Nuc.getAllele(bsmAlleleVarT.extractValue(mDataUnit_ChromProsRevVarAllelesMutType)); }
 	public Nuc getVariantAllelePopulation() { return Nuc.getAllele(bsmAlleleVarPop.extractValue(mDataUnit_ChromProsRevVarAllelesMutType)); }
+	
+	public void setReferenceAllele(Nuc aRef) {
+		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleRef.setValueInCompactUnit(aRef.getCode(),  mDataUnit_ChromProsRevVarAllelesMutType);
+	}
+	
+	public void setVariantAlleleNormal(Nuc aVarN) {
+		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarN.setValueInCompactUnit(aVarN.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
+	}
+	
+	public void setVariantAlleleTumor(Nuc aVarT) {
+		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarT.setValueInCompactUnit(aVarT.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
+	}
+	
+	public void setVariantAllelePopulation(Nuc aVarPop) {
+		mDataUnit_ChromProsRevVarAllelesMutType = bsmAlleleVarPop.setValueInCompactUnit(aVarPop.getCode(), mDataUnit_ChromProsRevVarAllelesMutType);
+	}
 	
 	public MutationType getMutationType() {
 		return MutationType.getMutationType((int) bsmMutType.extractValue(mDataUnit_ChromProsRevVarAllelesMutType));
@@ -289,6 +343,21 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 		sb.append(delimiter).append(getMutationType().getPrintName());
 		sb.append(delimiter).append(mHugoSymbol);
 		return sb;
+	}
+	
+	// ====================================================================
+	/** Checks if hugo symbol exists in table.  If it does, it returns the copy in the table.  If not, it adds 
+	 *  the symbol and returns the same input argument hugosymbol string. 
+	 * @param hugoSymbol
+	 * @return
+	 */
+	protected synchronized String findAndAddHugoSymbol(String hugoSymbol) {
+		String result = HugoSymbolArray.get(hugoSymbol);
+		if (result == null) {
+			HugoSymbolArray.add(hugoSymbol);
+			result = hugoSymbol;
+		}
+		return result;
 	}
 	
 	// ====================================================================		

@@ -15,6 +15,7 @@ import com.martiansoftware.jsap.JSAPResult;
 
 import nutils.ArgumentParserUtils;
 import nutils.CompareUtils;
+import nutils.ControlFlagBool;
 import nutils.EnumMapSafe;
 import nutils.IOUtils;
 import nutils.Logger;
@@ -28,22 +29,37 @@ import nutils.Logger;
 public class LOHcate {
 	
 	public static enum Sensitivity {
-		Low, High;
+		Low, High, VeryHigh;
+		
+		public boolean isHighOrMore()     { return this.ordinal() >= High.ordinal(); }
+		public boolean isVeryHighOrMore() { return this.ordinal() >= VeryHigh.ordinal(); }
+		public boolean isLow() { return this == Low; } 
 	}
 	
-	public static final boolean RunOld = true;
-	public static final String SuffixInputFile = RunOld ? ".germline.txt" :  
+	public static final ControlFlagBool RunOld = new ControlFlagBool(false);
+	public static final String SuffixInputFile = RunOld.getValue() ? ".germline.txt" :  
 		// ".txt";  
-		".lohcateInput_txt";	
-	public static final Sensitivity LOHcateSensitivity = Sensitivity.High;
+		//".lohcateInput_txt";
+		".lohcateInput.txt";
+	
+	public static Sensitivity LOHcateSensitivity = Sensitivity.Low;
+	
+	public static ControlFlagBool FindGermline = new ControlFlagBool(false);
+	
+	public static final ControlFlagBool EliminateExtremeGCSites = new ControlFlagBool(true);
+	public static final ControlFlagBool EliminateHighDensitySNVs = new ControlFlagBool(true);
+	public static final ControlFlagBool EliminateExcessiveGermlineCopyGains = new ControlFlagBool(true);
+	public static final ControlFlagBool EliminateAberrantGermlineAvgVAFs    = new ControlFlagBool(true);
 	
 	// Logging module
 	public static final Logger LogOutput = IOUtils.getLogger("LOHcate.Log." + ((new Date()).toString()).replace(' ', '_').replace(':', '-') + ".txt");
+	
 	
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
+		
 		entryPoint(args);
 	}
 	
@@ -281,4 +297,6 @@ public class LOHcate {
 		
 		System.out.println("Time elapsed: " + (System.currentTimeMillis()-sys_time_init)/1000 + " seconds");
 	}
+
+
 }
