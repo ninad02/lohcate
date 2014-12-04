@@ -1,8 +1,11 @@
 package nutils.counter;
 
+import genomeUtils.ChromPosition;
+
 import java.util.HashMap;
 
 import nutils.ArrayUtils;
+import nutils.NumberUtils;
 import nutils.PrimitiveWrapper;
 import nutils.NullaryClassFactory;
 import nutils.BitUtils.ValueExtractor;
@@ -61,7 +64,7 @@ public class DynamicBucketCounter {
 	}
 	
 	// ========================================================================
-	public int getCountMax() {
+	public int getCountMax() {			
 		return (mIndexOfMaxCount < 0) ? 0 : getCountAtIndex(mIndexOfMaxCount);
 	}
 	
@@ -107,6 +110,7 @@ public class DynamicBucketCounter {
 		if (indexOfKey < 0) {
 			int insertPoint = ArrayUtils.getInsertPoint(indexOfKey); 			
 			mArray.insert(insertPoint, getKeyValueAsLong(key, numToIncrement));
+			if (mIndexOfMaxCount >= insertPoint) { ++mIndexOfMaxCount; }
 			determineIndexOfMaxCountWithIncrementedIndex(insertPoint, numToIncrement);
 			return numToIncrement;
 		} else {
@@ -131,13 +135,13 @@ public class DynamicBucketCounter {
 	
 	// ========================================================================
 	public int getKeyWithMaxCount() {
-		long keyValueMax = getKeyValueWithMaxCount();
-		return (int) ValueExtractor.IntExtractorMSB.extractValue(keyValueMax);
+		int index = getIndexOfKeyWithMaxCount();
+		return (int) ValueExtractor.IntExtractorMSB.extractValue(mArray.get(index));
 	}
 	
 	// ========================================================================
-	public long getKeyValueWithMaxCount() {
-		return ArrayUtils.searchMaxValue(mArray, ValueExtractor.IntExtractorLSB);
+	public int getIndexOfKeyWithMaxCount() {	
+		return ArrayUtils.searchIndexOfMaxValue(mArray, ValueExtractor.IntExtractorLSB);		
 	}
 
 	// ========================================================================
@@ -244,6 +248,57 @@ public class DynamicBucketCounter {
 	
 	// ========================================================================
 	private static void TestDBC2() {
+		DynamicBucketCounter dbc = new DynamicBucketCounter();		
+		HashMap<PrimitiveWrapper.WInteger, PrimitiveWrapper.WInteger> truthMap = new HashMap<>();
+		PrimitiveWrapper.WInteger dummy = new PrimitiveWrapper.WInteger(0);
+		
+		
+		int numTrials = 100_000_000;		
+		int printIncr = 100_000;
+		for (int trial = 0; trial < numTrials; trial++) {
+			if (trial % printIncr == 0) System.out.printf("Trial: %d\n", trial);
+			int key = NumberUtils.getRandomInteger(0, 25);			
+			dbc.incrementCount(key);
+			
+			// Now increment in truth table
+			dummy.mInt = key;
+			PrimitiveWrapper.WInteger result = truthMap.get(dummy);
+			if (result == null) {
+				truthMap.put(new PrimitiveWrapper.WInteger(key), new PrimitiveWrapper.WInteger(1));
+			} else {
+				result.mInt++;
+			}
+		}
+		
+		// Now check
+		int maxTruthValue = -1;
+		int keyWithMaxTruthValue = -1;
+		
+		for (PrimitiveWrapper.WInteger theKey : truthMap.keySet()) {
+			PrimitiveWrapper.WInteger truthValue = truthMap.get(theKey);
+			int testValue = dbc.getCount(theKey.mInt);
+			
+			if (truthValue.mInt != testValue) {
+				System.err.printf("ERROR: Counts do not match: %d\t%d\t%d\n", theKey.mInt, truthValue.mInt, testValue);
+				
+			}
+			
+			if (truthValue.mInt > maxTruthValue) {
+				maxTruthValue = truthValue.mInt;
+				keyWithMaxTruthValue = theKey.mInt;
+			}
+		}
+		
+		// Now ensure the maximum tests are true		
+		if (keyWithMaxTruthValue != dbc.getKeyWithMaxCount()) {
+			System.err.printf("Max keys don't match: %d\t%d\n", keyWithMaxTruthValue, dbc.getKeyWithMaxCount());
+		}
+		System.out.println("Key Max: " + keyWithMaxTruthValue);
+		
+		if (maxTruthValue != dbc.getCountMax()) {
+			System.err.printf("Max counts don't match: %d\t%d\t%d\n", keyWithMaxTruthValue, maxTruthValue, dbc.getCountMax());
+		}		
+		System.out.println("Count Max: " + maxTruthValue);
 		
 	}
 
@@ -290,7 +345,8 @@ public class DynamicBucketCounter {
 	
 	// ========================================================================
 	public static void main(String[] args) {
-		TestDynamicBucketCounter();
+		//TestDynamicBucketCounter();
+		TestDBC2();
 	}
 	
 }

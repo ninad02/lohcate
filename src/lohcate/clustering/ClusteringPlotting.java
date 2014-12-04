@@ -175,9 +175,10 @@ public class ClusteringPlotting {
 			
 		// First get the max count for the chromosome boundaries
 		int maxCountAllChromosomes = 1;
-		for (Chrom chrom : Chrom.Autosomes) {
+		for (Chrom chrom : Chrom.Autosomes) {			
 			maxCountAllChromosomes = Math.max(eventCount.get(chrom).getCountMax(), maxCountAllChromosomes);
 		}
+		System.out.printf("EVENT: %s\t%d\n", eventType, maxCountAllChromosomes);
 		
 		for (Chrom chrom : Chrom.values()) {
 			if (Chrom.Autosomes.contains(chrom)) {		

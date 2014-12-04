@@ -618,21 +618,20 @@ public class ArrayUtils {
 	}
 	
 	
-	// ========================================================================
-	public static long searchMaxValue(LongArrayList longArray, ValueExtractor extractor) {
+	// ========================================================================	
+	public static int searchIndexOfMaxValue(LongArrayList longArray, ValueExtractor extractor) {
 		long maxValue = Long.MIN_VALUE;
 		int maxValueIndex = -1;
 		
 		for (int i = 0; i < longArray.size(); i++) {
 			long value = extractor.extractValue(longArray.get(i));
-			//System.out.println("" + i + "\t" + value);
 			if (value > maxValue) {
 				maxValue = value;
 				maxValueIndex = i;
 			}
 		}
 		
-		return longArray.get(maxValueIndex);
+		return maxValueIndex;
 	}
 
 	// ========================================================================

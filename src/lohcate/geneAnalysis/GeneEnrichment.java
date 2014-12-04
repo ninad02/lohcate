@@ -142,8 +142,8 @@ public class GeneEnrichment {
 		
 		ArrayList<String> allPatients = new ArrayList<String>(files.length);
 		ArrayList<File> mValidFiles = new ArrayList<File>(files.length);		
-		//String targetSuffix = Clustering.SitesClassifiedOutputSuffix + fileExtDelim.mExtension; // ".lohcateInput_txt";
-		String targetSuffix = Clustering.SitesClassifiedOutputSuffix + ".lohcateInput_txt";
+		String targetSuffix = Clustering.SitesClassifiedOutputSuffix + fileExtDelim.mExtension; 
+		//String targetSuffix = Clustering.SitesClassifiedOutputSuffix + ".lohcateInput_txt";
 		System.out.println("Reading Patients...");
 		for (File file : files) {  // Iterate through clustering/smoothing results			
 			if (file.getName().endsWith(targetSuffix)) {

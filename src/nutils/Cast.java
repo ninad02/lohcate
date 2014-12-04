@@ -8,6 +8,10 @@ package nutils;
  */
 public class Cast {
 
+	public static byte toByte(long l)  { return (byte) l; }
+	public static byte toByte(int i)   { return (byte) i; }
+	public static byte toByte(short s) { return (byte) s; }
+	
 	public static int toInt(double d) { return (int) d; }
 	public static int toInt(long l)   { return (int) l; }
 	public static int toInt(float f)  { return (int) f; }
