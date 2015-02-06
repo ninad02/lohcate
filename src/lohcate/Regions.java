@@ -181,7 +181,15 @@ public class Regions {
 				}
 				
 				// Now check the vaf normal and see whether it's an outlier.
-				Double vafNormal = Double.parseDouble(StringUtils.extractNthColumnValue(row, Regions.Col_NAFTAFInput_VariantRatioNormal, StringUtils.FileExtensionTSV.mDelimiter));
+				double vafNormal = 0;
+				if (ClusteringParams.GlobalClusteringParams.isTumorOnly()) {
+					short readsVariantTumor = Short.parseShort( StringUtils.extractNthColumnValue(row, Regions.Col_NAFTAFInput_VariantCoverageTumor, StringUtils.FileExtensionTSV.mDelimiter) );
+					short readsTotalTumor   = Short.parseShort( StringUtils.extractNthColumnValue(row, Regions.Col_NAFTAFInput_TotalCoverageTumor,   StringUtils.FileExtensionTSV.mDelimiter) );
+					vafNormal = (double) readsVariantTumor / (double) readsTotalTumor;					
+				} else {
+					vafNormal = Double.parseDouble(StringUtils.extractNthColumnValue(row, Regions.Col_NAFTAFInput_VariantRatioNormal, StringUtils.FileExtensionTSV.mDelimiter));					
+				}
+				
 				if (vafNormal > AlleleFractionStatsForSample.VAFNormalRange.getBoundLower()) {						
 					numVariantSitesSpanned++;
 				}

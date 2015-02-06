@@ -1,5 +1,11 @@
 package nutils.math;
 
+import java.io.BufferedReader;
+import java.io.PrintStream;
+
+import nutils.IOUtils;
+import nutils.StringUtils;
+
 /**
  *  This file is not used for LOHcate and was pulled from the package TASSEL, written by
  *  the Ed Buckler Lab for Maize Genetics and Diversity.  Full credit for this file goes 
@@ -366,8 +372,36 @@ public class FisherExact {
 
     }
     
+    public static void performFisherExactFromFile(String inFilename, PrintStream outStream) {
+    	
+    	BufferedReader in = IOUtils.getBufferedReader(inFilename);
+    	String line;
+    	FisherExact fe = new FisherExact(65535);
+    	int[] contingencyArray = new int[4];
+    	
+    	while ((line = IOUtils.getNextLineInBufferedReader(in)) != null) {
+    		String[] cols = line.split(StringUtils.TabPatternStr);
+    		
+    		// Print the original line
+    		outStream.printf("%s%s", line, StringUtils.TabStr);
+    		
+    		for (int i = 0; i < 4; i++) {
+    			contingencyArray[i] = Integer.parseInt(cols[i]);
+    		}
+    		
+    		contingencyArray[0] -= contingencyArray[1];
+    		contingencyArray[2] -= contingencyArray[3];
+    		
+    		double twoTailed = fe.getTwoTailedP(contingencyArray[0], contingencyArray[1], contingencyArray[2], contingencyArray[3]);
+    		outStream.printf("%g\n", twoTailed);    		
+    	}    	
+    }
+    
     public static void main(String[] args) {
-    	Test();
+    	
+    	performFisherExactFromFile(args[0], System.out);
+    	
+    	//Test();
     	/*
         int[][] argInts = new int[15][4];
         argInts[0] = new int[]{2, 3, 6, 4};

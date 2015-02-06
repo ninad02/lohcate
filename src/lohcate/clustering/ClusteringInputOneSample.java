@@ -1,5 +1,6 @@
 package lohcate.clustering;
 
+import genomeEnums.TissueType;
 import genomeUtils.RegionRange;
 import genomeUtils.RegionSimulator;
 import genomeUtils.SiteList;
@@ -51,6 +52,15 @@ public class ClusteringInputOneSample extends SiteList<ClusteringInputOneSite> i
 		super.clear();
 		
 		mSampleNameRoot = "";
+	}
+	
+	// ========================================================================
+	public double calcAverageCoverage(TissueType t) {
+		long sumReads = 0;
+		for (ClusteringInputOneSite oneSiteInfo : mInfoSites) {
+			sumReads += (t == TissueType.Normal) ? oneSiteInfo.getCovgTotalNormal() : oneSiteInfo.getCovgTotalTumor();
+		}		
+		return (double) sumReads / (double) getNumSites();
 	}
 	
 	// ========================================================================

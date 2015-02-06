@@ -83,6 +83,13 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 		setVariantAlleleTumor(tempNucVarNormal);
 	}
 	
+	public void copyTumorIntoNormal() {
+		mCovgTotalNormal = mCovgTotalTumor;
+		mCovgVarNormal   = mCovgVarTumor;
+		mFlankingNormal  = mFlankingTumor;
+		setVariantAlleleNormal(getVariantAlleleTumor());
+	}
+	
 	public void copyNormalIntoTumor() {
 		mCovgTotalTumor = mCovgTotalNormal;
 		mCovgVarTumor   = mCovgVarNormal;
@@ -95,31 +102,42 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	public ClusteringInputOneSite() {
 		clear();
 	}			
+
+	// ========================================================================
+	private static short parseShortHelper(String theString) {		
+		if (theString.charAt(0) == Regions.MissingAllele || theString.isEmpty()) {
+			return 0;
+		} else {
+			return Short.parseShort(theString);
+		}
+	}
 	
 	// ========================================================================
 	public ClusteringInputOneSite(String line, SeqPlatform platform) {
-		mFlankingNormal = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_FlankingStringNormal,  StringUtils.FileExtensionTSV.mDelimiter);
-		mFlankingTumor  = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_FlankingStringTumor,   StringUtils.FileExtensionTSV.mDelimiter);
+		String delimiter = StringUtils.FileExtensionTSV.mDelimiter;
 		
-		mCovgTotalNormal = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_TotalCoverageNormal,   StringUtils.FileExtensionTSV.mDelimiter));
-		mCovgTotalTumor  = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_TotalCoverageTumor,    StringUtils.FileExtensionTSV.mDelimiter));
-		mCovgVarNormal   = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_VariantCoverageNormal, StringUtils.FileExtensionTSV.mDelimiter));
-		mCovgVarTumor    = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_VariantCoverageTumor,  StringUtils.FileExtensionTSV.mDelimiter));
+		mFlankingNormal = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_FlankingStringNormal, delimiter);
+		mFlankingTumor  = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_FlankingStringTumor,  delimiter);
+		
+		mCovgTotalNormal = parseShortHelper(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_TotalCoverageNormal,   delimiter));
+		mCovgTotalTumor  = parseShortHelper(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_TotalCoverageTumor,    delimiter));
+		mCovgVarNormal   = parseShortHelper(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_VariantCoverageNormal, delimiter));
+		mCovgVarTumor    = parseShortHelper(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_VariantCoverageTumor,  delimiter));
 
 		// Now set the chrom, position, and alleles
-		Chrom chrom  = Chrom.getChrom(   StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Chrom,     StringUtils.FileExtensionTSV.mDelimiter) );
-		int position = Integer.parseInt( StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Position,  StringUtils.FileExtensionTSV.mDelimiter) );
+		Chrom chrom  = Chrom.getChrom(   StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Chrom,     delimiter) );
+		int position = Integer.parseInt( StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Position,  delimiter) );
 		
-		char nucChar = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleRef,  StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		char nucChar = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleRef,  delimiter).charAt(0);
 		Nuc aRef     = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
 		
-		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarN, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarN, delimiter).charAt(0);
 		Nuc aVarN    = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
 		
-		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarT, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarT, delimiter).charAt(0);
 		Nuc aVarT    = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
 		
-		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarPop, StringUtils.FileExtensionTSV.mDelimiter).charAt(0);
+		nucChar      = StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_AlleleVarPop, delimiter).charAt(0);
 		Nuc aVarPop  = nucChar == Regions.MissingAllele ? Nuc.N : Nuc.getNuc(nucChar);
 		
 		setChrom(chrom);
@@ -232,6 +250,12 @@ public class ClusteringInputOneSite implements Comparable<ClusteringInputOneSite
 	public void setPosition(int position) {			
 		mDataUnit_ChromProsRevVarAllelesMutType = bsmPos.setValueInCompactUnit(position,  mDataUnit_ChromProsRevVarAllelesMutType);
 	}
+
+	// ====================================================================
+	public short getCovgTotalNormal() { return this.mCovgTotalNormal; }
+	
+	// ====================================================================
+	public short getCovgTotalTumor()  { return this.mCovgTotalTumor; }
 	
 	// ====================================================================
 	public void setCovgTotalNormal(short covgTotalNormal) {

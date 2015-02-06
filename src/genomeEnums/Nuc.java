@@ -34,7 +34,8 @@ public enum Nuc implements Comparable<Nuc> {
 		if (theNuc == null) {
 			System.err.println("ERROR: Nuc.getNuc(): Invalid nucleotide!: (" + ch + ")");
 			(new Exception()).printStackTrace();			
-			System.exit(-1);
+			//System.exit(-1);
+			return Nuc.N;
 		}
 		return theNuc;
 	}

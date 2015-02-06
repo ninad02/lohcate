@@ -185,15 +185,47 @@ public class Clustering {
 		ArrayList<String> allVariantRowsStr = readLinesFromFilesAsStringList(file, true, LOHcate.EliminateHighDensitySNVs.getValue(), LOHcate.EliminateExtremeGCSites.getValue());
 		LOHcate.LogOutput.println("File: " + file.getName());
 		filterSitesAgainstAllelicTable(allVariantRowsStr, allelicBiasTable);
+		filterSitesMinimumReadThresholds(allVariantRowsStr);
 		ClusteringInputOneSample oneSampleData = new ClusteringInputOneSample(allVariantRowsStr);				
 		allVariantRowsStr.clear();
 		return oneSampleData;
 	}
 
 	// ========================================================================
+	private static ArrayList<String> filterSitesMinimumReadThresholds(ArrayList<String> allVariantRows) {
+
+		for (int row = 0; row < allVariantRows.size(); row++) {
+			String line = allVariantRows.get(row);
+			
+			try {
+				short readsTumor = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_TotalCoverageTumor, StringUtils.FileExtensionTSV.mDelimiter));
+				if (readsTumor < ClusteringParams.GlobalClusteringParams.mNumReadsMinTumor.getValue()) {
+					allVariantRows.set(row, null);
+				}
+				
+				if (!ClusteringParams.GlobalClusteringParams.isTumorOnly()) {
+					short readsNormal = Short.parseShort(StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_TotalCoverageNormal, StringUtils.FileExtensionTSV.mDelimiter));
+					if (readsNormal < ClusteringParams.GlobalClusteringParams.mNumReadsMinNormal.getValue()) {
+						allVariantRows.set(row, null);
+					}
+				}
+			} catch (NumberFormatException e) {
+				allVariantRows.set(row, null);
+			}
+		}
+		
+		return ArrayUtils.removeNullElements(allVariantRows);
+	}
+	
+	// ========================================================================
 	public static final int CopyNumberGermlineExcessivelyHighAcrossPatients = 4;
 	public static final float AberrantAvgVAFinGermline = 0.33f;
 	private static ArrayList<String> filterSitesAgainstAllelicTable(ArrayList<String> allVariantRows, AllelicBiasTable allelicBiasTable) {
+		
+		// If we have only tumor data, then return
+		if (ClusteringParams.GlobalClusteringParams.isTumorOnly()) {
+			return allVariantRows;
+		}
 		
 		// Iterate through all the rows and eliminate those sites for which the germline copy number
 		// is excessively high
@@ -288,11 +320,18 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	private static void swapTumorNormalInOnePatient(ClusteringInputOneSample oneSampleData) {
-		
+	private static void copyNormalIntoTumorInOnePatient(ClusteringInputOneSample oneSampleData) {		
 		for (int row = 0; row < oneSampleData.getNumSites(); row++) {
 			oneSampleData.getSiteAtIndex(row).copyNormalIntoTumor();
 		}
+	}
+	
+	// ========================================================================
+	private static void copyTumorIntoNormalInOnePatient(ClusteringInputOneSample oneSampleData) {
+		for (int row = 0; row < oneSampleData.getNumSites(); row++) {
+			oneSampleData.getSiteAtIndex(row).copyTumorIntoNormal();
+		}
+		
 	}
 	
 	// ========================================================================
@@ -301,6 +340,12 @@ public class Clustering {
 	 *  and stores the results in the metadata
 	 */
 	private static void classifySitesHelper_preprocessMetaData(ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData, AllelicBiasTable allelicBiasTable, SeqPlatform platform) {
+		
+		// If it's tumor only, then copy into normal
+		if (ClusteringParams.GlobalClusteringParams.isTumorOnly()) {
+			copyTumorIntoNormalInOnePatient(oneSampleData);  // necessary for any further calculations on normals
+		}
+		
 		
 		// Get the allele frequency statistics, and adjust the frames based on the resulting standard deviation
 		if (correctAllelicBias()) {
@@ -323,7 +368,14 @@ public class Clustering {
 		}*/
 		
 		if (LOHcate.FindGermline.getValue()) {
-			swapTumorNormalInOnePatient(oneSampleData);
+			copyNormalIntoTumorInOnePatient(oneSampleData);
+		} else if (ClusteringParams.GlobalClusteringParams.isTumorOnly()) {			
+			LOHcateSimulator.LOHcateSimulatorParams simParams = new LOHcateSimulator.LOHcateSimulatorParams();
+			double avgCovgTumor = oneSampleData.calcAverageCoverage(TissueType.Tumor);
+			System.out.println("\tAverage Coverage Tumor: " + avgCovgTumor);
+			simParams.setCoverageGenerated(TissueType.Normal, avgCovgTumor);			
+			LOHcateSimulator sim = new LOHcateSimulator();
+			sim.simulateMatchedNormal(simParams, oneSampleData);
 		}
 		
 		// First, get the copy number ratios at a per-chromosome level				
@@ -453,6 +505,9 @@ public class Clustering {
 	public static AllelicBiasTable constructAllelicBiasTable(ArrayList<File> files, AllelicBiasTable biasTable, SNVMap snvMap, FileExtensionAndDelimiter fileExtAndDelim, SeqPlatform platform) {
 		AllelicBiasTableCompact biasTableCompact = new AllelicBiasTableCompact(); 
 		biasTable = CompareUtils.isNull(biasTable) ? biasTableCompact : biasTable;
+		
+		if (ClusteringParams.GlobalClusteringParams.isTumorOnly()) return biasTable;
+		
 		int fileCounter = 0;
 		for (File inFile : files) {
 			System.out.printf("Reading File (%d/%d): %s\n", ++fileCounter, files.size(), inFile.getName());
@@ -471,6 +526,7 @@ public class Clustering {
 			}
 			final float avgCovgNormal = (float) totalCoverage / (float) allLines.size();
 			
+			// Now go through the lines again
 			for (String line : allLines) { 
 				final Chrom chrom  = Chrom.getChrom(   StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Chrom,    fileExtAndDelim.mDelimiter) );
 				final int position = Integer.parseInt( StringUtils.extractNthColumnValue(line, Regions.Col_NAFTAFInput_Position, fileExtAndDelim.mDelimiter) );				
@@ -1974,14 +2030,14 @@ public class Clustering {
 				// The vafNormal is either very low (homozygous reference) or very high (homozygous common variant).
 				// We do some very simple decision making now (which should be replaced by formal clustering later)
 				// to partition the calls.
-				float justBelowZero = -0.0001f;				
+				float justBelowZero = -0.001f;				
 				float hetBoundaryLower = 0.3333f;
 				float hetBoundaryUpper = 0.6667f;
 				float vafTumor = oneSiteInfo.calcVAFTumor();
 				if (RangeDouble.inRangeLowerExclusive(vafNormal, justBelowZero, vafNormalRange.getBoundLower())) {
 					// We are equal to or below the lower frame boundary
-					if (vafNormal <= 0.05 && vafTumor >= 0.10) {
-						eventAtSite = EventType.HETSomatic;
+					if (vafNormal <= 0.05 && vafTumor >= 0.10) {						
+						eventAtSite = ClusteringParams.GlobalClusteringParams.isTumorOnly() ? EventType.Ignored : EventType.HETSomatic;
 					} else if (vafTumor <= hetBoundaryLower) {
 						// Normal: AA, Tumor: AA [Thus homozygous reference in both, no events]
 						eventAtSite = EventType.Ignored;
@@ -1995,7 +2051,7 @@ public class Clustering {
 				} else if (RangeDouble.inRangeLowerExclusive(vafNormal, vafNormalRange.getBoundUpper(), Regions.MaxVariantAlleleFrequency)) {
 					// We are above the upper frame boundary
 					if (vafNormal >= (1.0 - 0.05) && vafTumor >= 0.10 && vafTumor <= 0.90) {
-						eventAtSite = EventType.HETSomatic;
+						eventAtSite = EventType.Ignored;
 					} else if (vafTumor <= hetBoundaryLower) {
 						// Normal: BB, Tumor: AA [made by: BB -> AB (reverse somatic het mutation) -> A (LOH, loss of B)]
 						eventAtSite = EventType.LOH;
@@ -2009,7 +2065,7 @@ public class Clustering {
 						eventAtSite = EventType.Ignored;
 					}
 				} else {
-					CompareUtils.throwErrorAndExit("ERROR: Contradiction - variant allele frequency cannot be in and out of bounds simultanteously!" + vafNormal);
+					CompareUtils.throwErrorAndExit("ERROR: Contradiction - variant allele frequency cannot be in and out of bounds simultanteously! " + vafNormal);
 				}
 				
 				// Now finally assign the cluster.
