@@ -11,10 +11,10 @@ import nutils.counter.BucketCounterEnum;
 /** Given an individual's copy number regions by chromosome, this partitions the
  *  regions into three such objects based on the clustering type (Dup, LOH, HET)
  */
-public class CopyNumberRegionRange extends RegionRange {
+public class CopyNumberRegionRangeLOHcate extends RegionRange {
 	
 	// Nullary
-	public static NullaryClassFactory<CopyNumberRegionRange> ClassFactory = new NullaryClassFactory<CopyNumberRegionRange>(CopyNumberRegionRange.class);
+	public static NullaryClassFactory<CopyNumberRegionRangeLOHcate> ClassFactory = new NullaryClassFactory<CopyNumberRegionRangeLOHcate>(CopyNumberRegionRangeLOHcate.class);
 	
 	// Member variables
 	public EventType mCopyNumberEventType;
@@ -22,12 +22,12 @@ public class CopyNumberRegionRange extends RegionRange {
 	public double mCopyNumber;
 	protected BucketCounterEnum<EventType> mEventTypeCounts;
 	
-	public CopyNumberRegionRange(EventType eventType, Chrom chrom, int regionStart) {
+	public CopyNumberRegionRangeLOHcate(EventType eventType, Chrom chrom, int regionStart) {
 		super(chrom, regionStart);
 		constructorCommon(eventType);
 	}		
 	
-	public CopyNumberRegionRange(EventType eventType, Chrom chrom, int regionStart, int regionEnd) {
+	public CopyNumberRegionRangeLOHcate(EventType eventType, Chrom chrom, int regionStart, int regionEnd) {
 		super(chrom, regionStart, regionEnd);
 		constructorCommon(eventType);
 	}
@@ -39,7 +39,7 @@ public class CopyNumberRegionRange extends RegionRange {
 		mEventTypeCounts = new BucketCounterEnum<EventType>(EventType.class);				
 	}
 	
-	public CopyNumberRegionRange(CopyNumberRegionRange rhs) {
+	public CopyNumberRegionRangeLOHcate(CopyNumberRegionRangeLOHcate rhs) {
 		super(rhs);
 		mCopyNumberEventType = rhs.mCopyNumberEventType;
 		mRecurrenceScore       = rhs.mRecurrenceScore;
@@ -47,12 +47,12 @@ public class CopyNumberRegionRange extends RegionRange {
 		mEventTypeCounts     = rhs.mEventTypeCounts.getCopy();
 	}
 	
-	public CopyNumberRegionRange() {
+	public CopyNumberRegionRangeLOHcate() {
 		super();
 		constructorCommon(EventType.Ignored);
 	}
 	
-	public boolean shareSameEvent(CopyNumberRegionRange rhs) { return this.mCopyNumberEventType == rhs.mCopyNumberEventType; }
+	public boolean shareSameEvent(CopyNumberRegionRangeLOHcate rhs) { return this.mCopyNumberEventType == rhs.mCopyNumberEventType; }
 	
-	public CopyNumberRegionRange getCopy() { return new CopyNumberRegionRange(this); }
+	public CopyNumberRegionRangeLOHcate getCopy() { return new CopyNumberRegionRangeLOHcate(this); }
 }

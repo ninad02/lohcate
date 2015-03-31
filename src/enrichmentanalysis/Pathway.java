@@ -1,13 +1,7 @@
 package enrichmentanalysis;
 
 import java.awt.Color;
-import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Scanner;
-
 import shared.FileOps;
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes

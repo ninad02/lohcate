@@ -42,9 +42,9 @@ public class LOHcate {
 		//".lohcateInput_txt";
 		".lohcateInput.txt";
 	
-	public static Sensitivity LOHcateSensitivity = Sensitivity.Low;
+	public static Sensitivity LOHcateSensitivity = Sensitivity.High;
 	
-	public static ControlFlagBool FindGermline = new ControlFlagBool(false);
+	public static ControlFlagBool FindGermline = new ControlFlagBool(true);
 	
 	public static final ControlFlagBool EliminateExtremeGCSites = new ControlFlagBool(true);
 	public static final ControlFlagBool EliminateHighDensitySNVs = new ControlFlagBool(true);

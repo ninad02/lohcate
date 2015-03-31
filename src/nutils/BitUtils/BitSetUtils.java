@@ -72,6 +72,23 @@ public class BitSetUtils {
 		}
 		return rV;
 	}
+
+	// ========================================================================
+	public static int nextTrueBoolean(boolean[] theArray, int startIndex) {
+		return nextTrueFalseBoolean(theArray, startIndex, true);
+	}
+	
+	// ========================================================================
+	public static int nextFalseBoolean(boolean[] theArray, int startIndex) {
+		return nextTrueFalseBoolean(theArray, startIndex, false);
+	}
+	
+	// ========================================================================
+	public static int nextTrueFalseBoolean(boolean[] theArray, int startIndex, boolean booleanToSearch) {
+		int i = startIndex;
+		for (; i < theArray.length && (theArray[i] != booleanToSearch); i++) {}
+		return (i >= theArray.length ? -1 : i);
+	}
 	
 	// ========================================================================
 	/** Given a BitSet and a string of bits, this populates the bitset.  Any non-zero characters

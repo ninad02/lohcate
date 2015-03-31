@@ -12,6 +12,8 @@ import nutils.BitUtils.ValueExtractor;
 import nutils.counter.BucketCounterEnum;
 
 import com.carrotsearch.hppc.DoubleArrayList;
+import com.carrotsearch.hppc.FloatArrayList;
+import com.carrotsearch.hppc.IntArrayList;
 import com.carrotsearch.hppc.LongArrayList;
 
 public class ArrayUtils {
@@ -23,6 +25,49 @@ public class ArrayUtils {
 		// TODO Auto-generated method stub
 		//Test_removeNullElements();
 		Test_removeNullElementsSimple();
+	}
+	
+	// ========================================================================
+	public static double[][] toDouble2D(ArrayList<FloatArrayList> twoDimensionalArray) {
+		double[][] rV = new double[twoDimensionalArray.size()][];
+		
+		for (int i = 0; i < twoDimensionalArray.size(); i++) {
+			FloatArrayList theList = twoDimensionalArray.get(i);
+			rV[i] = new double[theList.size()];
+			
+			for (int j = 0; j < theList.size(); j++) {
+				rV[i][j] = theList.get(j);
+			}
+			
+		}
+		return rV;
+	}
+	
+	// ========================================================================
+	public static int getIndexOfArrayWithMaxLength(double[][] theMatrix) {
+		int maxLengthIndex = -1;
+		int maxLength = Integer.MIN_VALUE;
+		
+		for (int i = 0; i < theMatrix.length; i++) {
+			if (theMatrix[i].length > maxLength) {
+				maxLength = theMatrix[i].length;
+				maxLengthIndex = i;
+			}
+		}
+		return maxLengthIndex;
+	}
+	
+	// ========================================================================
+	public static double[][] tranposeNaive(double[][] theMatrix) {
+		int indexOfMaxLength = getIndexOfArrayWithMaxLength(theMatrix);
+		double[][] rV = new double[theMatrix[indexOfMaxLength].length][theMatrix.length];
+		
+		for (int i = 0; i < theMatrix.length; i++) {
+			for (int j = 0; j < theMatrix[i].length; j++) {
+				rV[j][i] = theMatrix[i][j];
+			}
+		}
+		return rV;
 	}
 
 	/** Copies arr2 into arr1. */
@@ -1032,4 +1077,37 @@ public class ArrayUtils {
 	public static double[][] combineTwoDynamicArraysIntoOneStatic(DoubleArrayList list1, DoubleArrayList list2) {
 		return new double[][] { list1.toArray(), list2.toArray() };
 	}
+		
+	// ========================================================================
+	public static double[][] combineTwoDyanamicArraysIntoOneStatisDouble(IntArrayList list1, IntArrayList list2) {
+		int list1Size = list1.size();
+		int list2Size = list2.size();
+		int maxLength = Math.max(list1Size, list2Size);
+		
+		ParallelArrayDouble pad = new ParallelArrayDouble(maxLength);
+		for (int i = 0; i < maxLength; i++) {
+			double valueToAddList1 = (i < list1Size) ? list1.get(i) : Double.NaN;
+			double valueToAddList2 = (i < list2Size) ? list2.get(i) : Double.NaN;
+			pad.add(valueToAddList1, valueToAddList2);
+		}
+		
+		return pad.toArrays();
+	}
+
+	// ========================================================================
+	public static double[][] combineTwoDyanamicArraysIntoOneStatisDouble(IntArrayList list1, FloatArrayList list2) {
+		int list1Size = list1.size();
+		int list2Size = list2.size();
+		int maxLength = Math.max(list1Size, list2Size);
+		
+		ParallelArrayDouble pad = new ParallelArrayDouble(maxLength);
+		for (int i = 0; i < maxLength; i++) {
+			double valueToAddList1 = (i < list1Size) ? list1.get(i) : Double.NaN;
+			double valueToAddList2 = (i < list2Size) ? list2.get(i) : Double.NaN;
+			pad.add(valueToAddList1, valueToAddList2);
+		}
+		
+		return pad.toArrays();
+	}
+	
 }

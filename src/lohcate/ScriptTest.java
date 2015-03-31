@@ -25,24 +25,24 @@ import lohcateEnums.EventType;
 public class ScriptTest extends Regions {
 	
 	public static void TestRegionOverlaps() {
-		ArrayList<CopyNumberRegionRange> regionList = new ArrayList<CopyNumberRegionRange>();
+		ArrayList<CopyNumberRegionRangeLOHcate> regionList = new ArrayList<CopyNumberRegionRangeLOHcate>();
 		
-		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c1, 1, 1000));  //1
-		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 1, 1));     //2
-		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 1, 1));
-		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 1, 10));
-		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 4, 5));
-		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 9, 10));
-		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 5, 9));
-		regionList.add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 6, 8));
+		regionList.add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c1, 1, 1000));  //1
+		regionList.add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 1, 1));     //2
+		regionList.add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 1, 1));
+		regionList.add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 1, 10));
+		regionList.add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 4, 5));
+		regionList.add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 9, 10));
+		regionList.add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 5, 9));
+		regionList.add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 6, 8));
 		
 		for (int i = 0; i < regionList.size(); i++) {
 			System.out.print(i);
 			for (int j = 0; j < regionList.size(); j++) {
 				System.out.print("\t");
 				
-				CopyNumberRegionRange cnrr1 = regionList.get(i);
-				CopyNumberRegionRange cnrr2 = regionList.get(j);
+				CopyNumberRegionRangeLOHcate cnrr1 = regionList.get(i);
+				CopyNumberRegionRangeLOHcate cnrr2 = regionList.get(j);
 				System.out.print(cnrr1.testAndCharacterizeOverlap(cnrr2));								
 			}
 			System.out.println("");
@@ -50,9 +50,9 @@ public class ScriptTest extends Regions {
 	}
 	
 	public static void TestRegionCombining() {
-		ArrayList< ArrayList<CopyNumberRegionRange> > regionsFromSamples = new ArrayList< ArrayList<CopyNumberRegionRange> >();
+		ArrayList< ArrayList<CopyNumberRegionRangeLOHcate> > regionsFromSamples = new ArrayList< ArrayList<CopyNumberRegionRangeLOHcate> >();
 		int numSamples = 5;
-		for (int i = 0; i < numSamples; i++) { regionsFromSamples.add(new ArrayList<CopyNumberRegionRange>()); }
+		for (int i = 0; i < numSamples; i++) { regionsFromSamples.add(new ArrayList<CopyNumberRegionRangeLOHcate>()); }
 
 		StringBuilder sb = new StringBuilder(4096);
 		String resultStringPrev = null;
@@ -62,21 +62,21 @@ public class ScriptTest extends Regions {
 		for (int trial = 0; trial < numTrials; trial++) {
 			System.out.println("Trial: " + trial);
 			// Clear the contained objects
-			for (ArrayList<CopyNumberRegionRange> regionsFromOneSample : regionsFromSamples) {
+			for (ArrayList<CopyNumberRegionRangeLOHcate> regionsFromOneSample : regionsFromSamples) {
 				regionsFromOneSample.clear();				
 			}
 			
 			// Now fill
-			regionsFromSamples.get(0).add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 1, 10));
+			regionsFromSamples.get(0).add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 1, 10));
 
-			regionsFromSamples.get(1).add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 1, 1));
+			regionsFromSamples.get(1).add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 1, 1));
 
-			regionsFromSamples.get(2).add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 4, 5));
-			regionsFromSamples.get(2).add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 9, 10));
+			regionsFromSamples.get(2).add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 4, 5));
+			regionsFromSamples.get(2).add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 9, 10));
 
-			regionsFromSamples.get(3).add(new CopyNumberRegionRange(EventType.LOH, Chrom.c2, 5, 9));
+			regionsFromSamples.get(3).add(new CopyNumberRegionRangeLOHcate(EventType.LOH, Chrom.c2, 5, 9));
 
-			regionsFromSamples.get(4).add(new CopyNumberRegionRange(EventType.GainSomatic, Chrom.c2, 6, 8));
+			regionsFromSamples.get(4).add(new CopyNumberRegionRangeLOHcate(EventType.GainSomatic, Chrom.c2, 6, 8));
 
 			
 			// Do random shuffling
@@ -91,7 +91,7 @@ public class ScriptTest extends Regions {
 					} while (ind2 == ind1);
 
 					// Now swap
-					ArrayList<CopyNumberRegionRange> regionsTemp = regionsFromSamples.get(ind1);
+					ArrayList<CopyNumberRegionRangeLOHcate> regionsTemp = regionsFromSamples.get(ind1);
 					regionsFromSamples.set(ind1, regionsFromSamples.get(ind2));
 					regionsFromSamples.set(ind2, regionsTemp);
 
@@ -102,17 +102,17 @@ public class ScriptTest extends Regions {
 			int startIndex = goForward ? 0 : numSamples - 1;
 			int increment =  goForward ? 1 : -1;
 
-			RegionIntersectTester<CopyNumberRegionRange> regionTester = new Regions.RegionTester(EventType.LOH); 
+			RegionIntersectTester<CopyNumberRegionRangeLOHcate> regionTester = new Regions.RegionTester(EventType.LOH); 
 					
 			for (int i = startIndex + increment; (i >= 0) && (i < numSamples); i += increment) {
 				//System.out.println("");
 				//System.out.println(i);
-				RegionBreakerAndIntersecter.takeUnionAndBreakDownIntersectingRegions(regionsFromSamples.get(startIndex), regionsFromSamples.get(i), regionTester, CopyNumberRegionRange.class);
+				RegionBreakerAndIntersecter.takeUnionAndBreakDownIntersectingRegions(regionsFromSamples.get(startIndex), regionsFromSamples.get(i), regionTester, CopyNumberRegionRangeLOHcate.class);
 			}
 
 			// Now we print the regions
 			outList.clear();			
-			for (CopyNumberRegionRange cnrr : regionsFromSamples.get(startIndex)) {
+			for (CopyNumberRegionRangeLOHcate cnrr : regionsFromSamples.get(startIndex)) {
 				outList.add(cnrr.toString() + "\t" + cnrr.mCopyNumberEventType + "\t" + cnrr.mRecurrenceScore);				
 			}
 			Collections.sort(outList);

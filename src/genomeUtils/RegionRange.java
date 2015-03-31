@@ -81,7 +81,7 @@ public class RegionRange {
 	}
 	
 	public void set(RegionRange rhs) {
-		set(mChrom, mRangeStart, mRangeEnd, mRangeFinalized, mNumSitesInterrogated);
+		set(rhs.mChrom, rhs.mRangeStart, rhs.mRangeEnd, rhs.mRangeFinalized, rhs.mNumSitesInterrogated);
 	}
 	
 	/** Sets the range start. */
@@ -317,48 +317,30 @@ public class RegionRange {
 	// INNER CLASS
 	// ========================================================================
 	
-	public static class RegionRangeComparator implements Comparator<RegionRange> {
-		
-		public static final RegionRangeComparator TheComparator = new RegionRangeComparator();
-			
-		public int compare(RegionRange ar1, RegionRange ar2) {
-			if (ar1.mRangeStart == ar1.mRangeEnd) {
-				return compareHelper(ar1, ar2);
-			} else {
-				return (-1 * compareHelper(ar2, ar1));
-			}
-		}
-		
-		private int compareHelper(RegionRange ar1, RegionRange ar2) {
-			//System.out.println(ar1.toString() + ar2.toString());
-			
-			// First, compare the chromosomes. 
-			if (ar1.mChrom.getCode() < ar2.mChrom.getCode()) {
-				return -1;
-			} else if (ar1.mChrom.getCode() > ar2.mChrom.getCode()) {
-				return 1;
-			} else {				
-				if (ar1.mRangeStart < ar2.mRangeStart) {
-					return -1;
-				} else {
-					// means ar1.mRangeStart >= ar2.mRangeStart
-					// However, we do not match if it is so large that it crosses the end					
-					if (ar1.mRangeStart > ar2.mRangeEnd) {
-						return 1;
-					} else {
-						// Means ar1.mRangeStart <= ar2.mRangeEnd
-						// If we are using this class, then it means it is for
-						// searching in a list of ranges.  This class was made
-						// with the assumption that ar1.mRangeStart == 
-						// ar1.mRangeEnd (its range was of size 1).  Thus, we
-						// return 0 here
-						return 0;						
-					}
-				}
-			}
-		}
-	}
+	public static Comparator<RegionRange> TheComparator = new Comparator<RegionRange>() {
 
+		@Override
+		public int compare(RegionRange lhs, RegionRange rhs) {
+			RegionRangeOverlap result = lhs.testAndCharacterizeOverlap(rhs);
+			
+			switch(result) {
+			case Equals: 
+				return 0;
+			case BeforeWithoutOverlap: case BeforeViaDiffChromosome: case AdjacentBefore: 
+				return -1;
+			case SubsumesTotal: case SubsumesAlignedRight: case BeforeWithOverlap: case ConsumedByAlignedLeft:
+				return -1;		
+			case AfterWithoutOverlap:  case AfterViaDiffChromosome:  case AdjacentAfter:  
+				return 1;
+			case ConsumedByTotal: case ConsumedByAlignedRight: case AfterWithOverlap: case SubsumesAlignedLeft:
+				return 1;
+			default:
+				throwErrorAndExit("ERROR: Impossible state!");
+				return 0;
+			}		
+		}
+		
+	};
 	
 	// ========================================================================
 	// END INNER CLASS

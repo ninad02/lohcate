@@ -31,7 +31,7 @@ import kMeans.JCA;
 import lohcate.AllelicBiasTable;
 import lohcate.AllelicBiasTableCompact;
 import lohcate.AllelicBiasTableDummy;
-import lohcate.CopyNumberRegionRange;
+import lohcate.CopyNumberRegionRangeLOHcate;
 import lohcate.CopyNumberRegionsByChromosome;
 import lohcate.LOHcate;
 import lohcate.LOHcate.Sensitivity;
@@ -855,7 +855,7 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	public static CopyNumberRegionRange getMiddleRegion(CopyNumberRegionRange regionPrev, CopyNumberRegionRange regionCurr, ClusteringInputOneSample oneSampleData, boolean regionByIndex) {
+	public static CopyNumberRegionRangeLOHcate getMiddleRegion(CopyNumberRegionRangeLOHcate regionPrev, CopyNumberRegionRangeLOHcate regionCurr, ClusteringInputOneSample oneSampleData, boolean regionByIndex) {
 		
 		// Check that we have the same chromosome
 		if (regionPrev.getChromosome() != regionCurr.getChromosome()) {
@@ -879,7 +879,7 @@ public class Clustering {
 			return null;
 		}
 		
-		CopyNumberRegionRange midRange = new CopyNumberRegionRange(regionPrev);
+		CopyNumberRegionRangeLOHcate midRange = new CopyNumberRegionRangeLOHcate(regionPrev);
 		
 		if (regionByIndex) {
 			midRange.set(regionPrev.getChromosome(), indexMidRangeStart, indexMidRangeEnd, false, indexMidRangeEnd - indexMidRangeStart + 1);
@@ -893,7 +893,7 @@ public class Clustering {
 	}
 	
 	// ========================================================================
-	public static boolean combineTwoRegions(CopyNumberRegionRange regionPrev, CopyNumberRegionRange regionCurr, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData, boolean ensureRegionsToHaveSameEventType) {
+	public static boolean combineTwoRegions(CopyNumberRegionRangeLOHcate regionPrev, CopyNumberRegionRangeLOHcate regionCurr, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData, boolean ensureRegionsToHaveSameEventType) {
 		
 		// Check that we have the same chromosome
 		if (regionPrev.getChromosome() != regionCurr.getChromosome()) {
@@ -934,7 +934,7 @@ public class Clustering {
 				midRegionEndPos   = regionCurr.getRangeEnd();
 			}
 							
-			CopyNumberRegionRange midRange = new CopyNumberRegionRange(regionPrev);
+			CopyNumberRegionRangeLOHcate midRange = new CopyNumberRegionRangeLOHcate(regionPrev);
 			midRange.set(regionPrev.getChromosome(), midRegionStartPos, midRegionEndPos, false, indexRegionCurrStart - indexRegionPrevEnd - 1);
 			CompareUtils.ensureTrue(!midRange.spansOneSite(), "Must always span more than one site!");
 			boolean isEventRegion = fillRegionBasedOnVAFMaxLikelihood(midRange, oneSampleData, metaData, null, regionPrev.mCopyNumberEventType, probFromMaxLikelihood, false);
@@ -1082,8 +1082,8 @@ public class Clustering {
 						//regionsInOneSampleMerged.print(System.out, StringUtils.FileExtensionTSV.mDelimiter);
 
 						for (Chrom chrom : Chrom.values()) {
-							ArrayList<CopyNumberRegionRange> regionsOnChrom = regionsInOneSampleMerged.getRegions(chrom);
-							for (CopyNumberRegionRange region : regionsOnChrom) {							
+							ArrayList<CopyNumberRegionRangeLOHcate> regionsOnChrom = regionsInOneSampleMerged.getRegions(chrom);
+							for (CopyNumberRegionRangeLOHcate region : regionsOnChrom) {							
 								CompareUtils.ensureTrue(region.getChromosome() == chrom, "ERROR: Chromosomes should match!");							
 								fillRegionBasedOnVAFMaxLikelihood(region, oneSampleData, metaData, events, eventType, probFromMaxLikelihood, true);							
 								//System.out.println("CURR\t" + region.toString());
@@ -1105,8 +1105,8 @@ public class Clustering {
 								
 				// Smooth out the copy numbers even further
 				for (Chrom chrom : Chrom.values()) {
-					ArrayList<CopyNumberRegionRange> regions = regionsByChromPostFill.getRegions(chrom);
-					for (CopyNumberRegionRange region : regions) {
+					ArrayList<CopyNumberRegionRangeLOHcate> regions = regionsByChromPostFill.getRegions(chrom);
+					for (CopyNumberRegionRangeLOHcate region : regions) {
 						Clustering.calcAverageCopyNumberOverRegion(region, oneSampleData, metaData, true);						
 					}
 				}
@@ -1351,17 +1351,17 @@ public class Clustering {
 	// ========================================================================
 	private static void smoothCopyNumbers(SiteList<ClusteringInputOneSite> sites, ClusteringInputOneSampleMetaData metaData) {
 		
-		ArrayList<CopyNumberRegionRange> setOfRegions = new ArrayList<CopyNumberRegionRange>();
+		ArrayList<CopyNumberRegionRangeLOHcate> setOfRegions = new ArrayList<CopyNumberRegionRangeLOHcate>();
 		int positionDiffThreshold = LOHcate.RunOld.getValue() ? 3_000_000 : ClusteringParams.GlobalClusteringParams.mSmoothBlockLength.getValue();
 		
 		for (Chrom chrom : Chrom.values()) {
 			if (chrom.isInvalid()) continue;
 		
 			setOfRegions.clear();
-			ListIterator<CopyNumberRegionRange> regionsOnChrom = metaData.mGeneRegions.getIteratorForChromosome(chrom);
+			ListIterator<CopyNumberRegionRangeLOHcate> regionsOnChrom = metaData.mGeneRegions.getIteratorForChromosome(chrom);
 			
 			while (regionsOnChrom.hasNext()) {
-				CopyNumberRegionRange currentRegion = regionsOnChrom.next();
+				CopyNumberRegionRangeLOHcate currentRegion = regionsOnChrom.next();
 				
 				if (!setOfRegions.isEmpty()) {
 					int positionDiff = sites.getSiteAtIndex(currentRegion.getRangeStart()).getPosition() - 
@@ -1401,9 +1401,9 @@ public class Clustering {
 	}
 	
 	// ========================================================================
-	private static double smoothCopyNumbersHelper_findAverage(ArrayList<CopyNumberRegionRange> setOfRegions) {
+	private static double smoothCopyNumbersHelper_findAverage(ArrayList<CopyNumberRegionRangeLOHcate> setOfRegions) {
 		double sum = 0;
-		for (CopyNumberRegionRange cnrr : setOfRegions) {
+		for (CopyNumberRegionRangeLOHcate cnrr : setOfRegions) {
 			sum += cnrr.mCopyNumber;
 		}
 		return sum / setOfRegions.size();
@@ -1421,7 +1421,7 @@ public class Clustering {
 		int readCountSumTumor = 0;
 		int readCountSumNormal = 0;
 		int numRowsWithSameGene = 0;
-		CopyNumberRegionRange geneRegion = null;
+		CopyNumberRegionRangeLOHcate geneRegion = null;
 		
 		int avgCoverageNormal = metaData.mReadCountTalliesNormal.getKeyWithMaxCount();
 		int avgCoverageTumor  = metaData.mReadCountTalliesTumor.getKeyWithMaxCount();
@@ -1506,7 +1506,7 @@ public class Clustering {
 				
 				// New gene listed.  Thus, set a new row of first gene			
 				rowOfFirstInstanceOfGene = row;				
-				geneRegion = new CopyNumberRegionRange(EventType.Ignored, oneSiteInfo.getChrom(), row);
+				geneRegion = new CopyNumberRegionRangeLOHcate(EventType.Ignored, oneSiteInfo.getChrom(), row);
 				geneRegion.mCopyNumber = GenomeConstants.DefaultDiploidCopyNumber;
 				metaData.mGeneRegions.addRegion(geneRegion);				
 				if (metaData.mIsSomaticSite[row]) {
@@ -1701,7 +1701,7 @@ public class Clustering {
 			int indexChromEnd = oneSampleInfo.getIndexChromEnd(chrom);
 			CompareUtils.ensureTrue(indexChromEnd >= 0, "ERROR: Chromosome must have last position!");
 						
-			CopyNumberRegionRange range = new CopyNumberRegionRange(EventType.Ignored, chrom, oneSampleInfo.getSiteAtIndex(indexChromStart).getPosition(), oneSampleInfo.getSiteAtIndex(indexChromEnd).getPosition());
+			CopyNumberRegionRangeLOHcate range = new CopyNumberRegionRangeLOHcate(EventType.Ignored, chrom, oneSampleInfo.getSiteAtIndex(indexChromStart).getPosition(), oneSampleInfo.getSiteAtIndex(indexChromEnd).getPosition());
 			int indexOfMostLikelyList = determineCopyGainVAFMaxLikelihood(oneSampleInfo, metaData, range, listOfListOfMeans, TissueType.Normal, probFromMaxLikelihood);
 			
 			boolean exceedsParam = (metaData.mCopyNumRatioPerChromNormal[chrom.ordinal()] >= ClusteringParams.GlobalClusteringParams.mGermlineTrisomyThreshold.getValue()); 

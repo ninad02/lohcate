@@ -28,7 +28,7 @@ public class Cast {
 	public static float toFloat(long l)   { return (float) l; }
 	
 	public static<T, S extends T> T upcast(S source, Class<T> targetClass)   { return (T) source; }
-	public static<S, T extends S> T downcast(S source, Class<T> targetClass) { return (T) source; }
+	public static<S, T extends S> T downcast(S source, Class<T> targetClass) { return targetClass.cast(source); } 		
 
 	/**
 	 * @param args

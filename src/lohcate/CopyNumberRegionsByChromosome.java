@@ -1,6 +1,7 @@
 package lohcate;
 
 import genomeEnums.Chrom;
+import genomeUtils.RegionRangesOverGenome;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -15,16 +16,15 @@ import nutils.EnumMapSafe;
 /** Stores the regions for a given sample, split by chromosome.  
  *  Chromosomes are indexed starting at 1 */
 public class CopyNumberRegionsByChromosome {
-	private static final ArrayList<CopyNumberRegionRange> dummyListForChrom0 = new ArrayList<CopyNumberRegionRange>();
 	
 	// ========================================================================
 	// MEMBER VARIABLES
-	String mSampleName;
-	private EnumMapSafe<Chrom, ArrayList<CopyNumberRegionRange> > mRegionsByChrom;		
+	private String mSampleName;
+	private EnumMapSafe<Chrom, ArrayList<CopyNumberRegionRangeLOHcate> > mRegionsByChrom;		
 
 	// ========================================================================
 	public CopyNumberRegionsByChromosome(String sampleName) {
-		mRegionsByChrom = EnumMapSafe.createEnumMapOfArrayLists(Chrom.class, CopyNumberRegionRange.class);
+		mRegionsByChrom = EnumMapSafe.createEnumMapOfArrayLists(Chrom.class, CopyNumberRegionRangeLOHcate.class);
 		mSampleName = sampleName;
 	}
 	
@@ -34,29 +34,32 @@ public class CopyNumberRegionsByChromosome {
 		
 		// Now deep copy the regions
 		for (Chrom chrom : Chrom.values()) {
-			ArrayList<CopyNumberRegionRange> cnrrListRhs = rhs.mRegionsByChrom.get(chrom);
-			ArrayList<CopyNumberRegionRange> cnrrList    =     mRegionsByChrom.get(chrom); 
+			ArrayList<CopyNumberRegionRangeLOHcate> cnrrListRhs = rhs.mRegionsByChrom.get(chrom);
+			ArrayList<CopyNumberRegionRangeLOHcate> cnrrList    =     mRegionsByChrom.get(chrom); 
 			
-			for (CopyNumberRegionRange cnrrRhs : cnrrListRhs) {
+			for (CopyNumberRegionRangeLOHcate cnrrRhs : cnrrListRhs) {
 				cnrrList.add(cnrrRhs.getCopy());					
 			}
 		}
 	}
 	
 	// ========================================================================
-	public void addRegion(Chrom chrom, CopyNumberRegionRange region) {
+	public String getSampleName() { return mSampleName; }
+	
+	// ========================================================================
+	public void addRegion(Chrom chrom, CopyNumberRegionRangeLOHcate region) {
 		mRegionsByChrom.get(chrom).add(region);
 	}
 	
 	// ========================================================================
-	public void addRegion(CopyNumberRegionRange region) {
+	public void addRegion(CopyNumberRegionRangeLOHcate region) {
 		addRegion(region.getChromosome(), region);
 	}
 	
 	// ========================================================================
 	public void clearClusterCounts() {
 		for (Chrom chrom : Chrom.values()) {			
-			for (CopyNumberRegionRange oneRegionInChrom : mRegionsByChrom.get(chrom)) {
+			for (CopyNumberRegionRangeLOHcate oneRegionInChrom : mRegionsByChrom.get(chrom)) {
 				oneRegionInChrom.mEventTypeCounts.clear();
 			}
 		}
@@ -64,7 +67,7 @@ public class CopyNumberRegionsByChromosome {
 
 	// ========================================================================
 	/** Returns the list of regions for a chromosome. */
-	public ArrayList<CopyNumberRegionRange> getRegions(Chrom chrom) { return mRegionsByChrom.get(chrom); }
+	public ArrayList<CopyNumberRegionRangeLOHcate> getRegions(Chrom chrom) { return mRegionsByChrom.get(chrom); }
 	
 	// ========================================================================
 	/** Returns an exact replica of this entire object, including copies of any contained regions. */ 
@@ -76,7 +79,7 @@ public class CopyNumberRegionsByChromosome {
 		StringBuilder sb = new StringBuilder(65536);
 
 		for (Chrom chrom : Chrom.values()) {
-			for (CopyNumberRegionRange cnrr : mRegionsByChrom.get(chrom)) {
+			for (CopyNumberRegionRangeLOHcate cnrr : mRegionsByChrom.get(chrom)) {
 				sb.setLength(0);
 				sb.append(cnrr.mCopyNumberEventType);
 				sb.append(delimiter).append(cnrr.mRecurrenceScore);
@@ -101,7 +104,7 @@ public class CopyNumberRegionsByChromosome {
 	/** Given a chromosome and position, returns the region that includes the coordinate, or 
 	 *  null if no region includes the coordinate.
 	 */
-	public CopyNumberRegionRange getRegion(Chrom chrom, int position) {
+	public CopyNumberRegionRangeLOHcate getRegion(Chrom chrom, int position) {
 		int resultIndex = getIndexOfRegion(chrom, position);
 		return ((resultIndex < 0) ? null : mRegionsByChrom.get(chrom).get(resultIndex));
 	}
@@ -109,8 +112,8 @@ public class CopyNumberRegionsByChromosome {
 	
 	// ========================================================================
 	/** Returns an iterator for the regions for a chromosome. */
-	public ListIterator<CopyNumberRegionRange> getIteratorForChromosome(Chrom chrom) {
-		ArrayList<CopyNumberRegionRange> regionsForChrom = mRegionsByChrom.get(chrom);
+	public ListIterator<CopyNumberRegionRangeLOHcate> getIteratorForChromosome(Chrom chrom) {
+		ArrayList<CopyNumberRegionRangeLOHcate> regionsForChrom = mRegionsByChrom.get(chrom);
 		return regionsForChrom.listIterator();		
 	}
 	
@@ -119,7 +122,7 @@ public class CopyNumberRegionsByChromosome {
 	 *  -1 if no region includes the coordinate.
 	 */
 	public int getIndexOfRegion(Chrom chrom, int position) {
-		ArrayList<CopyNumberRegionRange> regions = mRegionsByChrom.get(chrom);
+		ArrayList<CopyNumberRegionRangeLOHcate> regions = mRegionsByChrom.get(chrom);
 		for (int i = 0; i < regions.size(); i++) {			
 			if (regions.get(i).inRange(chrom, position)) {
 				return i; 
@@ -134,12 +137,19 @@ public class CopyNumberRegionsByChromosome {
 	// ========================================================================
 	public void removeSingletonRegions() {
 		for (Chrom chrom : Chrom.values()) {
-			for (ListIterator<CopyNumberRegionRange> iter = getIteratorForChromosome(chrom); iter.hasNext(); ) {			
+			for (ListIterator<CopyNumberRegionRangeLOHcate> iter = getIteratorForChromosome(chrom); iter.hasNext(); ) {			
 				if (iter.next().spansOneSite()) {
 					iter.remove();
 				}
 			}
 		}
+	}
+	
+	// ========================================================================
+	public static class StringClone implements Cloneable {
+		String mStr;
+		public StringClone(String s) { mStr = s; }
+		public Object clone() { return new String(mStr); }
 	}
 }
 

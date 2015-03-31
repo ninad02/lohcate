@@ -21,8 +21,8 @@ public class ClusteringParams {
 	// MEMBER VARIABLES
 	// ====================================================================
 	
-	protected InputParameterDouble mAmplificationThreshold   = new InputParameterDouble(2.2 /*2.85*/,  "AmplificationThreshold",   JSAP.NO_SHORTFLAG, "ampThresh", "Copy_Number_Threshold_for_Amplification");
-	protected InputParameterDouble mDeletionThreshold        = new InputParameterDouble(1.85 /*1.15*/, "DeletionThreshold",        JSAP.NO_SHORTFLAG, "delThresh", "Copy_Number_Threshold_for_Deletion");
+	protected InputParameterDouble mAmplificationThreshold   = new InputParameterDouble(2.8 /*2.85*/,  "AmplificationThreshold",   JSAP.NO_SHORTFLAG, "ampThresh", "Copy_Number_Threshold_for_Amplification");
+	protected InputParameterDouble mDeletionThreshold        = new InputParameterDouble(1.15 /*1.15*/, "DeletionThreshold",        JSAP.NO_SHORTFLAG, "delThresh", "Copy_Number_Threshold_for_Deletion");
 	protected InputParameterDouble mDeletionHomozygousThreshold = new InputParameterDouble(1.1 /*0.5*/, "HomozygousDeletionThreshold",        JSAP.NO_SHORTFLAG, "homDelThresh", "Copy_Number_Threshold_for_Homozygous_Deletion");
 	//protected InputParameterDouble mAmplificationThreshold   = new InputParameterDouble(2.5,  "AmplificationThreshold",   JSAP.NO_SHORTFLAG, "ampThresh", "Copy_Number_Threshold_for_Amplification");
 	//protected InputParameterDouble mDeletionThreshold        = new InputParameterDouble(1.5,  "DeletionThreshold",        JSAP.NO_SHORTFLAG, "delThresh", "Copy_Number_Threshold_for_Deletion");

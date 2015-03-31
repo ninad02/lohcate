@@ -2,14 +2,10 @@ package genomeUtils;
 
 import genomeEnums.Chrom;
 
-import java.io.BufferedWriter;
 import java.util.ArrayList;
 import java.util.ListIterator;
 
-import lohcate.CopyNumberRegionRange;
-import lohcateEnums.EventType;
 import nutils.CompareUtils;
-import nutils.IOUtils;
 import nutils.NullaryClassFactory;
 
 /**

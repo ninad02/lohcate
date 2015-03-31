@@ -326,10 +326,10 @@ public class Regions {
 		
 		float maxRecurrenceScore = -1.0f;
 		for (Chrom chrom : Chrom.values()) {
-			ArrayList<CopyNumberRegionRange> cnrrOnChrom = recurrentRegionsForOneClusterType.getRegions(chrom);
+			ArrayList<CopyNumberRegionRangeLOHcate> cnrrOnChrom = recurrentRegionsForOneClusterType.getRegions(chrom);
 			if (cnrrOnChrom.isEmpty()) continue;
 			
-			for (CopyNumberRegionRange cnrr : cnrrOnChrom) {
+			for (CopyNumberRegionRangeLOHcate cnrr : cnrrOnChrom) {
 				DynamicBucketCounter dbc = eventCount.get(chrom);				
 				
 				int range = cnrr.getRangeLength();
@@ -364,14 +364,14 @@ public class Regions {
 			Collections.sort(allLines, LineComparatorTab);
 						
 			CopyNumberRegionsByChromosome regionsOneSample = regionsGenomeWideSampleSpecific.get(++sampleIndex);
-			if (inFile.getName().indexOf(regionsOneSample.mSampleName) < 0) {
-				CompareUtils.throwErrorAndExit("ERROR: Samples don't match up: " + regionsOneSample.mSampleName + "\t" + inFile.getName());
+			if (inFile.getName().indexOf(regionsOneSample.getSampleName()) < 0) {
+				CompareUtils.throwErrorAndExit("ERROR: Samples don't match up: " + regionsOneSample.getSampleName() + "\t" + inFile.getName());
 			}
 			
 			// We initialize some indices for efficiency purposes
 			Chrom prevChrom = null;
-			ArrayList<CopyNumberRegionRange> regionsInChr = null;
-			ArrayList<CopyNumberRegionRange> regionsInChrSampleSpecific = null;
+			ArrayList<CopyNumberRegionRangeLOHcate> regionsInChr = null;
+			ArrayList<CopyNumberRegionRangeLOHcate> regionsInChrSampleSpecific = null;
 			PrimitiveWrapper.WInteger regionIndexInChr               = new PrimitiveWrapper.WInteger(-1);
 			PrimitiveWrapper.WInteger regionIndexInChrSampleSpecific = new PrimitiveWrapper.WInteger(-1);
 			
@@ -429,7 +429,7 @@ public class Regions {
 						// The site lies upstream of the next region in the sample's list
 						// of regions.  We therefore take no action on this particular site.
 					} else {
-						CopyNumberRegionRange region = regionsInChr.get(regionIndexInChr.mInt);
+						CopyNumberRegionRangeLOHcate region = regionsInChr.get(regionIndexInChr.mInt);
 						region.mEventTypeCounts.increment(clusterType);
 					}
 				}
@@ -454,12 +454,12 @@ public class Regions {
 	 * @param position
 	 * @return Described above
 	 */
-	public static Boolean scanRegionsForPoint(ArrayList<? extends CopyNumberRegionRange> regionsInChromosome, 
+	public static Boolean scanRegionsForPoint(ArrayList<? extends CopyNumberRegionRangeLOHcate> regionsInChromosome, 
 											  PrimitiveWrapper.WInteger regionIndex, 
 											  Chrom chrom, int position) {
 		
 		for (; regionIndex.mInt < regionsInChromosome.size(); regionIndex.mInt++) {			
-			CopyNumberRegionRange region = regionsInChromosome.get(regionIndex.mInt);
+			CopyNumberRegionRangeLOHcate region = regionsInChromosome.get(regionIndex.mInt);
 			
 			if (region.inRange(chrom, position)) {
 				return Boolean.TRUE;				
@@ -495,7 +495,7 @@ public class Regions {
 	/** Given the merged segmented regions in one sample, this method prints the regions to file. */
 	public static void printSegmentedRegionsToFile(String outDir, CopyNumberRegionsByChromosome regionsInSample, EventType clusterType) {
 				
-		String outFilename = outDir + File.separator + "Regions.GISTIC." + clusterType.name() + "." + regionsInSample.mSampleName + ".txt";
+		String outFilename = outDir + File.separator + "Regions.GISTIC." + clusterType.name() + "." + regionsInSample.getSampleName() + ".txt";
 		StringBuilder sb = new StringBuilder(2048);
 		String delim = StringUtils.FileExtensionTSV.mDelimiter;
 		
@@ -508,8 +508,8 @@ public class Regions {
 		// Go chromosome by chromosome
 		for (Chrom chrom : Chrom.Autosomes) {							
 			
-			ArrayList<CopyNumberRegionRange> regionsInChrom = regionsInSample.getRegions(chrom);			
-			for (CopyNumberRegionRange cnrr : regionsInChrom) {
+			ArrayList<CopyNumberRegionRangeLOHcate> regionsInChrom = regionsInSample.getRegions(chrom);			
+			for (CopyNumberRegionRangeLOHcate cnrr : regionsInChrom) {
 				sb.setLength(0);
 				
 				double errorFactor = Math.random() / 10;  // Get between 0 and 0.1
@@ -520,7 +520,7 @@ public class Regions {
 				double log2Ratio = Math.log10(copyNumRatio) / Math.log10(2);
 
 				
-				sb.append(regionsInSample.mSampleName)
+				sb.append(regionsInSample.getSampleName())
 				  .append(delim).append(chrom.getName())
 				  .append(delim).append(cnrr.getRangeStart())
 				  .append(delim).append(cnrr.getRangeEnd())
@@ -539,7 +539,7 @@ public class Regions {
 	// Printing JISTIC relevant output
 	// ========================================================================
 
-	public static class ActionerGISTIC implements RegionAndSiteWalker.Actioner<CopyNumberRegionRange> {
+	public static class ActionerGISTIC implements RegionAndSiteWalker.Actioner<CopyNumberRegionRangeLOHcate> {
 
 		// ====================================================================		
 		private static final String Delim = StringUtils.FileExtensionTSV.mDelimiter;
@@ -560,7 +560,7 @@ public class Regions {
 				SNVMap snvMap) {
 						
 			mSB = new StringBuilder(2048);
-			RegionAndSiteWalker<CopyNumberRegionRange> regionSiteWalker = new RegionAndSiteWalker<CopyNumberRegionRange>(CopyNumberRegionRange.ClassFactory);
+			RegionAndSiteWalker<CopyNumberRegionRangeLOHcate> regionSiteWalker = new RegionAndSiteWalker<CopyNumberRegionRangeLOHcate>(CopyNumberRegionRangeLOHcate.ClassFactory);
 			mOneSampleInfo = oneSampleInfo;
 			mMetaData = metaData;
 			mOut = outputWriter;
@@ -568,14 +568,14 @@ public class Regions {
 			
 			
 			for (Chrom chrom : Chrom.Autosomes) {
-				ArrayList<CopyNumberRegionRange> reigonsInChrom = new ArrayList<CopyNumberRegionRange>(regionsInSample.getRegions(chrom));				
+				ArrayList<CopyNumberRegionRangeLOHcate> reigonsInChrom = new ArrayList<CopyNumberRegionRangeLOHcate>(regionsInSample.getRegions(chrom));				
 				regionSiteWalker.walk(reigonsInChrom, snvMap, chrom, this);
 			}
 		}
 		
 		// ====================================================================
 		@Override
-		public void takeAction(ArrayList<Boolean> rangeInTargetSet, ArrayList<CopyNumberRegionRange> regions, CopyNumberRegionRange regionLatest) {
+		public void takeAction(ArrayList<Boolean> rangeInTargetSet, ArrayList<CopyNumberRegionRangeLOHcate> regions, CopyNumberRegionRangeLOHcate regionLatest) {
 			
 			int indexOfStart = mOneSampleInfo.getIndex(regionLatest.getChromosome(), regionLatest.getRangeStart());
 			int indexOfEnd   = mOneSampleInfo.getIndex(regionLatest.getChromosome(), regionLatest.getRangeEnd());
@@ -630,10 +630,10 @@ public class Regions {
 	
 	public static void printSegmentedRegionsToFile(String outDir, CopyNumberRegionsByChromosome regionsInSample, EventType clusterType, SNVMap snvMap) {
 		
-		String outFilename = outDir + File.separator + "Regions.GISTIC." + clusterType.name() + "." + regionsInSample.mSampleName + ".txt";
+		String outFilename = outDir + File.separator + "Regions.GISTIC." + clusterType.name() + "." + regionsInSample.getSampleName() + ".txt";
 		StringBuilder sb = new StringBuilder(2048);
 		String delim = StringUtils.FileExtensionTSV.mDelimiter;
-		CopyNumberRegionRange dummyRange = new CopyNumberRegionRange(EventType.HETGermline, Chrom.c0, 0);		
+		CopyNumberRegionRangeLOHcate dummyRange = new CopyNumberRegionRangeLOHcate(EventType.HETGermline, Chrom.c0, 0);		
 		double dummyRangeCopyNumberBase = 2.0;
 		
 		double copyNumBase = (clusterType == EventType.GainSomatic) ? 2.5 : (clusterType == EventType.LOH ? 1.5 : 2.0);		
@@ -647,8 +647,8 @@ public class Regions {
 			int numSitesOnChrom = snvMap.getNumSitesOnChromosome(chrom);
 			if (numSitesOnChrom <= 0) continue;
 			
-			ListIterator<CopyNumberRegionRange> regionsInChromIter = regionsInSample.getRegions(chrom).listIterator();
-			CopyNumberRegionRange currentRegion = null;
+			ListIterator<CopyNumberRegionRangeLOHcate> regionsInChromIter = regionsInSample.getRegions(chrom).listIterator();
+			CopyNumberRegionRangeLOHcate currentRegion = null;
 			int indexInMap = 0;
 			boolean dummyRangeValid = false;
 						
@@ -656,7 +656,7 @@ public class Regions {
 			while (regionsInChromIter.hasNext()) {
 				currentRegion = regionsInChromIter.next();
 				if (currentRegion.afterRange(chrom, snvMap.getPosition(chrom, indexInMap))) {
-					printSegmentedRegionsToFile_Helper(currentRegion, sb, delim, copyNumBase, regionsInSample.mSampleName, out);
+					printSegmentedRegionsToFile_Helper(currentRegion, sb, delim, copyNumBase, regionsInSample.getSampleName(), out);
 					currentRegion = null;
 				} else {
 					break;
@@ -671,7 +671,7 @@ public class Regions {
 				if ((currentRegion == null) || currentRegion.beforeRange(chrom, mapPosition)) {
 					if (dummyRangeValid) {
 						if (dummyRange.isFinalized()) {
-							printSegmentedRegionsToFile_Helper(dummyRange, sb, delim, dummyRangeCopyNumberBase, regionsInSample.mSampleName, out);
+							printSegmentedRegionsToFile_Helper(dummyRange, sb, delim, dummyRangeCopyNumberBase, regionsInSample.getSampleName(), out);
 							dummyRange.set(chrom, mapPosition, mapPosition, false, 1);
 						} else {
 							boolean extendResult = dummyRange.extendRange(chrom, mapPosition);
@@ -688,7 +688,7 @@ public class Regions {
 					
 				} else if (currentRegion.inRange(chrom, mapPosition)) {
 					if (dummyRangeValid) {
-						printSegmentedRegionsToFile_Helper(dummyRange, sb, delim, dummyRangeCopyNumberBase, regionsInSample.mSampleName, out);
+						printSegmentedRegionsToFile_Helper(dummyRange, sb, delim, dummyRangeCopyNumberBase, regionsInSample.getSampleName(), out);
 						dummyRangeValid = false;
 					}
 					
@@ -708,7 +708,7 @@ public class Regions {
 					indexInMap = indexOfRegionEndInMap;  // indexInMap will be incremented at loop end
 					
 					currentRegion.set(chrom, currentRegion.getRangeStart(), currentRegion.getRangeEnd(), true, indexOfRegionEndInMap - indexOfRegionStartInMap + 1);
-					printSegmentedRegionsToFile_Helper(currentRegion, sb, delim, copyNumBase, regionsInSample.mSampleName, out);				
+					printSegmentedRegionsToFile_Helper(currentRegion, sb, delim, copyNumBase, regionsInSample.getSampleName(), out);				
 					
 					// Now move to the next cna-affected region
 					currentRegion = regionsInChromIter.hasNext() ? regionsInChromIter.next() : null;
@@ -721,7 +721,7 @@ public class Regions {
 			}
 			
 			if (dummyRangeValid) {
-				printSegmentedRegionsToFile_Helper(dummyRange, sb, delim, dummyRangeCopyNumberBase, regionsInSample.mSampleName, out);
+				printSegmentedRegionsToFile_Helper(dummyRange, sb, delim, dummyRangeCopyNumberBase, regionsInSample.getSampleName(), out);
 			}
 		}
 		
@@ -729,7 +729,7 @@ public class Regions {
 	}
 	
 	// ========================================================================
-	private static void printSegmentedRegionsToFile_Helper(CopyNumberRegionRange cnrr, StringBuilder sb, String delim, double copyNumBase, String sampleName, BufferedWriter out) {
+	private static void printSegmentedRegionsToFile_Helper(CopyNumberRegionRangeLOHcate cnrr, StringBuilder sb, String delim, double copyNumBase, String sampleName, BufferedWriter out) {
 		sb.setLength(0);
 		
 		double errorFactor = Math.random() / 10;  // Get between 0 and 0.1
@@ -757,20 +757,20 @@ public class Regions {
 	public static CopyNumberRegionsByChromosome reassignRegionsByCopyNumber(CopyNumberRegionsByChromosome regionsInSample, ArrayList<EventType> events, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
 		
 		// Create an empty return object
-		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName);
-		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(EventType.Ignored, Chrom.c0, 0);
+		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.getSampleName());
+		CopyNumberRegionRangeLOHcate regionTest = new CopyNumberRegionRangeLOHcate(EventType.Ignored, Chrom.c0, 0);
 		
 		PrimitiveWrapper.WDouble probFromMaxLikelihood = new PrimitiveWrapper.WDouble(0);
 		// Go chromosome by chromosome
 		for (Chrom chrom : Chrom.Autosomes) {				
-			ArrayList<CopyNumberRegionRange> regionsInChromOriginal =       regionsInSample.getRegions(chrom);
-			ArrayList<CopyNumberRegionRange> regionsInChromMerged   = regionsInSampleMerged.getRegions(chrom);
+			ArrayList<CopyNumberRegionRangeLOHcate> regionsInChromOriginal =       regionsInSample.getRegions(chrom);
+			ArrayList<CopyNumberRegionRangeLOHcate> regionsInChromMerged   = regionsInSampleMerged.getRegions(chrom);
 			
 			// We declare a stored region that can be extended.  Initialize to null for now
-			CopyNumberRegionRange regionToExtend = null;
+			CopyNumberRegionRangeLOHcate regionToExtend = null;
 			
 			// Iterate through the regions for this chromosome
-			for (CopyNumberRegionRange currentRegion : regionsInChromOriginal) {
+			for (CopyNumberRegionRangeLOHcate currentRegion : regionsInChromOriginal) {
 				
 				if (currentRegion.mCopyNumberEventType == EventType.HETGermline) {
 					double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(currentRegion, oneSampleData, metaData);	
@@ -833,19 +833,19 @@ public class Regions {
 	public static CopyNumberRegionsByChromosome mergeRegionsWithConstraints(CopyNumberRegionsByChromosome regionsInSample, EventType eventType, int maxBasePairsContiguousRegion, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
 		
 		// Create an empty return object
-		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.mSampleName);
-		CopyNumberRegionRange regionTest = new CopyNumberRegionRange(EventType.Ignored, Chrom.c0, 0);
+		CopyNumberRegionsByChromosome regionsInSampleMerged = new CopyNumberRegionsByChromosome(regionsInSample.getSampleName());
+		CopyNumberRegionRangeLOHcate regionTest = new CopyNumberRegionRangeLOHcate(EventType.Ignored, Chrom.c0, 0);
 		
 		// Go chromosome by chromosome
 		for (Chrom chrom : Chrom.Autosomes) {				
-			ArrayList<CopyNumberRegionRange> regionsInChromOriginal =       regionsInSample.getRegions(chrom);
-			ArrayList<CopyNumberRegionRange> regionsInChromMerged   = regionsInSampleMerged.getRegions(chrom);
+			ArrayList<CopyNumberRegionRangeLOHcate> regionsInChromOriginal =       regionsInSample.getRegions(chrom);
+			ArrayList<CopyNumberRegionRangeLOHcate> regionsInChromMerged   = regionsInSampleMerged.getRegions(chrom);
 						
 			// We declare a stored region that can be extended.  Initialize to null for now
-			CopyNumberRegionRange regionToExtend = null;
+			CopyNumberRegionRangeLOHcate regionToExtend = null;
 			
 			// Iterate through the regions for this chromosome
-			for (CopyNumberRegionRange currentRegion : regionsInChromOriginal) {
+			for (CopyNumberRegionRangeLOHcate currentRegion : regionsInChromOriginal) {
 
 				if (currentRegion.mCopyNumberEventType == eventType) {
 					// Check if there's a region already waiting for extension.  
@@ -862,7 +862,7 @@ public class Regions {
 						boolean shouldCombine = Clustering.combineTwoRegions(regionToExtend, currentRegion, oneSampleData, metaData, true);					
 						System.out.printf("RegionsCombined: %b\t%s\t%d\t%d\t%d\t%d\t%d\n", shouldCombine, eventType.name(), regionToExtend.getChromosome().getCode(), regionToExtend.getRangeStart(), regionToExtend.getRangeEnd(), currentRegion.getRangeStart(), currentRegion.getRangeEnd());
 						
-						CopyNumberRegionRange midRegion = Clustering.getMiddleRegion(regionToExtend, currentRegion, oneSampleData, false);
+						CopyNumberRegionRangeLOHcate midRegion = Clustering.getMiddleRegion(regionToExtend, currentRegion, oneSampleData, false);
 						if (midRegion != null) {
 							double avgCopyNum = Clustering.calcAverageCopyNumberOverRegion(midRegion, oneSampleData, metaData);	
 							shouldCombine = mergeRegionsWithConstraints_Helper_ShouldCombine(regionToExtend.mCopyNumberEventType, avgCopyNum, shouldCombine);
@@ -960,7 +960,7 @@ public class Regions {
 	public static CopyNumberRegionsByChromosome segmentRegionsOneSample(ClusteringInputOneSample oneSampleInfo, ArrayList<EventType> eventPerSite, String outDir, SNVMap snvMap) {
 		// Have an array of regions for amplifications and LOH
 		CopyNumberRegionsByChromosome regionsByChrom = new CopyNumberRegionsByChromosome(oneSampleInfo.getSampleNameRoot());		 	
-		CopyNumberRegionRange currentRegion = null;
+		CopyNumberRegionRangeLOHcate currentRegion = null;
 		ChromPositionTracker chromPosTrack = new ChromPositionTracker();		
 		
 		// We start at index 0 assuming no header and that the rows are sorted by chrom/position
@@ -990,7 +990,7 @@ public class Regions {
 			// Now determine whether we create or extend regions
 			if (currentRegion == null) {
 				if (segmentRegionsOneFile_isValidEvent(eventType)) {
-					currentRegion = new CopyNumberRegionRange(eventType, chrom, position);
+					currentRegion = new CopyNumberRegionRangeLOHcate(eventType, chrom, position);
 					regionsByChrom.addRegion(chrom, currentRegion);
 				}
 			} else {
@@ -1019,7 +1019,7 @@ public class Regions {
 					// if it is not null or it is not noise.					
 					if (segmentRegionsOneFile_isValidEvent(eventType)) {
 						currentRegion.makeFinalized();
-						currentRegion = new CopyNumberRegionRange(eventType, chrom, position);
+						currentRegion = new CopyNumberRegionRangeLOHcate(eventType, chrom, position);
 						regionsByChrom.addRegion(chrom, currentRegion);
 					}
 				}
@@ -1041,7 +1041,7 @@ public class Regions {
 	}
 
 	// ========================================================================
-	public static class RegionTester implements RegionIntersectTester<CopyNumberRegionRange> { 
+	public static class RegionTester implements RegionIntersectTester<CopyNumberRegionRangeLOHcate> { 
 
 		// Member variables
 		final EventType mEventType;
@@ -1049,13 +1049,13 @@ public class Regions {
 		public RegionTester(EventType eventType) { mEventType = eventType; }
 		
 		@Override
-		public void takeActionOnEqualRegions(CopyNumberRegionRange region) { region.mRecurrenceScore += 1.0; }
+		public void takeActionOnEqualRegions(CopyNumberRegionRangeLOHcate region) { region.mRecurrenceScore += 1.0; }
 		
 		@Override
-		public boolean isValidRegion(CopyNumberRegionRange region) { return (region.mCopyNumberEventType == mEventType); }
+		public boolean isValidRegion(CopyNumberRegionRangeLOHcate region) { return (region.mCopyNumberEventType == mEventType); }
 		
 		@Override
-		public boolean isInvalidRegion(CopyNumberRegionRange region) { return !isValidRegion(region); }
+		public boolean isInvalidRegion(CopyNumberRegionRangeLOHcate region) { return !isValidRegion(region); }
 	};
 	
 	public static EnumMapSafe<EventType, RegionTester> RegionTesterByEvent = new EnumMapSafe<EventType, RegionTester>(EventType.class);
@@ -1086,9 +1086,9 @@ public class Regions {
 		
 		// First iterate over the chromosomes
 		for (Chrom chrom : Chrom.Autosomes) {
-			ArrayList<CopyNumberRegionRange> regionsChrTarget = regionsTarget.getRegions(chrom);
-			ArrayList<CopyNumberRegionRange> regionsChrSource = regionsSource.getRegions(chrom);
-			RegionBreakerAndIntersecter.takeUnionAndBreakDownIntersectingRegions(regionsChrTarget, regionsChrSource, regionTester, CopyNumberRegionRange.class);	
+			ArrayList<CopyNumberRegionRangeLOHcate> regionsChrTarget = regionsTarget.getRegions(chrom);
+			ArrayList<CopyNumberRegionRangeLOHcate> regionsChrSource = regionsSource.getRegions(chrom);
+			RegionBreakerAndIntersecter.takeUnionAndBreakDownIntersectingRegions(regionsChrTarget, regionsChrSource, regionTester, CopyNumberRegionRangeLOHcate.class);	
 		}
 
 		return regionsTarget;
@@ -1151,10 +1151,10 @@ public class Regions {
 			Collections.sort(allLines, LineComparatorTab);			
 
 			CopyNumberRegionsByChromosome regionsOneSample = samplesWithRegions.get(++sampleIndex);
-			if (inFile.getName().indexOf(regionsOneSample.mSampleName) < 0) {
-				CompareUtils.throwErrorAndExit("ERROR: Samples don't match up: " + regionsOneSample.mSampleName + "\t" + inFile.getName());
+			if (inFile.getName().indexOf(regionsOneSample.getSampleName()) < 0) {
+				CompareUtils.throwErrorAndExit("ERROR: Samples don't match up: " + regionsOneSample.getSampleName() + "\t" + inFile.getName());
 			}
-			String sampleNameRoot = regionsOneSample.mSampleName;
+			String sampleNameRoot = regionsOneSample.getSampleName();
 			
 			System.out.println("Processing sample (" + sampleIndex + " / " + sampleFiles.size() + "):\t" + sampleNameRoot);
 
@@ -1178,7 +1178,7 @@ public class Regions {
 				outListForChrom.add("browser hide all");								
 				outListForChrom.add( constructTrackNameString_BED(sampleNameRoot, sb, true).toString() );
 	
-				for (CopyNumberRegionRange cnrr : regionsOneSample.getRegions(chrom)) {
+				for (CopyNumberRegionRangeLOHcate cnrr : regionsOneSample.getRegions(chrom)) {
 					constructRowString_BEDFormat(chrom, sb, cnrr.getRangeStart(), cnrr.getRangeEnd() + 1, ++rowNum[chrom.ordinal()], snowString);
 					outListForChrom.add(sb.toString());
 				}
@@ -1272,14 +1272,14 @@ public class Regions {
 			float recurrenceMax = Float.MIN_VALUE;
 			
 			// First get the min and max values to scale
-			for (CopyNumberRegionRange cnrr : recurrentRegionsForOneClusterType.getRegions(chrom)) {
+			for (CopyNumberRegionRangeLOHcate cnrr : recurrentRegionsForOneClusterType.getRegions(chrom)) {
 				recurrenceMin = Math.min(recurrenceMin, cnrr.mRecurrenceScore);
 				recurrenceMax = Math.max(recurrenceMax, cnrr.mRecurrenceScore);
 			}
 			float recurrenceMinMaxRange = recurrenceMax - recurrenceMin + 1;
 			
 			// Scale accordingly -- this idea was inspired from Siddharth Reddy
-			for (CopyNumberRegionRange cnrr : recurrentRegionsForOneClusterType.getRegions(chrom)) {
+			for (CopyNumberRegionRangeLOHcate cnrr : recurrentRegionsForOneClusterType.getRegions(chrom)) {
 				float score = cnrr.mRecurrenceScore;
 				float fraction = (score - recurrenceMin) / recurrenceMinMaxRange;
 				float newScoreRaw = fraction * bedScoreRange;
@@ -1385,7 +1385,7 @@ public class Regions {
 			// Now go through and figure out the sampleIndices in sorted order, from highest to lowest			
 			for (int i = eventCountForChromWithSampleID.length - 1; i >= 0; i--) {
 				int indexSample = (int) (eventCountForChromWithSampleID[i] & 0xFFFFFFFF);
-				String theSampleName = samplesWithRegions.get(indexSample).mSampleName;
+				String theSampleName = samplesWithRegions.get(indexSample).getSampleName();
 				String samplePath = filePrefix + constructGenBrowserTrackFilenamePerSampleAndCluster(theSampleName, clusterType, chrom);
 				IOUtils.writeToBufferedWriter(outManifest, samplePath, true);
 			}

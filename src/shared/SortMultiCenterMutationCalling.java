@@ -1,13 +1,18 @@
 package shared;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.ListIterator;
 
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.stat.correlation.PearsonsCorrelation;
+
 import com.carrotsearch.hppc.DoubleArrayList;
 import com.carrotsearch.hppc.FloatArrayList;
 
+import nutils.ArrayUtils;
 import nutils.CompareUtils;
 import nutils.EnumMapSafe;
 import nutils.IOUtils;
@@ -47,9 +52,48 @@ public class SortMultiCenterMutationCalling {
 	public static double calcFMeasure(double recall, double precision) {
 		return (2 * ((recall * precision) / (recall + precision)));
 	}
+
+
+	// ========================================================================
+	private static void printMatrix(RealMatrix theMatrix, PrintStream out) {
+		int numRows = theMatrix.getRowDimension();
+		int numCols = theMatrix.getColumnDimension();
+		
+		for (int i = 0; i < numRows; i++) {
+			for (int j = 0; j < numCols; j++) {
+				if (j > 0) { out.printf("\t"); }
+				out.printf("%g", theMatrix.getEntry(i, j));
+			}
+			out.println();
+		}
+	}
 	
 	// ========================================================================
-	public static void printOverallScores(ArrayList<FloatArrayList> overallScore, String title, int maxCardinalityToInclude) {
+	private static RealMatrix performPairwiseCorrelations(double[][] theMatrix) {
+		PearsonsCorrelation correlator = new PearsonsCorrelation(theMatrix);
+		return correlator.getCorrelationMatrix();
+	}	
+	
+	// ========================================================================
+	/** Rows are correlated against one another. */
+	private static double[][] performPairwiseCorrelations2(double[][] theMatrix) {
+		int numCategories = theMatrix.length;
+		double[][] correlationMatrix = new double[numCategories][numCategories];
+		
+		PearsonsCorrelation correlator = new PearsonsCorrelation();
+		
+		// Iterate through the categories, but don't duplicate
+		for (int categoryFirst = 0; categoryFirst < theMatrix.length - 1; categoryFirst++) {
+			for (int categorySecond = categoryFirst + 1; categorySecond < theMatrix.length; categorySecond++) {
+				
+			}
+		}
+		
+		return correlationMatrix;
+	}
+	
+	// ========================================================================
+	private static void printOverallScores(ArrayList<FloatArrayList> overallScore, String title, int maxCardinalityToInclude) {
 		
 		System.out.println("-------- " + title + " Overall ----------");
 		System.out.print(title);
@@ -165,33 +209,38 @@ public class SortMultiCenterMutationCalling {
 		ArrayList<FloatArrayList> scoresF1Overall = new ArrayList<FloatArrayList>();
 		
 		for (int minCardinality = 1; minCardinality <= maxCardinalityToInclude; minCardinality++) {
+			
+			System.out.println("---------------Min Cardinality: " + minCardinality + "\n---------------");
 
-			EnumMapSafe<Center, PrimitiveWrapper.WInteger> mapScorePPV = PrimitiveWrapper.WInteger.ClassFactory.newEnumMap(Center.class);
-			EnumMapSafe<Center, PrimitiveWrapper.WInteger> mapTotalPPV = PrimitiveWrapper.WInteger.ClassFactory.newEnumMap(Center.class);
+			EnumMapSafe<Center, PrimitiveWrapper.WInteger> mapScorePPV  = PrimitiveWrapper.WInteger.ClassFactory.newEnumMap(Center.class);
+			EnumMapSafe<Center, PrimitiveWrapper.WInteger> mapTotalPPV  = PrimitiveWrapper.WInteger.ClassFactory.newEnumMap(Center.class);
 			EnumMapSafe<Center, PrimitiveWrapper.WInteger> mapTotalSens = PrimitiveWrapper.WInteger.ClassFactory.newEnumMap(Center.class);
 			EnumMapSafe<Center, PrimitiveWrapper.WInteger> mapScoreSens = PrimitiveWrapper.WInteger.ClassFactory.newEnumMap(Center.class);
 
+			// Iterate over all cardinality amounts
 			for (int i = 0; i < allRowsCardinality.size(); i++) {
 				int cardinality = i + 1;
+				
+				// Iterate through all the combinations within a particular cardinality
 				for (RowCount rowCount : allRowsCardinality.get(i)) {				
+				
+					// Iterate through the centers
 					for (Center c : Center.values()) {
 						
+						// For each center, we add to the denominator that will be later used for sensitivity calculations
 						if (cardinality >= minCardinality && cardinality <= maxCardinalityToInclude) {
 							PrimitiveWrapper.WInteger totalSens = mapTotalSens.get(c);
 							totalSens.mInt += (doScalingScore(cardinality, doScaling) * rowCount.mCount);
 						}
 
+						// Now take action if the center is actually present in the current combination
 						if (rowCount.contains(c)) {
-							PrimitiveWrapper.WInteger totalCount = mapTotalPPV.get(c);
-							totalCount.mInt += (doScalingScore(maxCardinalityToInclude, doScaling) * rowCount.mCount);
+							mapTotalPPV.get(c).mInt += (doScalingScore(maxCardinalityToInclude, doScaling) * rowCount.mCount);
 
 							if (cardinality >= minCardinality && cardinality <= maxCardinalityToInclude) {
 								
-								totalCount = mapScorePPV.get(c);
-								totalCount.mInt += (doScalingScore(cardinality, doScaling) * rowCount.mCount);
-								
-								totalCount = mapScoreSens.get(c);
-								totalCount.mInt += (doScalingScore(cardinality, doScaling) * rowCount.mCount);
+								mapScorePPV.get(c).mInt  += (doScalingScore(cardinality, doScaling) * rowCount.mCount);								
+								mapScoreSens.get(c).mInt += (doScalingScore(cardinality, doScaling) * rowCount.mCount);
 							}
 						}
 					}
@@ -254,6 +303,29 @@ public class SortMultiCenterMutationCalling {
 		printOverallScores(scoresSensOverall, "Sens_Score", maxCardinalityToInclude);
 		printOverallScores(scoresPPVOverall, "PPV_Score", maxCardinalityToInclude);
 		printOverallScores(scoresF1Overall, "F1_Score", maxCardinalityToInclude);
+		
+		// Now look at correlations
+		double[][] scoresSensOverallTranspose = ArrayUtils.tranposeNaive( ArrayUtils.toDouble2D(scoresSensOverall) );
+		double[][] scoresPPVOverallTranspose  = ArrayUtils.tranposeNaive( ArrayUtils.toDouble2D(scoresPPVOverall)  );
+		double[][] scoresF1OverallTranspose   = ArrayUtils.tranposeNaive( ArrayUtils.toDouble2D(scoresF1Overall)   );
+		
+		scoresSensOverallTranspose =  ArrayUtils.toDouble2D(scoresSensOverall);
+		scoresPPVOverallTranspose  =  ArrayUtils.toDouble2D(scoresPPVOverall);
+		scoresF1OverallTranspose   =  ArrayUtils.toDouble2D(scoresF1Overall);
+
+		
+		RealMatrix pairwiseCorrelationSens = performPairwiseCorrelations(scoresSensOverallTranspose);
+		RealMatrix pairwiseCorrelationPPV  = performPairwiseCorrelations(scoresPPVOverallTranspose);
+		RealMatrix pairwiseCorrelationF1   = performPairwiseCorrelations(scoresF1OverallTranspose);
+		
+		System.out.println("Printing Sens Correlation Matrix");
+		printMatrix(pairwiseCorrelationSens, System.out);
+		
+		System.out.println("\nPrinting PPV Correlation Matrix");
+		printMatrix(pairwiseCorrelationPPV, System.out);
+		
+		System.out.println("\nPrinting F1 Correlation Matrix");
+		printMatrix(pairwiseCorrelationF1, System.out);
 		
 		
 		for (int i = 0; i < allRowsCardinality.size() - 1; i++) {

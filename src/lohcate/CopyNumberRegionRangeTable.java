@@ -17,7 +17,7 @@ import nutils.MapUtils;
 import nutils.NullaryClassFactory;
 import nutils.StringUtils;
 
-public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
+public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRangeLOHcate> {
 	
 	HashMap<String, ArrayList<E>> mTable; 
 	
@@ -44,8 +44,8 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 	}
 	
 	// ========================================================================
-	public static CopyNumberRegionRangeTable<CopyNumberRegionRange> readTableFromFile(String inFilename, boolean hasHeader) {
-		CopyNumberRegionRangeTable<CopyNumberRegionRange> table = new CopyNumberRegionRangeTable<CopyNumberRegionRange>();
+	public static CopyNumberRegionRangeTable<CopyNumberRegionRangeLOHcate> readTableFromFile(String inFilename, boolean hasHeader) {
+		CopyNumberRegionRangeTable<CopyNumberRegionRangeLOHcate> table = new CopyNumberRegionRangeTable<CopyNumberRegionRangeLOHcate>();
 		
 		BufferedReader in = IOUtils.getBufferedReader(inFilename);
 		
@@ -62,12 +62,12 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 			double log2CopyNum = (cols.length > 5) ? Double.parseDouble(cols[5]) : 0;
 			EventType event    = (cols.length > 6) ?  EventType.valueOf(cols[6]) : EventType.Ignored;
 			
-			CopyNumberRegionRange cnrr = new CopyNumberRegionRange(event, chrom, regionStart, regionEnd);		
+			CopyNumberRegionRangeLOHcate cnrr = new CopyNumberRegionRangeLOHcate(event, chrom, regionStart, regionEnd);		
 			cnrr.mCopyNumber = log2CopyNum;
 			cnrr.mRecurrenceScore = numMarkers;
 			cnrr.set(chrom, regionStart, regionEnd, true, numMarkers);
 			
-			ArrayList<CopyNumberRegionRange> regionsForPatient = MapUtils.getOrCreateArrayList(patientName, table.mTable);
+			ArrayList<CopyNumberRegionRangeLOHcate> regionsForPatient = MapUtils.getOrCreateArrayList(patientName, table.mTable);
 			regionsForPatient.add(cnrr);			
 		}
 		
@@ -77,19 +77,19 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 
 	// ========================================================================
 	public static void filterTable(String inFilename1, ArrayList<RegionRange> allRegions, boolean hasHeader1) {
-		CopyNumberRegionRangeTable<CopyNumberRegionRange> table1 = readTableFromFile(inFilename1, hasHeader1);		
+		CopyNumberRegionRangeTable<CopyNumberRegionRangeLOHcate> table1 = readTableFromFile(inFilename1, hasHeader1);		
 
 		String outFilename = inFilename1 + ".filtered.txt";
 		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);
 		
 		String delim = StringUtils.FileExtensionTSV.mDelimiter;
 		StringBuilder sb = new StringBuilder(1024);
-		for (Map.Entry<String, ArrayList<CopyNumberRegionRange>> keyVal : table1.mTable.entrySet()) {
+		for (Map.Entry<String, ArrayList<CopyNumberRegionRangeLOHcate>> keyVal : table1.mTable.entrySet()) {
 			
 			String patientName = keyVal.getKey();	
-			ArrayList<CopyNumberRegionRange> regions = keyVal.getValue();
+			ArrayList<CopyNumberRegionRangeLOHcate> regions = keyVal.getValue();
 			
- 			for (CopyNumberRegionRange cnrr : regions) {
+ 			for (CopyNumberRegionRangeLOHcate cnrr : regions) {
 				
 				for (RegionRange regionOther : allRegions) {
 					
@@ -112,7 +112,7 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 	
 
 	// ========================================================================
-	private static void addRegionInfoToStringBuilder(String delim, CopyNumberRegionRange cnrr, StringBuilder sb) {
+	private static void addRegionInfoToStringBuilder(String delim, CopyNumberRegionRangeLOHcate cnrr, StringBuilder sb) {
 		sb.append(delim)
 		  .append(cnrr.getChromosome().getCode())
 		  .append(delim)
@@ -129,21 +129,21 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 	
 	// ========================================================================
 	public static void compareTables(String inFilename1, String inFilename2, boolean hasHeader1, boolean hasHeader2) {
-		CopyNumberRegionRangeTable<CopyNumberRegionRange> table1 = readTableFromFile(inFilename1, hasHeader1);
-		CopyNumberRegionRangeTable<CopyNumberRegionRange> table2 = readTableFromFile(inFilename2, hasHeader2);
+		CopyNumberRegionRangeTable<CopyNumberRegionRangeLOHcate> table1 = readTableFromFile(inFilename1, hasHeader1);
+		CopyNumberRegionRangeTable<CopyNumberRegionRangeLOHcate> table2 = readTableFromFile(inFilename2, hasHeader2);
 		
 		String outFilename = inFilename1 + ".vs." + (new File(inFilename2)).getName() + ".txt";
 		BufferedWriter out = IOUtils.getBufferedWriter(outFilename);
 		
 		String delim = StringUtils.FileExtensionTSV.mDelimiter;
 		StringBuilder sb = new StringBuilder(1024);
-		for (Map.Entry<String, ArrayList<CopyNumberRegionRange>> keyVal : table1.mTable.entrySet()) {
+		for (Map.Entry<String, ArrayList<CopyNumberRegionRangeLOHcate>> keyVal : table1.mTable.entrySet()) {
 			String patientName = keyVal.getKey();
-			ArrayList<CopyNumberRegionRange> regions = keyVal.getValue();
+			ArrayList<CopyNumberRegionRangeLOHcate> regions = keyVal.getValue();
 			
-			ArrayList<CopyNumberRegionRange> resultRegions = table2.mTable.get(patientName);
+			ArrayList<CopyNumberRegionRangeLOHcate> resultRegions = table2.mTable.get(patientName);
 			if (resultRegions == null) {
-				for (CopyNumberRegionRange cnrr : regions) {
+				for (CopyNumberRegionRangeLOHcate cnrr : regions) {
 					sb.setLength(0);
 					sb.append(patientName);
 					addRegionInfoToStringBuilder(delim, cnrr, sb);
@@ -159,11 +159,11 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRange> {
 					IOUtils.writeToBufferedWriter(out, sb.toString(), true);
 				}
 			} else {				
-				for (CopyNumberRegionRange cnrr : regions) {
+				for (CopyNumberRegionRangeLOHcate cnrr : regions) {
 					boolean oneOverlapFound = false;
 					boolean hadGermline = false;
 					
-					for (CopyNumberRegionRange cnrrOther : resultRegions) {						
+					for (CopyNumberRegionRangeLOHcate cnrrOther : resultRegions) {						
 						if (cnrr.overlapRange(cnrrOther)) {
 							if (cnrrOther.mCopyNumberEventType == EventType.Ignored) continue;
 							

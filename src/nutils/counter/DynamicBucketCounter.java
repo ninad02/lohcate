@@ -47,12 +47,13 @@ public class DynamicBucketCounter {
 	// ========================================================================
 	public int getCount(int key) {
 		int indexOfKey = getIndexOfKey(key);
-		if (indexOfKey < 0) return indexOfKey;
+		if (indexOfKey < 0) return 0;
 		return getCountAtIndex(indexOfKey);			
 	}
 	
 	// ========================================================================
-	public void getCounts(IntArrayList countsBuffer) {
+	public IntArrayList getCounts(IntArrayList countsBuffer) {
+		countsBuffer = (countsBuffer == null) ? new IntArrayList() : countsBuffer; 
 		countsBuffer.clear();
 		
 		int numKeys = getNumKeys();
@@ -61,6 +62,7 @@ public class DynamicBucketCounter {
 		for (int i = 0; i < numKeys; i++) {
 			countsBuffer.add(getCountAtIndex(i));
 		}
+		return countsBuffer;
 	}
 	
 	// ========================================================================
@@ -145,17 +147,22 @@ public class DynamicBucketCounter {
 	}
 
 	// ========================================================================
-	public void getKeys(IntArrayList keysBuffer) {
+	public IntArrayList getKeys(IntArrayList keysBuffer) {
+		keysBuffer = (keysBuffer == null) ? new IntArrayList() : keysBuffer;
+		
 		keysBuffer.clear();
 		int numKeys = getNumKeys();
 		keysBuffer.ensureCapacity(numKeys);
 		for (int i = 0; i < numKeys; i++) {
 			keysBuffer.add(getKeyAtIndex(i));
 		}
+		return keysBuffer;
 	}
 	
 	// ========================================================================
-	public void getProportions(FloatArrayList proportionsBuffer) {
+	public FloatArrayList getProportions(FloatArrayList proportionsBuffer) {
+		
+		proportionsBuffer = (proportionsBuffer == null) ? new FloatArrayList() : proportionsBuffer;		
 		proportionsBuffer.clear();
 		
 		int numKeys = getNumKeys();
@@ -163,28 +170,32 @@ public class DynamicBucketCounter {
 		for (int i = 0; i < numKeys; i++) {			
 			proportionsBuffer.add(calcProportionAtIndex(i));
 		}
+		return proportionsBuffer;
 	}
 	
 	// ========================================================================
-	public void getProportionsCumulativeForward(FloatArrayList proportionsBuffer) {
-		getProportions(proportionsBuffer);
+	public FloatArrayList getCumulativeProportionsForward(FloatArrayList proportionsBuffer) {
+		proportionsBuffer = getProportions(proportionsBuffer);
 		
 		// Return early if empty list		
 		int numKeys = getNumKeys();
-		if (numKeys == 0) return;
+		if (numKeys == 0) return proportionsBuffer;
 		
 		for (int i = 1; i < numKeys; i++) {
 			proportionsBuffer.set(i, proportionsBuffer.get(i) + proportionsBuffer.get(i - 1));			
-		}		
+		}	
+		
+		return proportionsBuffer;
 	}
 	
 	// ========================================================================
-	public void getCumulativeSumsForward(IntArrayList cumulativeCountsBuffer) {		
+	public IntArrayList getCumulativeSumsForward(IntArrayList cumulativeCountsBuffer) {
+		cumulativeCountsBuffer = (cumulativeCountsBuffer == null) ? new IntArrayList() : cumulativeCountsBuffer;
 		cumulativeCountsBuffer.clear();		
 		
 		// Return early if empty list		
 		int numKeys = getNumKeys();
-		if (numKeys == 0) return;
+		if (numKeys == 0) return cumulativeCountsBuffer;
 		cumulativeCountsBuffer.ensureCapacity(numKeys);
 		
 		// First initialize first element
@@ -193,6 +204,7 @@ public class DynamicBucketCounter {
 		for (int i = 1; i < numKeys; i++) {
 			cumulativeCountsBuffer.add(cumulativeCountsBuffer.get(i - 1) + getCountAtIndex(i));			
 		}
+		return cumulativeCountsBuffer;
 	}
 	
 	// ========================================================================
@@ -235,7 +247,7 @@ public class DynamicBucketCounter {
 		dbc.getCumulativeSumsForward(cumulativeForward);
 		dbc.getCumulativeSumsBackward(cumulativeBackward);
 		dbc.getProportions(proportionsBuffer);
-		dbc.getProportionsCumulativeForward(proportionsBufferCumulativeForward);
+		dbc.getCumulativeProportionsForward(proportionsBufferCumulativeForward);
 		
 		for (int i = 0; i < dbc.getNumKeys(); i++) {
 			System.out.printf("%d\t%d\t%d\t%d\t%d\t%g\t%g\n", i, dbc.getKeyAtIndex(i), dbc.getCountAtIndex(i), cumulativeForward.get(i), cumulativeBackward.get(i), proportionsBuffer.get(i), proportionsBufferCumulativeForward.get(i));

@@ -43,7 +43,7 @@ public class EnumMapSafe<K extends Enum<K>, V> extends EnumMap<K, V> {
 	}
 
 	// ========================================================================
-	public static <E extends Enum<E>, V> EnumMapSafe<E, ArrayList<V>> createEnumMapOfArrayLists(Class<E> enumClass, Class<V> arrayTargetObject) {
+	public static <E extends Enum<E>, V> EnumMapSafe<E, ArrayList<V>> createEnumMapOfArrayLists(Class<E> enumClass) {
 		EnumMapSafe<E, ArrayList<V>> newMap = new EnumMapSafe<E, ArrayList<V>>(enumClass);
 		E[] enumValues = enumClass.getEnumConstants();
 		
@@ -52,6 +52,11 @@ public class EnumMapSafe<K extends Enum<K>, V> extends EnumMap<K, V> {
 		}
 		
 		return newMap;
+	}
+	
+	// ========================================================================
+	public static <E extends Enum<E>, V> EnumMapSafe<E, ArrayList<V>> createEnumMapOfArrayLists(Class<E> enumClass, Class<V> arrayTargetObject) {
+		return createEnumMapOfArrayLists(enumClass);
 	}
 
 	// ========================================================================

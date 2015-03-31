@@ -86,8 +86,9 @@ public class CodeEvalTestRecursion {
 	
 	public static void main(String[] args) {
 		//Test3();
-		System.out.println(NumberUtils.MathLog2(1));
-		dbsnptest();
+		TestGenericTypes();
+		//System.out.println(NumberUtils.MathLog2(1));
+		//dbsnptest();
 		
 		
 		/*
@@ -166,6 +167,52 @@ public class CodeEvalTestRecursion {
 		public TestA foo(TestA a) { return this; }
 	}
 	
+	// =====
+	public static interface CloneInf<T> {
+		public T clone(); 
+	}
+	
+	public static abstract class A<T extends A<T> & CloneInf<T>> {
+		public abstract T foo();
+		public abstract T clone();
+	}
+	
+	public static class B extends A<B> implements CloneInf<B> {
+
+		@Override
+		public B foo() {
+			System.out.println("Running foo " + this.getClass().getName());
+			return this;
+		}		
+		
+		public B clone() { return null; }
+	}
+	
+	public static class C extends B  {
+		public C foo() { 
+			System.out.println("Running foo " + this.getClass().getName());
+			return this;
+		}
+		
+		@Override
+		public C clone() { return null; }
+	}
+	
+
+	public static void TestGenericTypes_Help(A<?> objA) {
+		ArrayList<C> listC = new ArrayList<C>();
+		listC.add((C) objA);
+	}
+	
+	public static void TestGenericTypes() {
+		B objB = new C();
+		A<?> objA = objB;
+		
+		objB.foo();
+		objA.foo();
+		
+		
+	}
 	
 //	public static class TestB extends TestA implements TestInterface<TestB> {		
 //		public TestB foo(TestB b) { return this; }

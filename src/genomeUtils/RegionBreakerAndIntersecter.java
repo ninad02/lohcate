@@ -11,9 +11,6 @@ import genomeUtils.RegionRange.RegionRangeOverlap;
 
 import java.util.ArrayList;
 
-import lohcate.CopyNumberRegionRange;
-import lohcateEnums.EventType;
-
 import nutils.Cast;
 import nutils.CompareUtils;
 
@@ -239,11 +236,11 @@ public class RegionBreakerAndIntersecter {
 
 
 	//=========================================================================
-	public static ArrayList<CopyNumberRegionRange>
-		takeUnionAndBreakDownIntersectingRegionsOld(ArrayList<CopyNumberRegionRange> regionsTarget, ArrayList<CopyNumberRegionRange> regionsSource, final EventType clusterType) {		
+/*	public static ArrayList<CopyNumberRegionRangeLOHcate>
+		takeUnionAndBreakDownIntersectingRegionsOld(ArrayList<CopyNumberRegionRangeLOHcate> regionsTarget, ArrayList<CopyNumberRegionRangeLOHcate> regionsSource, final EventType clusterType) {		
 		
 		// Make a pseudo-shallow array copy so we don't alter the caller's master copy 
-		regionsSource = new ArrayList<CopyNumberRegionRange>(regionsSource);  
+		regionsSource = new ArrayList<CopyNumberRegionRangeLOHcate>(regionsSource);  
 		
 		int indexTarget = 0;
 		int indexSource = 0;
@@ -251,8 +248,8 @@ public class RegionBreakerAndIntersecter {
 		
 		while ((indexTarget < regionsTarget.size()) && (indexSource < regionsSource.size())) {
 			//System.out.println(indexTarget + "\t" + regionsTarget.size() + "\t" + indexSource + "\t" + regionsSource.size());
-			CopyNumberRegionRange regionTarget = regionsTarget.get(indexTarget);
-			CopyNumberRegionRange regionSource = regionsSource.get(indexSource);
+			CopyNumberRegionRangeLOHcate regionTarget = regionsTarget.get(indexTarget);
+			CopyNumberRegionRangeLOHcate regionSource = regionsSource.get(indexSource);
 	
 			// Check and make sure that we are using the correct cluster type
 			if (regionTarget.mCopyNumberEventType != clusterType) {
@@ -301,7 +298,7 @@ public class RegionBreakerAndIntersecter {
 				CompareUtils.throwErrorAndExit("ERROR: Should be on different chromosomes!");					
 				break;
 			case SubsumesTotal: case SubsumesAlignedRight: case BeforeWithOverlap: {					
-				breakdownThreeCasesHelper(regionsTarget, regionsSource, indexTarget, indexSource, false, true, CopyNumberRegionRange.class);
+				breakdownThreeCasesHelper(regionsTarget, regionsSource, indexTarget, indexSource, false, true, CopyNumberRegionRangeLOHcate.class);
 				indexTarget++;  // increment the target array index				
 	
 				// The following procedure reduces these cases to: 
@@ -313,7 +310,7 @@ public class RegionBreakerAndIntersecter {
 			}
 			case SubsumesAlignedLeft: {
 				// The following procedure reduces the case to Equals, and whatever follows
-				breakdownSubsumesConsumedAlignedLeftHelper(regionsTarget, regionsSource, indexTarget, indexSource, false, CopyNumberRegionRange.class);
+				breakdownSubsumesConsumedAlignedLeftHelper(regionsTarget, regionsSource, indexTarget, indexSource, false, CopyNumberRegionRangeLOHcate.class);
 				overlapTypePredicted = RegionRangeOverlap.Equals;
 				break;
 			}
@@ -321,7 +318,7 @@ public class RegionBreakerAndIntersecter {
 				// The following procedure reduces these cases to:
 				//     ConsumedByAlignedLeft, if ConsumedByTotal was this case
 				//     Equals, if ConsumedByAlignedRight was this case
-				breakdownThreeCasesHelper(regionsSource, regionsTarget, indexSource, indexTarget, true, false, CopyNumberRegionRange.class);
+				breakdownThreeCasesHelper(regionsSource, regionsTarget, indexSource, indexTarget, true, false, CopyNumberRegionRangeLOHcate.class);
 				indexTarget++;  // increment the target array index
 				
 				overlapTypePredicted = (overlapType == ConsumedByTotal) ? ConsumedByAlignedLeft :
@@ -330,7 +327,7 @@ public class RegionBreakerAndIntersecter {
 			}
 			case ConsumedByAlignedLeft: {
 				// The following procedure reduces the case to Equals, and whatever follows
-				breakdownSubsumesConsumedAlignedLeftHelper(regionsSource, regionsTarget, indexSource, indexTarget, true, CopyNumberRegionRange.class);
+				breakdownSubsumesConsumedAlignedLeftHelper(regionsSource, regionsTarget, indexSource, indexTarget, true, CopyNumberRegionRangeLOHcate.class);
 				overlapTypePredicted = RegionRangeOverlap.Equals;
 				break;					
 			}		
@@ -356,14 +353,14 @@ public class RegionBreakerAndIntersecter {
 		
 		// We only need to add elements (actually, their copies) if more still exist in the source array. 
 		for (; indexSource < regionsSource.size(); indexSource++) {
-			CopyNumberRegionRange regionSource = regionsSource.get(indexSource);
+			CopyNumberRegionRangeLOHcate regionSource = regionsSource.get(indexSource);
 			if (regionSource.mCopyNumberEventType == clusterType) {
 				regionsTarget.add(regionSource.getCopy());
 			}
 		}
 		
 		return regionsTarget;
-	}
+	}*/
 
 	//=========================================================================
 	/**

@@ -64,11 +64,16 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 	 *  value.  If rejects any attempt to set the value to a second new value.
 	 */
 	public static class WIntegerSetOnce extends WInteger {
+		
+		public static final NullaryClassFactory<WIntegerSetOnce> ClassFactory = new NullaryClassFactory<WIntegerSetOnce>(WIntegerSetOnce.class);
+		
 		private boolean mAlreadySetOnce;
+		
+		public WIntegerSetOnce() { this(DefaultValue); }
 		
 		public WIntegerSetOnce(int i) {
 			super(i);
-			mAlreadySetOnce = false;
+			reset();
 		}
 		
 		public boolean set(final int i) {			
@@ -82,13 +87,24 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		
 		public boolean isAlreadySetOnce() { return mAlreadySetOnce; }
 		
+		/** Method the resets the state of whether the integer has been set or not.  
+		 *  This method allows the object to be reused, while enforcing the one-set 
+		 *  restriction, as the user needs to make an explicitly call to this function
+		 *  to reset the one-set restriction.
+		 */
+		public void reset() { mAlreadySetOnce = false; }	
 		
+		public void resetAndSet(final int i) {
+			reset();
+			set(i);
+		}
 	}
 
 	//=========================================================================
 	public static class WDouble extends PrimitiveWrapper<WDouble> {
 		public double mDouble;
 		public WDouble(double d) { mDouble = d; }
+		public WDouble() { this(DefaultValue); }
 		
 		/* (non-Javadoc)
 		 * @see java.lang.Object#hashCode()
@@ -124,8 +140,46 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 		public int compareTo(WDouble rhs) {
 			return Double.compare(mDouble, rhs.mDouble);
 		}
+	}
+	
+	//=========================================================================
+	/** A class that sets an initial value, with an option of setting it to a new
+	 *  value.  If rejects any attempt to set the value to a second new value.
+	 */
+	public static class WDoubleSetOnce extends WDouble {
+		private boolean mAlreadySetOnce;
 		
+		public WDoubleSetOnce() {
+			this(DefaultValue);
+		}
 		
+		public WDoubleSetOnce(final double d) {
+			super(d);
+			reset();
+		}
+		
+		public boolean set(final double d) {			
+			if (mAlreadySetOnce) {
+				return (d == mDouble);
+			} else {
+				mDouble = d;
+				return (mAlreadySetOnce = true);
+			}
+		}
+		
+		public boolean isAlreadySetOnce() { return mAlreadySetOnce; }
+		
+		/** Method the resets the state of whether the integer has been set or not.  
+		 *  This method allows the object to be reused, while enforcing the one-set 
+		 *  restriction, as the user needs to make an explicitly call to this function
+		 *  to reset the one-set restriction.
+		 */
+		public void reset() { mAlreadySetOnce = false; }	
+		
+		public void resetAndSet(final double d) {
+			reset();
+			set(d);
+		}
 	}
 
 	//=========================================================================

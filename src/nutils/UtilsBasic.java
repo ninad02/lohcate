@@ -1,5 +1,8 @@
 package nutils;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
 public class UtilsBasic {
 
 	public UtilsBasic() {
@@ -23,6 +26,17 @@ public class UtilsBasic {
 	}
 	
 	// ========================================================================
+	@SuppressWarnings("unchecked")
+	public static<E extends Cloneable> E getClone(E obj) {
+		try {
+			Method m = obj.getClass().getMethod("clone");
+			return (E) m.invoke(obj);
+		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			e.printStackTrace();
+			System.exit(-1);
+		}
+		return null;
+	}
 	
 	/**
 	 * @param args

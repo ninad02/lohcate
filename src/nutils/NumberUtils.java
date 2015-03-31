@@ -1,6 +1,7 @@
 package nutils;
 
 import genomeEnums.Nuc;
+import htsjdk.tribble.util.MathUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -152,6 +153,15 @@ public class NumberUtils {
 	// ========================================================================
 	public static final int roundToNearest5(int num) {
 		return (int) (Math.round(num / 5.0) * 5);
+	}
+	
+	// ========================================================================
+	/** @param nthPower - must be a positive value, else the original number is returned. */
+	public static final int roundToNearestNthPositivePowerOf10(int num, int nthPower) {
+		if (nthPower <= 0) return num;
+		
+		int multiplier = Cast.toInt(Math.round(Math.pow(10, nthPower)));
+		return (int) (Math.round(num / (double) multiplier) * multiplier);
 	}
 	
 	// ========================================================================

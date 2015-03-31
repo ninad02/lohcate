@@ -223,21 +223,21 @@ public class LOHcateSimulator {
 		simulateReadsInRegion(simParams, oneSampleData, null, goldStandard);
 		
 		// Get the regions
-		ArrayList<CopyNumberRegionRange> regionsSelected = deduceRegions(simParams, oneSampleData);
+		ArrayList<CopyNumberRegionRangeLOHcate> regionsSelected = deduceRegions(simParams, oneSampleData);
 		
 		// Go through the regions and generate the data
-		for (CopyNumberRegionRange regionSelected : regionsSelected) {
+		for (CopyNumberRegionRangeLOHcate regionSelected : regionsSelected) {
 			simulateReadsInRegion(simParams, oneSampleData, regionSelected, goldStandard);
 		}
 	}
 	
 	// ========================================================================
-	private ArrayList<CopyNumberRegionRange> deduceRegions(LOHcateSimulatorParams simParams, ClusteringInputOneSample oneSampleData) {
+	private ArrayList<CopyNumberRegionRangeLOHcate> deduceRegions(LOHcateSimulatorParams simParams, ClusteringInputOneSample oneSampleData) {
 
 		ControlFlagBool specifyRandomSeed = new ControlFlagBool(true);
 		SeqReadSimulator readSimulator = specifyRandomSeed.getValue() ? new SeqReadSimulator(Integer.SIZE) : new SeqReadSimulator();
 		
-		ArrayList<CopyNumberRegionRange> cnRegions = new ArrayList<CopyNumberRegionRange>(simParams.getNumCNARegions());
+		ArrayList<CopyNumberRegionRangeLOHcate> cnRegions = new ArrayList<CopyNumberRegionRangeLOHcate>(simParams.getNumCNARegions());
 		
 		// We create an array that tracks which chromosomes were used
 		boolean[] chromsUsed = new boolean[Chrom.values().length];
@@ -249,7 +249,7 @@ public class LOHcateSimulator {
 			//SequenceLogger.outputPrintln("Region Length: " + regionLength);
 			// Get random event type
 			int randomEventIndex = NumberUtils.getRandomInteger(0, EventType.AmpLOHcnLOH.length - 1);
-			CopyNumberRegionRange newCNRegion = new CopyNumberRegionRange(EventType.AmpLOHcnLOH[randomEventIndex], Chrom.c0, 0);
+			CopyNumberRegionRangeLOHcate newCNRegion = new CopyNumberRegionRangeLOHcate(EventType.AmpLOHcnLOH[randomEventIndex], Chrom.c0, 0);
 			
 			RegionSimulator.generateRegion(regionLength, newCNRegion, cnRegions, oneSampleData);
 			chromsUsed[newCNRegion.getChromosome().ordinal()] = true;  // Set this this chromosome was used
@@ -266,8 +266,8 @@ public class LOHcateSimulator {
 				if (indexChromStart >= 0) {
 					int indexChromEnd = oneSampleData.getIndexChromEnd(germlineGainChrom);
 					if (indexChromEnd - indexChromStart > 1) {
-						CopyNumberRegionRange newCNRegion = 
-								new CopyNumberRegionRange(EventType.GainGermline, germlineGainChrom, 
+						CopyNumberRegionRangeLOHcate newCNRegion = 
+								new CopyNumberRegionRangeLOHcate(EventType.GainGermline, germlineGainChrom, 
 										oneSampleData.getSiteAtIndex(germlineGainChrom, indexChromStart).getPosition(),
 										oneSampleData.getSiteAtIndex(germlineGainChrom, indexChromEnd).getPosition());
 						cnRegions.add(newCNRegion);
@@ -282,7 +282,7 @@ public class LOHcateSimulator {
 		// 
 		// Go through the regions and assign 
 		//Print out the regions
-		for (CopyNumberRegionRange region : cnRegions) {
+		for (CopyNumberRegionRangeLOHcate region : cnRegions) {
 			System.out.println(region + "\t" + region.mCopyNumberEventType);
 		}
 		
@@ -333,7 +333,7 @@ public class LOHcateSimulator {
 	}
 	
 	// ========================================================================	
-	public void simulateReadsInRegion(LOHcateSimulatorParams simParams, ClusteringInputOneSample infoSample, CopyNumberRegionRange cnRegion, LOHcateSimulatorGoldStandard goldStandard) {
+	public void simulateReadsInRegion(LOHcateSimulatorParams simParams, ClusteringInputOneSample infoSample, CopyNumberRegionRangeLOHcate cnRegion, LOHcateSimulatorGoldStandard goldStandard) {
 		
 		Nuc[] genotype = new Nuc[2];
 		SeqReadSimulator seqSim = new SeqReadSimulator();
