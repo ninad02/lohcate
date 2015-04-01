@@ -26,7 +26,7 @@ public class RegionSimulator {
 	
 	// ========================================================================
 	/** Generates a known region given the parameter values and adds it to the list of existing regions. */
-	public static<E extends RegionRange, T extends SiteInformation> 
+	public static<E extends RegionRange<E>, T extends SiteInformation> 
 		E generateRegion(int approxLength, E newRegion, ArrayList<E> existingRegions, SampleInformation<T> oneSampleInfo) {
 		//ArrayList<CNRegion> regions = new ArrayList<CNRegion>();
 		

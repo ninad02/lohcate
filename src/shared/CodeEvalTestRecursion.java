@@ -175,6 +175,7 @@ public class CodeEvalTestRecursion {
 	public static abstract class A<T extends A<T> & CloneInf<T>> {
 		public abstract T foo();
 		public abstract T clone();
+		public boolean compare(A<?> rhs) { return true; }
 	}
 	
 	public static class B extends A<B> implements CloneInf<B> {
@@ -186,6 +187,24 @@ public class CodeEvalTestRecursion {
 		}		
 		
 		public B clone() { return null; }
+	}
+	
+	public static class B2 extends A<B2> implements CloneInf<B2> {
+		public B2 foo() { 
+			System.out.println("Running foo " + this.getClass().getName());
+			return this;
+		}
+		
+		public B2 clone() { return null; }
+	}
+	
+	public static class B3<E> extends A<B3<E>> implements CloneInf<B3<E>> {
+		public B3<E> foo() { 
+			System.out.println("Running foo " + this.getClass().getName());
+			return this;
+		}
+		
+		public B3<E> clone() { return null; }
 	}
 	
 	public static class C extends B  {
@@ -211,7 +230,8 @@ public class CodeEvalTestRecursion {
 		objB.foo();
 		objA.foo();
 		
-		
+		B2 objB2 = new B2();
+		objB2.compare(objB);
 	}
 	
 //	public static class TestB extends TestA implements TestInterface<TestB> {		

@@ -3,18 +3,17 @@
  */
 package genomeUtils;
 
-import nutils.Cast;
+import nutils.CloneInf;
 import genomeEnums.Chrom;
 
 /**
  * @author Ninad Dewal
  *
  */
-public class RegionRangeWithPayload<T extends Comparable<T>> 
-	extends RegionRange 
-	implements Comparable<RegionRangeWithPayload<T>> {
+public class RegionRangeWithPayload<E extends CloneInf<E> & Comparable<E>>
+	extends RegionRange<RegionRangeWithPayload<E>> {
 
-	protected T mPayload;
+	protected E mPayload;
 	
 	// ========================================================================
 	public RegionRangeWithPayload() {		
@@ -23,41 +22,44 @@ public class RegionRangeWithPayload<T extends Comparable<T>>
 	}
 
 	// ========================================================================
-	/**
-	 * @param chrom
-	 * @param rangeStart
-	 */
-	public RegionRangeWithPayload(Chrom chrom, int rangeStart, T payload) {
+	public RegionRangeWithPayload(Chrom chrom, int rangeStart, E payload) {
 		super(chrom, rangeStart);
 		setPayload(payload);
 	}
 
 	// ========================================================================
-	/**
-	 * @param chrom
-	 * @param rangeStart
-	 * @param rangeEnd
-	 */
-	public RegionRangeWithPayload(Chrom chrom, int rangeStart, int rangeEnd, T payload) {
+	public RegionRangeWithPayload(Chrom chrom, int rangeStart, int rangeEnd, E payload) {
 		super(chrom, rangeStart, rangeEnd);
 		setPayload(payload);
 	}
 
 	// ========================================================================
-	public RegionRangeWithPayload(RegionRangeWithPayload<T> rhs) {
-		super(Cast.upcast(rhs, RegionRange.class));
-		setPayload(rhs.mPayload);
+	public RegionRangeWithPayload(RegionRangeWithPayload<E> rhs, boolean deepCopy) {
+		super(rhs);		
+		setPayload(deepCopy ? rhs.mPayload.makeClone() : rhs.mPayload);
 	}
 
 	// ========================================================================
-	public void setPayload(T payload) { mPayload = payload; }
+	@Override
+	public RegionRangeWithPayload<E> makeClone() {
+		return makeClone(true);
+	}
 	
 	// ========================================================================
-	public T getPayload() { return mPayload; }
+	@Override
+	public RegionRangeWithPayload<E> makeClone(boolean deepCopy) {
+		return new RegionRangeWithPayload<E>(this, deepCopy);
+	}
+	
+	// ========================================================================
+	public void setPayload(E payload) { mPayload = payload; }
+	
+	// ========================================================================
+	public E getPayload() { return mPayload; }
 
 	// ========================================================================
-	//@Override
-	public int compareTo(RegionRangeWithPayload<T> rhs) {
+	@Override
+	public int compareTo(RegionRangeWithPayload<E> rhs) {		
 		int result = super.compareTo(rhs);
 		if (result == 0) {
 			result = mPayload.compareTo(rhs.mPayload);
@@ -74,7 +76,5 @@ public class RegionRangeWithPayload<T extends Comparable<T>>
 
 	}
 
-
-	
 
 }

@@ -107,7 +107,7 @@ public class ScriptTest extends Regions {
 			for (int i = startIndex + increment; (i >= 0) && (i < numSamples); i += increment) {
 				//System.out.println("");
 				//System.out.println(i);
-				RegionBreakerAndIntersecter.takeUnionAndBreakDownIntersectingRegions(regionsFromSamples.get(startIndex), regionsFromSamples.get(i), regionTester, CopyNumberRegionRangeLOHcate.class);
+				RegionBreakerAndIntersecter.takeUnionAndBreakDownIntersectingRegions(regionsFromSamples.get(startIndex), regionsFromSamples.get(i), regionTester);
 			}
 
 			// Now we print the regions

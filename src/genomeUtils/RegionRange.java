@@ -4,69 +4,84 @@ import genomeEnums.Chrom;
 
 import java.util.Comparator;
 
+import nutils.CloneInf;
 
-public class RegionRange {
+
+public abstract class RegionRange<T extends RegionRange<T> & CloneInf<T> & Comparable<T>> implements Comparable<T>, CloneInf<T> {
 	
 	// ========================================================================
 	// MAIN CLASS
 	// ========================================================================
-	Chrom mChrom;
-	boolean mRangeFinalized;
-	int mRangeStart;
-	int mRangeEnd;		
-	int mNumSitesInterrogated;
-	
-	public RegionRange() {
+	protected Chrom mChrom;
+	protected boolean mRangeFinalized;
+	protected int mRangeStart;
+	protected int mRangeEnd;		
+	protected int mNumSitesInterrogated;
+
+	// ========================================================================
+	protected RegionRange() {
 		set(Chrom.c0, 0);
 	}
 	
-	public RegionRange(Chrom chrom, int rangeStart) {
+	// ========================================================================
+	protected RegionRange(Chrom chrom, int rangeStart) {
 		set(chrom, rangeStart);		
 	}
 	
-	public RegionRange(Chrom chrom, int rangeStart, int rangeEnd) {
+	// ========================================================================
+	protected RegionRange(Chrom chrom, int rangeStart, int rangeEnd) {
 		this(chrom, rangeStart);		
 		extendRange(chrom, rangeEnd);
 	}
 	
-	public RegionRange(RegionRange rhs) {
-		set(rhs.mChrom, rhs.mRangeStart, rhs.mRangeEnd, rhs.mRangeFinalized, rhs.mNumSitesInterrogated);
+	// ========================================================================
+	protected RegionRange(RegionRange<T> rhs) {
+		set(rhs);
 	}
 	
-	public RegionRange getCopy() { return new RegionRange(this); }
-	
+	// ========================================================================
 	/** Returns the range start. */
 	public int getRangeStart() { return mRangeStart; }
 	
+	// ========================================================================
 	/** Returns the range end. */
 	public int getRangeEnd() { return mRangeEnd; }
 	
+	// ========================================================================
 	/** Returns the range length, inclusive of start and end. */
 	public int getRangeLength() { return mRangeEnd - mRangeStart + 1; }
 	
+	// ========================================================================
 	/** Returns whether the range spans only one site (in other words, has range length of 1. */
 	public boolean spansOneSite() { return (getRangeLength() == 1); }
 	
+	// ========================================================================
 	/** Returns the chromosome. */
 	public Chrom getChromosome() { return mChrom; }
 	
+	// ========================================================================
 	/** Increments the number of sites interrogated by the given amount. */
 	public void incrementSitesInterrogated(int numSitesToAdd) { mNumSitesInterrogated += numSitesToAdd; }
 	
+	// ========================================================================
 	/** Returns the number of sites interrogated in the region. */
 	public int getNumSitesInterrogated() { return mNumSitesInterrogated; }
 	
+	// ========================================================================
 	/** Makes the range finalized. */
 	public void makeFinalized() { mRangeFinalized = true; }
 	
+	// ========================================================================
 	/** Returns whether this range is finalized or not. */
 	public boolean isFinalized() { return mRangeFinalized; }
 	
+	// ========================================================================
 	/** Sets the range to the given chrom and position.  Automatically sets the range end. */
 	public void set(Chrom chrom, int rangeStart) {
 		set(chrom, rangeStart, rangeStart, false, 1);
 	}
 	
+	// ========================================================================
 	/** Sets the range. */
 	public void set(Chrom chrom, int rangeStart, int rangeEnd, boolean makeFinalized, int numSitesInterrogated) {
 		if (rangeEnd < rangeStart) {
@@ -80,22 +95,26 @@ public class RegionRange {
 		mNumSitesInterrogated = numSitesInterrogated;
 	}
 	
-	public void set(RegionRange rhs) {
+	// ========================================================================
+	public void set(RegionRange<?> rhs) {
 		set(rhs.mChrom, rhs.mRangeStart, rhs.mRangeEnd, rhs.mRangeFinalized, rhs.mNumSitesInterrogated);
 	}
 	
+	// ========================================================================
 	/** Sets the range start. */
 	public void setRangeStart(int rangeStart) {
 		if (rangeStart > mRangeEnd) throwErrorAndExit("ERROR: RegionRange.setRangeStart() Range start must precede range end!");
 		mRangeStart = rangeStart;
 	}
 	
+	// ========================================================================
 	/** Sets the range end.  */
 	public void setRangeEnd(int rangeEnd) {
 		if (rangeEnd < mRangeStart) throwErrorAndExit("ERROR: RegionRange.setRangeEnd(): Range end must follow range start!");
 		mRangeEnd = rangeEnd;		
 	}
 	
+	// ========================================================================
 	/** Given a chromNum and a position, this checks whether the chrom
 	 *  number and the position can be used to extend the range.  First, 
 	 *  this checks that the chrom number and position do not already 
@@ -114,30 +133,35 @@ public class RegionRange {
 		return true;
 	}
 	
+	// ========================================================================
 	/** Given a chromNum and a position, this returns whether in range. */
 	public boolean inRange(Chrom chrom, int position) {
 		return (mChrom.equals(chrom) && ((position >= mRangeStart) && (position <= mRangeEnd)));
 	}
 	
+	// ========================================================================
 	/** Given a chromNum and a position, this returns whether it is after the range. */
 	public boolean afterRange(Chrom chrom, int position) {
 		return (chrom.greaterThan(mChrom) || (mChrom.equals(chrom) && (position > mRangeEnd)));
 	}
 	
+	// ========================================================================
 	/** Given a chromNum and a position, this returns whether it is before the range. */
 	public boolean beforeRange(Chrom chrom, int position) {
 		return (chrom.lessThan(mChrom) || (mChrom.equals(chrom) && (position < mRangeStart)));
 	}
 	
+	// ========================================================================
 	/** Given another region, this returns whether there is any overlap.  */
-	public boolean overlapRange(RegionRange rhs) {
+	public boolean overlapRange(RegionRange<?> rhs) {
 		return testAndCharacterizeOverlap(rhs).isOverlapType();		
 	}
 			
+	// ========================================================================
 	/** Given another region, this returns the type of overlap, if any.  
 	 *  The return value is with respect to "this" object, not the argument object passed in.
 	 */
-	public RegionRangeOverlap testAndCharacterizeOverlap(RegionRange rhs) {
+	public RegionRangeOverlap testAndCharacterizeOverlap(RegionRange<?> rhs) {
 		if (mChrom.lessThan   (rhs.mChrom)) return RegionRangeOverlap.BeforeViaDiffChromosome;
 		if (mChrom.greaterThan(rhs.mChrom)) return RegionRangeOverlap.AfterViaDiffChromosome;
 		
@@ -184,25 +208,9 @@ public class RegionRange {
 	}
 	
 	// ========================================================================
-	//@Override
-	public int compareTo(RegionRange rhs) {
-		RegionRangeOverlap result = testAndCharacterizeOverlap(rhs);
-		
-		switch(result) {
-		case Equals: 
-			return 0;
-		case BeforeWithoutOverlap: case BeforeViaDiffChromosome: case AdjacentBefore: 
-			return -1;
-		case SubsumesTotal: case SubsumesAlignedRight: case BeforeWithOverlap: case ConsumedByAlignedLeft:
-			return -1;		
-		case AfterWithoutOverlap:  case AfterViaDiffChromosome:  case AdjacentAfter:  
-			return 1;
-		case ConsumedByTotal: case ConsumedByAlignedRight: case AfterWithOverlap: case SubsumesAlignedLeft:
-			return 1;
-		default:
-			throwErrorAndExit("ERROR: Impossible state!");
-			return 0;
-		}		
+	@Override
+	public int compareTo(T rhs) {
+		return TheComparator.compare(this, rhs);
 	}
 
 	// ========================================================================
@@ -293,8 +301,6 @@ public class RegionRange {
 	}
 	
 	// ========================================================================
-	
-	
 	/** Returns this as a string. */
 	public String toString() {
 		StringBuilder sb = new StringBuilder(512);
@@ -306,21 +312,54 @@ public class RegionRange {
 		return sb.toString();
 	}
 	
-	
+
+	// ========================================================================
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
+	}
+
+	// ========================================================================
+	// INNER CLASS
+	// ========================================================================
+	public static class Default extends RegionRange<Default> {
+
+		public Default() {
+			super();
+		}
+
+		public Default(Chrom chrom, int rangeStart, int rangeEnd) {
+			super(chrom, rangeStart, rangeEnd);
+		}
+
+		public Default(Chrom chrom, int rangeStart) {
+			super(chrom, rangeStart);
+		}
+
+		public Default(RegionRange<Default> rhs) {
+			super(rhs);
+		}
+
+		@Override
+		public Default makeClone() {			
+			return makeClone(true);
+		}
+
+		@Override
+		// In this case, a deep copy is the same as a shallow copy
+		public Default makeClone(boolean deepCopy) { return new Default(this); }
+		
 	}
 	
 	// ========================================================================
 	// INNER CLASS
 	// ========================================================================
 	
-	public static Comparator<RegionRange> TheComparator = new Comparator<RegionRange>() {
+	public static Comparator<RegionRange<?>> TheComparator = new Comparator<RegionRange<?>>() {
 
 		@Override
-		public int compare(RegionRange lhs, RegionRange rhs) {
+		public int compare(RegionRange<?> lhs, RegionRange<?> rhs) {
 			RegionRangeOverlap result = lhs.testAndCharacterizeOverlap(rhs);
 			
 			switch(result) {
@@ -338,6 +377,8 @@ public class RegionRange {
 				throwErrorAndExit("ERROR: Impossible state!");
 				return 0;
 			}		
+			
+			
 		}
 		
 	};

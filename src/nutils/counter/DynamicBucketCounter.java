@@ -6,8 +6,8 @@ import java.util.HashMap;
 
 import nutils.ArrayUtils;
 import nutils.NumberUtils;
-import nutils.PrimitiveWrapper;
 import nutils.NullaryClassFactory;
+import nutils.PrimitiveWrapper;
 import nutils.BitUtils.ValueExtractor;
 
 import com.carrotsearch.hppc.FloatArrayList;

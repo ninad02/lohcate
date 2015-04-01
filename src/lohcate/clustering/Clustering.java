@@ -678,7 +678,7 @@ public class Clustering {
 	}
 	
 	// ========================================================================
-	public static boolean fillRegionBasedOnVAFMaxLikelihood(RegionRange region, 
+	public static boolean fillRegionBasedOnVAFMaxLikelihood(RegionRange<?> region, 
 														  ClusteringInputOneSample oneSampleData, 
 														  ClusteringInputOneSampleMetaData metaData,
 														  ArrayList<EventType> events,
@@ -828,12 +828,12 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	public static double calcAverageCopyNumberOverRegion(RegionRange regionByCoordinates, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
+	public static double calcAverageCopyNumberOverRegion(RegionRange<?> regionByCoordinates, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData) {
 		return calcAverageCopyNumberOverRegion(regionByCoordinates, oneSampleData, metaData, false);		
 	}
 	
 	// ========================================================================
-	public static double calcAverageCopyNumberOverRegion(RegionRange regionByCoordinates, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData, boolean applyAvgCopyNum) {
+	public static double calcAverageCopyNumberOverRegion(RegionRange<?> regionByCoordinates, ClusteringInputOneSample oneSampleData, ClusteringInputOneSampleMetaData metaData, boolean applyAvgCopyNum) {
 		int indexRegionStart = oneSampleData.getIndex(regionByCoordinates.getChromosome(), regionByCoordinates.getRangeStart()); 
 		CompareUtils.ensureTrue(indexRegionStart >= 0, "ERROR: Starting index must be > 0");
 		int indexRegionEnd   = oneSampleData.getIndex(regionByCoordinates.getChromosome(), regionByCoordinates.getRangeEnd());
@@ -1066,7 +1066,7 @@ public class Clustering {
 				//EnumMapSafe<EventType, CopyNumberRegionsByChromosome> regionsInSamplePerEventType = 
 				//		new EnumMapSafe<EventType, CopyNumberRegionsByChromosome>(EventType.class);
 
-				RegionRange midRange = new RegionRange(Chrom.c0, 0);
+				//RegionRange midRange = new RegionRange(Chrom.c0, 0);
 				PrimitiveWrapper.WDouble probFromMaxLikelihood = new PrimitiveWrapper.WDouble(0);
 //				int numMidPossibilities = 2;
 //				double[] probMLMidPossibilities = new double[numMidPossibilities];
@@ -1387,14 +1387,14 @@ public class Clustering {
 	}
 
 	// ========================================================================
-	private static<E extends RegionRange> void applyCopyNumberToSitesInRegion(double copyNumber, E targetRegion, ClusteringInputOneSampleMetaData metaData) {
+	private static<E extends RegionRange<E>> void applyCopyNumberToSitesInRegion(double copyNumber, E targetRegion, ClusteringInputOneSampleMetaData metaData) {
 		for (int index = targetRegion.getRangeStart(); index <= targetRegion.getRangeEnd(); index++) {
 			metaData.setCopyNumberAtIndex(index, copyNumber);			
 		}
 	}
 	
 	// ========================================================================
-	private static<E extends RegionRange> void smoothCopyNumbersHelper_applyCopyNumberToSites(double copyNumber, ArrayList<E> setOfRegions, ClusteringInputOneSampleMetaData metaData) {
+	private static<E extends RegionRange<E>> void smoothCopyNumbersHelper_applyCopyNumberToSites(double copyNumber, ArrayList<E> setOfRegions, ClusteringInputOneSampleMetaData metaData) {
 		for (E cnrr : setOfRegions) {
 			applyCopyNumberToSitesInRegion(copyNumber, cnrr, metaData);
 		}
@@ -1625,7 +1625,7 @@ public class Clustering {
 	}	
 
 	// ========================================================================
-	public static int determineCopyGainVAFMaxLikelihood(ClusteringInputOneSample oneSampleInfo, ClusteringInputOneSampleMetaData metaData, RegionRange range, ArrayList<DoubleArrayList> listOfListOfMeans, TissueType targetTissue,  PrimitiveWrapper.WDouble probFromMaxLikelihood) {
+	public static int determineCopyGainVAFMaxLikelihood(ClusteringInputOneSample oneSampleInfo, ClusteringInputOneSampleMetaData metaData, RegionRange<?> range, ArrayList<DoubleArrayList> listOfListOfMeans, TissueType targetTissue,  PrimitiveWrapper.WDouble probFromMaxLikelihood) {
 		Chrom chrom = range.getChromosome();
 		if (chrom.isInvalid()) return -1;  // Return if not on a valid chromosome
 
@@ -1983,6 +1983,24 @@ public class Clustering {
 		switch(eventType) {
 		case LOH:
 			CompareUtils.ensureTrue(copyNumber < Regions.DefaultDiploidCopyNumber, "ERROR: Invalid copyNumber for LOH");
+		case DELHom:
+			break;
+		case GainGermline:
+			break;
+		case GainSomatic:
+			break;
+		case HETGermline:
+			break;
+		case HETSomatic:
+			break;
+		case Ignored:
+			break;
+		case Noise:
+			break;
+		case cnLOH:
+			break;
+		default:
+			break;
 		
 		}
 		return 0;

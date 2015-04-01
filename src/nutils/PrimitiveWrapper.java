@@ -3,6 +3,7 @@
  */
 package nutils;
 
+
 /**
  * @author ninad
  *
@@ -18,7 +19,7 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 	//=========================================================================
 	/** Provides a wrapper for a primitive int value that can be changed.  Useful
 	 *  when you want to have a changeable integer within a container. */
-	public static class WInteger extends PrimitiveWrapper<WInteger> {
+	public static class WInteger extends PrimitiveWrapper<WInteger> implements CloneInf<WInteger> {
 		public static final NullaryClassFactory<WInteger> ClassFactory = new NullaryClassFactory<WInteger>(WInteger.class);
 		
 		public int mInt;
@@ -55,6 +56,12 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 				return false;
 			return true;
 		}
+		
+		@Override
+		public WInteger makeClone() { return makeClone(true); }
+		
+		@Override
+		public WInteger makeClone(boolean deepCopy) { return new WInteger(this.mInt); }
 		
 		
 	}

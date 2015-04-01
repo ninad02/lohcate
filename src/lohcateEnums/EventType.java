@@ -1,7 +1,5 @@
 package lohcateEnums;
 
-import java.util.ArrayList;
-
 public enum EventType {
 	GainGermline,	
 	GainSomatic,

@@ -48,6 +48,7 @@ import com.google.common.io.Files;
 import nutils.ArrayUtils;
 import nutils.ArrayUtils.ParallelArrayDouble;
 import nutils.Cast;
+import nutils.CloneInf;
 import nutils.CompareUtils;
 import nutils.EnumMapSafe;
 import nutils.GraphUtils;
@@ -64,9 +65,15 @@ public class OriginReplicationBEDReaderTester {
 	private static final int SplineIncrement = 3;
 	
 	// ===========================
-	public static enum MutPOLEType {
+	public static enum MutPOLEType implements CloneInf<MutPOLEType> {
 		TCTtoTAT,
 		AGAtoATA;
+
+		@Override
+		public MutPOLEType makeClone() { return this; }
+
+		@Override
+		public MutPOLEType makeClone(boolean deepCopy) { return this; }
 	}
 	
 	// ========================================================================
@@ -757,8 +764,8 @@ public class OriginReplicationBEDReaderTester {
 
 	// ===========================
 	private static class AnnotationLine {
-		RegionRange mRangeStrict = new RegionRange();
-		RegionRange mRangeFlexible = new RegionRange();
+		RegionRange<?> mRangeStrict = new RegionRange.Default();
+		RegionRange<?> mRangeFlexible = new RegionRange.Default();
 		String mGeneName;		
 	}
 	

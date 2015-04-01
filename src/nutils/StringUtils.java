@@ -3,10 +3,8 @@ package nutils;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Comparator;
-import java.util.ListIterator;
 import java.util.Random;
 
-import com.sun.org.apache.xml.internal.utils.StringComparable;
 
 
 public class StringUtils {
@@ -35,6 +33,18 @@ public class StringUtils {
 			mExtension = extension;
 			mDelimiter = delimiter;
 		}
+	}
+
+	// ========================================================================
+	public static class StringClone implements CloneInf<StringClone> {
+		public String mStr;
+		public StringClone(String s) { mStr = s; }		
+		
+		@Override
+		public StringClone makeClone() { return makeClone(true); }
+		
+		@Override
+		public StringClone makeClone(boolean deepCopy) { return new StringClone(mStr); }
 	}
 
 	// ========================================================================

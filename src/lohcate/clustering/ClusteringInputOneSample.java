@@ -76,7 +76,7 @@ public class ClusteringInputOneSample extends SiteList<ClusteringInputOneSite> i
 	}
 	
 	// ========================================================================
-	public long getIndicesForRegion(RegionRange range) {
+	public long getIndicesForRegion(RegionRange<?> range) {
 		int indexStart = getIndex(range.getChromosome(), range.getRangeStart()); 
 		CompareUtils.ensureTrue(indexStart >= 0, "ERROR: Starting index must be > 0");
 		

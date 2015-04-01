@@ -13,11 +13,11 @@ import nutils.NullaryClassFactory;
  * @author Ninad Dewal
  *
  */
-public class RegionAndSiteWalker<T extends RegionRange> {
+public class RegionAndSiteWalker<T extends RegionRange<T>> {
 
 	// ========================================================================
 	// ========================================================================
-	public static interface Actioner<T extends RegionRange> {
+	public static interface Actioner<T extends RegionRange<T>> {
 		
 		public void takeAction(ArrayList<Boolean> rangeInTargetSet, ArrayList<T> regions, T regionLatest);
 	}
@@ -139,7 +139,7 @@ public class RegionAndSiteWalker<T extends RegionRange> {
 			CompareUtils.ensureTrue(false, "ERROR: Must have >= 1 region on Chrom: " + chrom.getCode());
 		}
 		int regionIndex = 0;  
-		RegionRange currentRegion = regions.get(regionIndex);
+		RegionRange<T> currentRegion = regions.get(regionIndex);
 		
 		for (int indexInMap = 0; indexInMap < numSitesOnChrom; indexInMap++) {
 			int mapPosition = snvMap.getPosition(chrom, indexInMap);
@@ -171,7 +171,6 @@ public class RegionAndSiteWalker<T extends RegionRange> {
 		mClassFactory = theClassFactory;
 		createAndSetNewBufferRegion(Chrom.c0, 0);
 		mRangeInTargetSet = new ArrayList<Boolean>();
-		// TODO Auto-generated constructor stub
 	}
 	
 	// ========================================================================

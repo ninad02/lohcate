@@ -14,7 +14,6 @@ import lohcateEnums.EventType;
 
 import nutils.IOUtils;
 import nutils.MapUtils;
-import nutils.NullaryClassFactory;
 import nutils.StringUtils;
 
 public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRangeLOHcate> {
@@ -27,9 +26,9 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRangeLOHcate> 
 	}
 
 	// ========================================================================
-	public static ArrayList<RegionRange> readListOfRegions(String inFilename) {
+	public static ArrayList<RegionRange<?>> readListOfRegions(String inFilename) {
 		ArrayList<String> allLines = IOUtils.readAllLinesFromFile(inFilename);
-		ArrayList<RegionRange> allRegions = new ArrayList<>(allLines.size());
+		ArrayList<RegionRange<?>> allRegions = new ArrayList<>(allLines.size());
 		
 		for (String line : allLines) {
 			String[] cols = line.split(StringUtils.TabPatternStr);
@@ -37,7 +36,7 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRangeLOHcate> 
 			int rangeStart = Integer.parseInt(cols[1]);
 			int rangeEnd   = Integer.parseInt(cols[2]);	 
 			
-			RegionRange rr = new RegionRange(chrom, rangeStart, rangeEnd);
+			RegionRange.Default rr = new RegionRange.Default(chrom, rangeStart, rangeEnd);
 			allRegions.add(rr);
 		}
 		return allRegions;
@@ -76,7 +75,7 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRangeLOHcate> 
 	}
 
 	// ========================================================================
-	public static void filterTable(String inFilename1, ArrayList<RegionRange> allRegions, boolean hasHeader1) {
+	public static void filterTable(String inFilename1, ArrayList<RegionRange<?>> allRegions, boolean hasHeader1) {
 		CopyNumberRegionRangeTable<CopyNumberRegionRangeLOHcate> table1 = readTableFromFile(inFilename1, hasHeader1);		
 
 		String outFilename = inFilename1 + ".filtered.txt";
@@ -91,7 +90,7 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRangeLOHcate> 
 			
  			for (CopyNumberRegionRangeLOHcate cnrr : regions) {
 				
-				for (RegionRange regionOther : allRegions) {
+				for (RegionRange<?> regionOther : allRegions) {
 					
 					if (cnrr.overlapRange(regionOther)) {
 						
@@ -223,7 +222,7 @@ public class CopyNumberRegionRangeTable<E extends CopyNumberRegionRangeLOHcate> 
 	public static void main(String[] args) {
 		boolean filterStep = false;
 		if (filterStep) {
-			ArrayList<RegionRange> allRegions = readListOfRegions(args[1]);		
+			ArrayList<RegionRange<?>> allRegions = readListOfRegions(args[1]);		
 			System.out.println("Read regions...\t" + allRegions.size());
 			filterTable(args[0], allRegions, false);
 		} else {

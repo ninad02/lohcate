@@ -1,12 +1,14 @@
 package nutils.counter;
 
+import nutils.CloneInf;
+
 /**
  * This class provides a counter for all the constants of an enum type
  * @author vegit_000
  *
  * @param <E>
  */
-public class BucketCounterEnum<E extends Enum<E>> extends BucketCounterCore {
+public class BucketCounterEnum<E extends Enum<E>> extends BucketCounterCore implements CloneInf<BucketCounterEnum<E>> {
 	
 	// ========================================================================
 	public BucketCounterEnum(Class<E> theClass) {		
@@ -40,7 +42,14 @@ public class BucketCounterEnum<E extends Enum<E>> extends BucketCounterCore {
 	}
 	
 	// ========================================================================
-	public BucketCounterEnum<E> getCopy() { return new BucketCounterEnum<E>(this); }
+	@Override
+	public BucketCounterEnum<E> makeClone() { return makeClone(true); }
+
+	// ========================================================================
+	@Override
+	public BucketCounterEnum<E> makeClone(boolean deepCopy) {
+		return new BucketCounterEnum<E>(this);
+	}
 	
 	// ========================================================================	
 	public void increment(E e) { 
@@ -84,4 +93,5 @@ public class BucketCounterEnum<E extends Enum<E>> extends BucketCounterCore {
 	public static void main(String[] args) {
 		TestRobust();
 	}
+
 }

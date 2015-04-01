@@ -5,13 +5,9 @@ import genomeEnums.VariantLocation;
 import genomeUtils.ChromPositionTracker;
 import genomeUtils.GenotypeUtils;
 import genomeUtils.RegionAndSiteWalker;
-import genomeUtils.RegionAndSiteWalker.Actioner;
 import genomeUtils.RegionBreakerAndIntersecter;
 import genomeUtils.RegionBreakerAndIntersecter.RegionIntersectTester;
-import genomeUtils.RegionRange;
 import genomeUtils.SNVMap;
-import static genomeUtils.RegionRange.RegionRangeOverlap.*;
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -19,10 +15,8 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.ListIterator;
 
-import nutils.ArgumentParserUtils;
 import nutils.ArrayUtils;
 import nutils.Cast;
 import nutils.CompareUtils;
@@ -33,18 +27,10 @@ import nutils.NullaryClassFactory;
 import nutils.NumberUtils;
 import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
-import nutils.UtilsBasic;
 import nutils.BitUtils.Compactor.CompactorIntoLong;
 import nutils.collectionsSorted.ArrayListSortedComparable;
 import nutils.counter.DynamicBucketCounter;
 
-import com.carrotsearch.hppc.IntArrayList;
-import com.martiansoftware.jsap.FlaggedOption;
-import com.martiansoftware.jsap.JSAP;
-import com.martiansoftware.jsap.JSAPResult;
-import com.martiansoftware.jsap.StringParser;
-
-import lohcate.LOHcate.SubdirsDefault;
 import lohcate.clustering.AlleleFractionStatsForSample;
 import lohcate.clustering.Clustering;
 import lohcate.clustering.ClusteringInputOneSample;
@@ -55,7 +41,6 @@ import lohcate.clustering.ClusteringPlotting;
 import lohcateEnums.EventType;
 import lohcateEnums.ColorPastel;
 import lohcateEnums.MutationType;
-import lohcateEnums.SeqPlatform;
 
 /**
  * LOHcate --- A software tool for LOH calling and visualization in cancer genomes
@@ -481,7 +466,7 @@ public class Regions {
 		if (regionsInSamples.isEmpty()) return null;
 		
 		// Create a copy that serves as the target (or "sink") for all the intersecting regions
-		CopyNumberRegionsByChromosome target = regionsInSamples.get(0).getCopy();
+		CopyNumberRegionsByChromosome target = regionsInSamples.get(0).makeClone();
 		
 		// Now traverse the rest of the samples
 		for (int i = 1; i < regionsInSamples.size(); i++) {
@@ -851,7 +836,7 @@ public class Regions {
 					// Check if there's a region already waiting for extension.  
 					// If not, create a new one (and a copy at that), and add to array
 					if (regionToExtend == null) {
-						regionToExtend = currentRegion.getCopy();
+						regionToExtend = currentRegion.makeClone();
 						regionsInChromMerged.add(regionToExtend);  // add this to the new array
 						
 					} else {
@@ -874,7 +859,7 @@ public class Regions {
 						} else {
 							// The current region is out of bounds.  We simply set
 							// the current region as the new region to extend.
-							regionToExtend = currentRegion.getCopy();
+							regionToExtend = currentRegion.makeClone();
 							regionsInChromMerged.add(regionToExtend);  // add this to the new array
 						}						
 					}	
@@ -1088,7 +1073,7 @@ public class Regions {
 		for (Chrom chrom : Chrom.Autosomes) {
 			ArrayList<CopyNumberRegionRangeLOHcate> regionsChrTarget = regionsTarget.getRegions(chrom);
 			ArrayList<CopyNumberRegionRangeLOHcate> regionsChrSource = regionsSource.getRegions(chrom);
-			RegionBreakerAndIntersecter.takeUnionAndBreakDownIntersectingRegions(regionsChrTarget, regionsChrSource, regionTester, CopyNumberRegionRangeLOHcate.class);	
+			RegionBreakerAndIntersecter.takeUnionAndBreakDownIntersectingRegions(regionsChrTarget, regionsChrSource, regionTester);	
 		}
 
 		return regionsTarget;
