@@ -10,9 +10,9 @@ import java.util.ArrayList;
 import com.google.common.primitives.Primitives;
 
 import nutils.CompareUtils;
-import nutils.PrimitiveWrapper;
 import nutils.RangeDouble;
 import nutils.BitUtils.Compactor.CompactorIntoLong;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 import lohcateEnums.SeqPlatform;
 
 /**

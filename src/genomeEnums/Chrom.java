@@ -37,11 +37,23 @@ public enum Chrom {
 	public static final int IndexSexChromEnd    = 24;
 	public static final int NumAutosomes = 22;
 	public static final ArrayList<Chrom> Autosomes = createAutosomeArray();
+	public static final ArrayList<Chrom> ValidChromosomes = createValidChromosomeArray();
 	public static final int MaxPositionOnLongestChrom = 0x0FFFFFFF;  // 28 bit mask
 
 	public static final String ChromPrefix_chr_ = "chr_";
 	public static final String ChromPrefix_chr  = "chr";
 	public static final String ChromPrefix_c    = "c";
+
+	// ========================================================================
+	private static ArrayList<Chrom> createValidChromosomeArray() {
+		ArrayList<Chrom> rV = new ArrayList<Chrom>();
+		for (Chrom chrom : Chrom.values()) {
+			if (!chrom.isInvalid()) {
+				rV.add(chrom);
+			}
+		}
+		return rV;
+	}
 	
 	// ========================================================================
 	private static ArrayList<Chrom> createAutosomeArray() {
@@ -140,7 +152,11 @@ public enum Chrom {
 		} else if (subStr.charAt(0) == 'm') {
 			return cM;
 		} else {
-			return getChrom(Byte.parseByte(subStr));
+			try {
+				return getChrom(Byte.parseByte(subStr));
+			} catch (NumberFormatException e) {
+				return null;
+			}
 		}
 	}
 	

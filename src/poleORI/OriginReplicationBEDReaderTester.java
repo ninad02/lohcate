@@ -1,8 +1,10 @@
 package poleORI;
 
 import genomeEnums.Chrom;
+import genomeUtils.RegionBreakerAndIntersecter;
 import genomeUtils.RegionRange;
 import genomeUtils.RegionRangeWithPayload;
+import genomeUtils.RegionRangesOverGenome;
 import htsjdk.tribble.util.MathUtils;
 
 import java.awt.Color;
@@ -11,10 +13,13 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -47,6 +52,8 @@ import com.google.common.io.Files;
 
 import nutils.ArrayUtils;
 import nutils.ArrayUtils.ParallelArrayDouble;
+import nutils.BitUtils.BitSetUtils;
+import nutils.BitUtils.BitSetUtils.BitSetPermutationTask;
 import nutils.Cast;
 import nutils.CloneInf;
 import nutils.CompareUtils;
@@ -55,25 +62,19 @@ import nutils.GraphUtils;
 import nutils.IOUtils;
 import nutils.NullaryClassFactory;
 import nutils.NumberUtils;
-import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
-import nutils.BitUtils.BitSetUtils;
 import nutils.counter.DynamicBucketCounter;
+import nutils.counter.ObjectCounter;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 public class OriginReplicationBEDReaderTester {
 
 	private static final int SplineIncrement = 3;
 	
 	// ===========================
-	public static enum MutPOLEType implements CloneInf<MutPOLEType> {
+	public static enum MutPOLEType implements Serializable {
 		TCTtoTAT,
 		AGAtoATA;
-
-		@Override
-		public MutPOLEType makeClone() { return this; }
-
-		@Override
-		public MutPOLEType makeClone(boolean deepCopy) { return this; }
 	}
 	
 	// ========================================================================
@@ -90,22 +91,23 @@ public class OriginReplicationBEDReaderTester {
 			String[] cols = allLines.get(row).split(StringUtils.TabPatternStr);
 			
 			MutBEDLine mbl = new MutBEDLine();
-			mbl.mChrom = Chrom.getChrom(cols[0]);
-			mbl.mPosStart = Integer.parseInt(cols[1]);
-			mbl.mPosEnd   = Integer.parseInt(cols[2]);			
+			Chrom theChrom = Chrom.getChrom(cols[0]); 
+			mbl.set(theChrom, Integer.parseInt(cols[1]), Integer.parseInt(cols[2]), true, 0);
 			int mutValue = Integer.parseInt(cols[4]);
-			mbl.mMutType = (mutValue > 0) ? MutPOLEType.TCTtoTAT : MutPOLEType.AGAtoATA; 			
-			
-			infoPerChrom.get(mbl.mChrom).add(mbl);			
+			mbl.setPayload((mutValue > 0) ? MutPOLEType.TCTtoTAT : MutPOLEType.AGAtoATA);
+
+			infoPerChrom.get(theChrom).add(mbl);			
 		}
 		
 		return infoPerChrom;
 	}
 
 	// ========================================================================
-	public static void doWork(File inFile, String outDir, String transcriptStartSiteFile, int windowSize,
+	public static RegionRangesOverGenome<BinTestWindow, String>
+		doWork(File inFile, String outDir, String transcriptStartSiteFile, int windowSize,
 			DefaultXYDataset xyDatasetCumCount, DefaultXYDataset xyDatasetCumFraction,
-			DefaultXYDataset xyDatasetCount, DefaultXYDataset xyDatasetFraction) {
+			DefaultXYDataset xyDatasetCount, DefaultXYDataset xyDatasetFraction,
+			ObjectCounter<String> geneCount) {
 		
 		IOUtils.createDirectoryPath(outDir, false);
 		
@@ -125,6 +127,8 @@ public class OriginReplicationBEDReaderTester {
 		DynamicBucketCounter oriDistCountPermutation = new DynamicBucketCounter();
 		
 		// Map for keeping all the windows over the chromosome		
+		RegionRangesOverGenome<BinTestWindow, String> oriRangesOnePatient = new RegionRangesOverGenome<>(sampleName);
+		
 		EnumMapSafe<Chrom, ArrayList<BinTestWindow>> binTestWindowsOnePatient = EnumMapSafe.createEnumMapOfArrayLists(Chrom.class, BinTestWindow.class);
 		EnumMapSafe<Chrom, BitSet> oriIndicesOnePatient = new EnumMapSafe<Chrom, BitSet>(Chrom.class); 
 		
@@ -150,6 +154,7 @@ public class OriginReplicationBEDReaderTester {
 			
 			// Prepare the spline points
 			BitSet binTestWindowIsORI       = new BitSet(bedItemList.size());
+			BitSet binTestWindowIsORIHighConf = new BitSet(bedItemList.size());
 			BitSet binTestWindowIsCollision = new BitSet(bedItemList.size());
 			oriIndicesOnePatient.put(chrom, binTestWindowIsORI);
 			
@@ -181,7 +186,7 @@ public class OriginReplicationBEDReaderTester {
 					// Remove the head element and decrease the count					
 					try {
 						MutBEDLine headElement = abq.take();
-						--countMutType[headElement.mMutType.ordinal()];
+						--countMutType[headElement.getPayload().ordinal()];
 					} catch (InterruptedException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -194,8 +199,8 @@ public class OriginReplicationBEDReaderTester {
 					System.err.println("Impossible state!");
 					System.exit(-1);
 				}				
-				++countMutType[bedItem.mMutType.ordinal()];
-				boolean firstPointWasSet = firstIndices.get(bedItem.mMutType).set(row);
+				++countMutType[bedItem.getPayload().ordinal()];
+				boolean firstPointWasSet = firstIndices.get(bedItem.getPayload()).set(row);
 				
 				// Now we see if the queue is full again or if we've reached the last element.
 				// If so, we calculate the statistical test
@@ -212,7 +217,7 @@ public class OriginReplicationBEDReaderTester {
 					double scaledPVal = -NumberUtils.MathLog10Safe(pVal);					
 					int midPoint = getMidPoint(abq, midPoints);					
 					//System.out.println(chrom.ordinal() + "\t" + midPoint + "\t" + scaledPVal);
-					BinTestWindow windowCurrent = new BinTestWindow(chrom, midPoints.get(0).mPosStart, midPoints.get(1).mPosStart, pValMultiplied);
+					BinTestWindow windowCurrent = new BinTestWindow(chrom, midPoints.get(0).getRangeStart(), midPoints.get(1).getRangeStart(), pValMultiplied);
 					binTestWindows.add(windowCurrent);					
 					
 					if (pValPrev.isAlreadySetOnce()) {
@@ -236,7 +241,7 @@ public class OriginReplicationBEDReaderTester {
 						} else if (trackState.equals(PvalueTrackState.Negative)) {
 							// We are not in a easy-to-detect ORI region
 							if (firstIndices.get(MutPOLEType.TCTtoTAT).isAlreadySetOnce()) {
-								if (midPoints.get(0).mMutType == MutPOLEType.AGAtoATA) {
+								if (midPoints.get(0).getPayload() == MutPOLEType.AGAtoATA) {
 									if (pValMultiplied >= -0.1) {
 										// We backtrack windows until we reach an ORI
 										int minIndex = -1;
@@ -265,7 +270,7 @@ public class OriginReplicationBEDReaderTester {
 												for (int rowTemp = row - 1, currentIndex = binTestWindows.size() - 2; 
 													 rowTemp >= 0 && !binTestWindowIsORI.get(currentIndex); 
 													 rowTemp--, currentIndex--) {
-													if (bedItemList.get(rowTemp).mMutType == MutPOLEType.TCTtoTAT) {
+													if (bedItemList.get(rowTemp).getPayload() == MutPOLEType.TCTtoTAT) {
 														firstIndices.get(MutPOLEType.TCTtoTAT).resetAndSet(rowTemp);
 														break;
 													}
@@ -277,11 +282,13 @@ public class OriginReplicationBEDReaderTester {
 								}
 							}
 						} else {
-							// The result is an easy to detect ORI 								
+							// The result is an easy to detect ORI 		
+							int indexToSet = binTestWindows.size() - 1;
 							if (trackState.equals(PvalueTrackState.ORI)) {
-								binTestWindowIsORI.set(binTestWindows.size() - 1);
+								binTestWindowIsORI.set(indexToSet);
+								binTestWindowIsORIHighConf.set(indexToSet);
 							} else {
-								binTestWindowIsCollision.set(binTestWindows.size() - 1);
+								binTestWindowIsCollision.set(indexToSet);
 							}
 							firstIndices.get(MutPOLEType.AGAtoATA).reset();  // finally reset the first index
 							firstIndices.get(MutPOLEType.TCTtoTAT).reset();
@@ -310,7 +317,9 @@ public class OriginReplicationBEDReaderTester {
 			}
 			
 			// Filter the back and forth oscillation between ORI and collision points
+			
 			filterORICollisionBackAndForth(binTestWindowIsORI, binTestWindowIsCollision, binTestWindows);
+			binTestWindowIsORIHighConf.and(binTestWindowIsORI);  // Filter out back and forth points			
 			
 			// Set up the ORI output
 			BitSet bedGraphEntriesORIorCollision = new BitSet();
@@ -321,10 +330,11 @@ public class OriginReplicationBEDReaderTester {
 			// Write ORI track
 			BitSet bitsetToUse = binTestWindowIsORI;
 			for (int i = bitsetToUse.nextSetBit(0); i >= 0; i = bitsetToUse.nextSetBit(i + 1)) {
-				BinTestWindow bgeCurrent = binTestWindows.get(i);				
+				BinTestWindow bgeCurrent = binTestWindows.get(i);			
+				oriRangesOnePatient.addRegion(bgeCurrent);
 				try {
 					double tickValue = binTestWindowIsORI.get(i) ? getTickValue(PvalueTrackState.ORI) : getTickValue(PvalueTrackState.Collision);
-					bgORI.add("chr" + chrom.getName(), bgeCurrent.mRegionWindow.getRangeStart(), bgeCurrent.mRegionWindow.getRangeEnd(), tickValue);
+					bgORI.add("chr" + chrom.getName(), bgeCurrent.getRangeStart(), bgeCurrent.getRangeEnd(), tickValue);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -336,7 +346,7 @@ public class OriginReplicationBEDReaderTester {
 				if (prevORIIndex.isAlreadySetOnce()) {
 					BinTestWindow bgeCurrent = binTestWindows.get(i);
 					BinTestWindow bgeEarlier = binTestWindows.get(prevORIIndex.mInt);
-					int distance = bgeCurrent.mRegionWindow.getRangeStart() - bgeEarlier.mRegionWindow.getRangeEnd();
+					int distance = bgeCurrent.getRangeStart() - bgeEarlier.getRangeEnd();
 					int distanceDiscretized = discretizeORIDistance(distance);
 					oriDistCount.incrementCount(distanceDiscretized);
 					oriDistCountRaw.incrementCount(distance);
@@ -347,7 +357,7 @@ public class OriginReplicationBEDReaderTester {
 			
 			// Perform permutation for ORI distance
 			interORIpermTask.mBedGrahEntries = binTestWindows;
-			performPermutation(binTestWindows.size(), binTestWindowIsORI.cardinality(), 50, interORIpermTask);
+			BitSetUtils.performPermutation(binTestWindows.size(), binTestWindowIsORI.cardinality(), 50, interORIpermTask);
 			
 			// Do spline
 			System.out.println(chrom);
@@ -371,7 +381,7 @@ public class OriginReplicationBEDReaderTester {
 				
 				if (shouldAdd) {
 					BinTestWindow bge = binTestWindows.get(i);
-					splineX.add(bge.mRegionWindow.getRangeStart());
+					splineX.add(bge.getRangeStart());
 					splineY.add(bge.mValueWindow);
 					indexAdded = i;
 				}
@@ -379,7 +389,7 @@ public class OriginReplicationBEDReaderTester {
 					
 			// Add final point
 			if (indexAdded < (binTestWindows.size() - 1)) {
-				splineX.add(binTestWindows.get(binTestWindows.size() - 1).mRegionWindow.getRangeStart());
+				splineX.add(binTestWindows.get(binTestWindows.size() - 1).getRangeStart());
 				splineY.add(binTestWindows.get(binTestWindows.size() - 1).mValueWindow);
 			}
 			//System.out.println(splineX);
@@ -391,8 +401,8 @@ public class OriginReplicationBEDReaderTester {
 				
 				for (BinTestWindow bge : binTestWindows) {
 					try {
-						double value = psf.value(bge.mRegionWindow.getRangeStart());
-						bgSpline.add("chr" + chrom.getName(), bge.mRegionWindow.getRangeStart(), bge.mRegionWindow.getRangeStart(), Math.max(Math.min(value, 0.5), -0.5));
+						double value = psf.value(bge.getRangeStart());
+						bgSpline.add("chr" + chrom.getName(), bge.getRangeStart(), bge.getRangeStart(), Math.max(Math.min(value, 0.5), -0.5));
 					} catch (IOException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -410,7 +420,10 @@ public class OriginReplicationBEDReaderTester {
 		String interORIDistance       = outFilenameRoot + ".ORI.windowSize." + windowSize + ".interORIDistance.txt";
 		
 		String transcriptPositions    = outFilenameRoot + ".ORI.windowSize." + windowSize + ".transcriptSites.txt";
-		parseTranscriptAnnotationsByChrom(transcriptStartSiteFile, transcriptPositions, binTestWindowsOnePatient, oriIndicesOnePatient);
+		ObjectCounter<String> geneCounter = 
+				parseTranscriptAnnotationsByChrom(transcriptStartSiteFile, transcriptPositions, binTestWindowsOnePatient, oriIndicesOnePatient);
+		geneCount.clear();
+		geneCount.increment(geneCounter);
 		
 		try {
 			bgPvalue.write(new File(bedGraphPval));
@@ -481,9 +494,12 @@ public class OriginReplicationBEDReaderTester {
 		
 		//track name="ColorByStrandDemo" description="Color by strand demonstration" visibility=2 colorByStrand="255,0,0 0,0,255"
 		
-		
+		return oriRangesOnePatient;
 	}
 
+	// ===========================
+	//private static void 
+	
 	// ===========================
 	private static void filterORICollisionBackAndForth(BitSet bsORI, BitSet bsCollision, ArrayList<BinTestWindow> bedGraphEntries) {
 		BitSet bedGraphEntriesORIorCollision = new BitSet();
@@ -544,7 +560,7 @@ public class OriginReplicationBEDReaderTester {
 				if (mPrevIndex.isAlreadySetOnce()) {
 					BinTestWindow bgePrev = mBedGrahEntries.get(mPrevIndex.mInt);
 					BinTestWindow bgeCurr = mBedGrahEntries.get(i);
-					int distance = bgeCurr.mRegionWindow.getRangeStart() - bgePrev.mRegionWindow.getRangeStart();
+					int distance = bgeCurr.getRangeStart() - bgePrev.getRangeStart();
 					int distanceDiscretized = discretizeORIDistance(distance);
 					mCounterDiscretized.incrementCount(distanceDiscretized);
 					mCounterRaw.incrementCount(distance);
@@ -555,21 +571,7 @@ public class OriginReplicationBEDReaderTester {
 		}
 	}
 
-	// ===========================
-	public static interface BitSetPermutationTask {
-		public void takeAction(boolean[] bitArray, int permutationNumber);
-	}
-	
-	// ===========================
-	private static void performPermutation(int numSlots, int numSlotsDesiredTrue, int numIterations, BitSetPermutationTask permutationTask) {
-		boolean[] bitArray = new boolean[numSlots];
-		Arrays.fill(bitArray, false);
-		
-		for (int iter = 0; iter < numIterations; iter++) {
-			BitSetUtils.setBooleanArrayWithRandomValues(bitArray, numSlotsDesiredTrue);
-			permutationTask.takeAction(bitArray, iter);
-		}
-	}
+
 	
 	// ===========================
 	private static int discretizeORIDistance(int distance) {
@@ -637,13 +639,13 @@ public class OriginReplicationBEDReaderTester {
 					if (midPoints != null) { 
 						midPoints.add(mbl); 
 					}
-					return mbl.mPosStart;
+					return mbl.getRangeStart();
 				} else {
 					if (midPoints != null) {
 						midPoints.add(mblPrev);
 						midPoints.add(mbl);						
 					}
-					return ((mblPrev.mPosStart + mbl.mPosStart) >>> 1);
+					return ((mblPrev.getRangeStart() + mbl.getRangeStart()) >>> 1);
 				}
 			}
 			mblPrev = mbl;
@@ -664,18 +666,29 @@ public class OriginReplicationBEDReaderTester {
 	}
 	
 	// ===========================
-	public static class BinTestWindow {
-		RegionRangeWithPayload<PrimitiveWrapper.WInteger> mRegionWindow;
-		double mValueWindow;
+	public static class BinTestWindow extends RegionRange<BinTestWindow> { 	
 
-		public BinTestWindow(Chrom chrom, int position, double value) {
+		/** */
+		private static final long serialVersionUID = 3178720475931225698L;
+		
+		double mValueWindow;
+		int    mRecurrence;
+
+		public BinTestWindow(Chrom chrom, int position, double value) {			
 			this(chrom, position, position, value);
 		}
 		
 		public BinTestWindow(Chrom chrom, int positionStart, int positionEnd, double value) {
-			mRegionWindow = new RegionRangeWithPayload<>(chrom, positionStart, positionEnd, new PrimitiveWrapper.WInteger(0));
-			mValueWindow = value;			
+			super(chrom, positionStart, positionEnd);
+			mValueWindow = value;	
+			mRecurrence  = 1;
 		}
+
+		@Override
+		public BinTestWindow makeClone() { return makeClone(true); }
+
+		@Override
+		public BinTestWindow makeClone(boolean deepCopy) { return IOUtils.makeCopy(this); }
 	}
 
 	// ===========================
@@ -688,9 +701,7 @@ public class OriginReplicationBEDReaderTester {
 	
 	// ===========================
 	public static class MutBEDLine extends RegionRangeWithPayload<MutPOLEType> {
-		Chrom mChrom;
-		int mPosStart, mPosEnd;
-		MutPOLEType mMutType;		
+		private static final long serialVersionUID = -234268559760843356L;
 	}
 
 	// ===========================
@@ -745,21 +756,39 @@ public class OriginReplicationBEDReaderTester {
 	}
 
 	// ===========================
-	private static void parseTranscriptAnnotationsByChrom_ParseLine(String line, AnnotationLine annot) {
-		int leeway = 1000;
-		String chromString = StringUtils.extractNthColumnValue(line, 1, StringUtils.TabStr);
-		Chrom chrom = Chrom.getChrom(chromString);
+	/** Returns true if line is well-formed, false if line is mal-formed somehow. */
+	private static boolean parseTranscriptAnnotationsByChrom_ParseLine(String line, AnnotationLine annot) {
+		int leeway = 100_000;
 		
-		int posStart = Integer.parseInt(StringUtils.extractNthColumnValue(line, 4, StringUtils.TabStr));
-		int posEnd   = Integer.parseInt(StringUtils.extractNthColumnValue(line, 5, StringUtils.TabStr));
+		int colChrom = 2;
+		int colGene = 12;
+		int colTXStart = 4;
+		int colTXEnd   = 5;
+		
+		String chromStringFull = StringUtils.extractNthColumnValue(line, colChrom, StringUtils.TabStr);
+		int indexUnderscore = chromStringFull.indexOf("_");
+		Chrom chrom = (indexUnderscore > 0) ? Chrom.getChrom(chromStringFull.substring(0, indexUnderscore)) : Chrom.getChrom(chromStringFull);
+		if (chrom == null) {
+			return false;
+		}
+		
+		
+		int posStart = Integer.parseInt(StringUtils.extractNthColumnValue(line, colTXStart, StringUtils.TabStr));
+		int posEnd   = Integer.parseInt(StringUtils.extractNthColumnValue(line, colTXEnd, StringUtils.TabStr));
+		//int posEnd = posStart;
 		
 		annot.mRangeStrict.set(  chrom, posStart,          posEnd,          true, 0);
 		annot.mRangeFlexible.set(chrom, posStart - leeway, posEnd + leeway, true, 0);
 		
+		/*
 		String targetGeneNamePrefixString = "gene_name \"";
 		int indexGeneName = line.indexOf(targetGeneNamePrefixString) + targetGeneNamePrefixString.length() + 1;
 		int indexEndQuote = line.indexOf("\"", indexGeneName);
 		annot.mGeneName = line.substring(indexGeneName, indexEndQuote);
+		*/
+		annot.mGeneName = StringUtils.extractNthColumnValue(line, colGene, StringUtils.TabStr);
+		
+		return true;
 	}
 
 	// ===========================
@@ -770,7 +799,7 @@ public class OriginReplicationBEDReaderTester {
 	}
 	
 	// ===========================
-	private static void parseTranscriptAnnotationsByChrom(
+	private static ObjectCounter<String> parseTranscriptAnnotationsByChrom(
 			String annotationsFile, 
 			String outFileName, 
 			EnumMapSafe<Chrom, ArrayList<BinTestWindow>> bedGraphEntries,
@@ -781,6 +810,7 @@ public class OriginReplicationBEDReaderTester {
 		AnnotationLine annotLine = new AnnotationLine();
 		String line = IOUtils.getNextLineInBufferedReader(inAnnot);
 		parseTranscriptAnnotationsByChrom_ParseLine(line, annotLine);
+		ObjectCounter<String> geneCounter = new ObjectCounter<String>();		
 		
 		for (Chrom chrom : Chrom.values()) {
 			ArrayList<BinTestWindow> bedGraphEntriesChrom = bedGraphEntries.get(chrom);
@@ -789,16 +819,20 @@ public class OriginReplicationBEDReaderTester {
 			for (int i = 0; i < bedGraphEntriesChrom.size(); ) {
 				BinTestWindow bge = bedGraphEntriesChrom.get(i);
 				
-				if (annotLine.mRangeFlexible.beforeRange(chrom, bge.mRegionWindow.getRangeStart())) {
+				if (annotLine.mRangeFlexible.beforeRange(chrom, bge.getRangeStart())) {
 					i++;  // increment to next point
-				} else if (annotLine.mRangeFlexible.afterRange(chrom, bge.mRegionWindow.getRangeStart())) {
-					line = IOUtils.getNextLineInBufferedReader(inAnnot);					
-					if (line == null) break;					
-					parseTranscriptAnnotationsByChrom_ParseLine(line, annotLine);
-				} else if (annotLine.mRangeFlexible.inRange(chrom, bge.mRegionWindow.getRangeStart())) {
-					if (oriIndicesChrom.get(i)) {
-						String outLine = chrom.ordinal() + "\t" + bge.mRegionWindow.getRangeStart() + "\t" + annotLine.mGeneName + "\t" + line;
-						IOUtils.writeToBufferedWriter(out, outLine, true);						
+				} else if (annotLine.mRangeFlexible.afterRange(chrom, bge.getRangeStart())) {
+					do {
+						line = IOUtils.getNextLineInBufferedReader(inAnnot);					
+						if (line == null) break;					
+					} while (!parseTranscriptAnnotationsByChrom_ParseLine(line, annotLine));
+					
+				} else if (annotLine.mRangeFlexible.inRange(chrom, bge.getRangeStart())) {
+					if (oriIndicesChrom.get(i) && !geneCounter.contains(annotLine.mGeneName)) {
+						String outLine = chrom.ordinal() + "\t" + bge.getRangeStart() + "\t" + annotLine.mGeneName + "\t" + line;
+						IOUtils.writeToBufferedWriter(out, outLine, true);
+						geneCounter.increment(annotLine.mGeneName);
+						
 					}
 					i++;
 				} else {
@@ -809,7 +843,60 @@ public class OriginReplicationBEDReaderTester {
 		
 		IOUtils.closeBufferedReader(inAnnot);
 		IOUtils.closeBufferedWriter(out);
+		
+		return geneCounter;
 	}
+	
+
+	// ===========================
+	private static void writeORIIntersectionTracks(RegionRangesOverGenome<BinTestWindow, String> oriIntersectRegions, String outFilename) {
+		int maxRecurrence = Integer.MIN_VALUE;
+		
+		for (Chrom chrom : Chrom.ValidChromosomes) {
+			ArrayList<BinTestWindow> regions = oriIntersectRegions.getRegions(chrom);
+			for (BinTestWindow theWindow : regions) {
+				if (theWindow.mRecurrence > maxRecurrence) {
+					maxRecurrence = theWindow.mRecurrence;
+				}
+			}
+		}
+		
+		BedGraph bgORI_Intersect = new BedGraph("Intersected ORI", "Intersected ORI Locations for all patients");
+		for (Chrom chrom : Chrom.ValidChromosomes) {
+			for (BinTestWindow theWindow : oriIntersectRegions.getRegions(chrom)) {
+				try {
+					if (theWindow.mRecurrence >= 3) {
+						bgORI_Intersect.add("chr" + chrom.getName(), theWindow.getRangeStart() - 1, theWindow.getRangeEnd(), -theWindow.mRecurrence);
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}				
+			}
+		}
+		
+		try {
+			bgORI_Intersect.write(new File(outFilename));
+			bgORI_Intersect.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	// ===========================
+	private static RegionBreakerAndIntersecter.RegionIntersectTester<BinTestWindow> BinTestWindowIntersector = 
+			new RegionBreakerAndIntersecter.RegionIntersectTester<BinTestWindow>() {
+
+				@Override
+				public boolean isValidRegion(BinTestWindow region) { return true; }
+
+				@Override
+				public boolean isInvalidRegion(BinTestWindow region) { return false; }
+
+				@Override
+				public void takeActionOnEqualRegions(BinTestWindow region) {
+					region.mRecurrence++;
+				}
+	};
 	
 	
 	// ===========================
@@ -835,9 +922,26 @@ public class OriginReplicationBEDReaderTester {
 			DefaultXYDataset xyDatasetCount = new DefaultXYDataset();
 			DefaultXYDataset xyDatasetFraction = new DefaultXYDataset();
 			
-			for (File file : validFiles) {								
-				doWork(file, outDir, transcriptStartSiteFile, windowSize, xyDatasetCumCount, xyDatasetCumFraction, xyDatasetCount, xyDatasetFraction);
+			ArrayList<RegionRangesOverGenome<BinTestWindow, String>> oriRangesAllpatients = new ArrayList<>();
+			ObjectCounter<String> geneCounterAllPatients = new ObjectCounter<String>();
+			
+			for (File file : validFiles) {	
+				ObjectCounter<String> geneCounterOnePatient = new ObjectCounter<String>();
+				
+				RegionRangesOverGenome<BinTestWindow, String> oriRangesOnePatient = 
+						doWork(file, outDir, transcriptStartSiteFile, windowSize, xyDatasetCumCount, xyDatasetCumFraction, xyDatasetCount, xyDatasetFraction, geneCounterOnePatient);
+				oriRangesAllpatients.add(oriRangesOnePatient);
+				geneCounterAllPatients.increment(geneCounterOnePatient);
 			}
+			
+			RegionRangesOverGenome<BinTestWindow, String> oriRangesIntersected = 
+					RegionRangesOverGenome.intersectAll(oriRangesAllpatients, BinTestWindowIntersector);
+			writeORIIntersectionTracks(oriRangesIntersected, outDir + File.separator + "ORI_Intersected.window." + windowSize + ".bed");
+			
+			// Write gene counts to file
+			String outFilenameGeneCounter = outDir + File.separator + "ORI_Transcript_Gene_Counts.window." + windowSize + ".txt";
+			PrintStream outGeneCounter = IOUtils.getPrintStream(outFilenameGeneCounter);
+			geneCounterAllPatients.print(outGeneCounter, StringUtils.TabStr);
 			
 			String outFilenameRoot = outDir + File.separator + "Inter_ORI.Cumulative.Counts.window." + windowSize;
 			createGraphs(xyDatasetCumCount, outFilenameRoot, true, true);

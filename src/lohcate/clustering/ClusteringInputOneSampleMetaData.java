@@ -7,9 +7,9 @@ import java.util.Arrays;
 import lohcate.CopyNumberRegionsByChromosome;
 import lohcate.Regions;
 import nutils.Cast;
-import nutils.PrimitiveWrapper;
 import nutils.RangeDouble;
 import nutils.counter.DynamicBucketCounter;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 // ========================================================================
 // ========================================================================

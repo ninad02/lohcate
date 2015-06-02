@@ -7,6 +7,7 @@ import java.util.Collections;
 
 import nutils.BitUtils.ValueExtractor;
 import nutils.array.FastArrayListLong.FastArrayListIndex;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 import cern.colt.function.LongComparator;
 import cern.colt.list.LongArrayList;

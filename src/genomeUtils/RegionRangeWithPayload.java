@@ -3,16 +3,21 @@
  */
 package genomeUtils;
 
-import nutils.CloneInf;
+import java.io.Serializable;
+
+import nutils.IOUtils;
 import genomeEnums.Chrom;
 
 /**
  * @author Ninad Dewal
  *
  */
-public class RegionRangeWithPayload<E extends CloneInf<E> & Comparable<E>>
+public class RegionRangeWithPayload<E extends Serializable & Comparable<E>>
 	extends RegionRange<RegionRangeWithPayload<E>> {
 
+	/**  */
+	private static final long serialVersionUID = 3591362749120273406L;
+	
 	protected E mPayload;
 	
 	// ========================================================================
@@ -36,7 +41,7 @@ public class RegionRangeWithPayload<E extends CloneInf<E> & Comparable<E>>
 	// ========================================================================
 	public RegionRangeWithPayload(RegionRangeWithPayload<E> rhs, boolean deepCopy) {
 		super(rhs);		
-		setPayload(deepCopy ? rhs.mPayload.makeClone() : rhs.mPayload);
+		setPayload((deepCopy && (rhs.mPayload != null)) ? IOUtils.makeCopy(rhs.mPayload) : rhs.mPayload);
 	}
 
 	// ========================================================================

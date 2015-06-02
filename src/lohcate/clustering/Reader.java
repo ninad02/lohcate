@@ -8,8 +8,8 @@ import htsjdk.samtools.SamReaderFactory;
 import java.io.File;
 import java.util.Map;
 
-import nutils.PrimitiveWrapper;
 import nutils.counter.ObjectCounter;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 public class Reader {
 

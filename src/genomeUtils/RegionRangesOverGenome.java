@@ -1,11 +1,15 @@
 package genomeUtils;
 
+import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.ListIterator;
 
 import genomeEnums.Chrom;
 import nutils.CloneInf;
 import nutils.EnumMapSafe;
+import nutils.IOUtils;
 
 /** A class to house ranges for a particular sample, grouped by chromosome.  Allows for also
  *  holding metainformation about a particular sample
@@ -14,9 +18,14 @@ import nutils.EnumMapSafe;
  * @param <E> The range class specified
  * @param <T> An object that holds meta information for the sample
  */
-public class RegionRangesOverGenome<E extends RegionRange<E>, T extends CloneInf<T>> 
-	implements CloneInf<RegionRangesOverGenome<E, T>> {
+public class RegionRangesOverGenome<E extends RegionRange<E>, T extends Serializable> 
+	implements CloneInf<RegionRangesOverGenome<E, T>>, Serializable {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -6561264663430750082L;
+	
 	// ========================
 	// MEMBER VARIABLES
 	// ========================
@@ -49,7 +58,8 @@ public class RegionRangesOverGenome<E extends RegionRange<E>, T extends CloneInf
 	
 	// ========================================================================
 	private void performCopy(RegionRangesOverGenome<E, T> rhs, boolean deepCopy) {
-		setMetaInfo(deepCopy ? rhs.mMetaInfo.makeClone() : rhs.mMetaInfo);
+				
+		setMetaInfo(deepCopy ? IOUtils.makeCopy(rhs.mMetaInfo) : rhs.mMetaInfo);
 		
 		// Now iterate over the chromosomes
 		for (Chrom chrom : Chrom.values()) {
@@ -130,8 +140,57 @@ public class RegionRangesOverGenome<E extends RegionRange<E>, T extends CloneInf
 	public ListIterator<E> getIteratorForChromosome(Chrom chrom) {
 		return getRegions(chrom).listIterator();
 	}
-		
+
 	// ========================================================================	
+	public void iterateOverChromosomes(ActionerPerChromosome<E> actioner) {
+		for (Chrom chrom : Chrom.ValidChromosomes) {
+			actioner.takeAction(chrom, getRegions(chrom));			
+		}
+	}
+	
+	// ========================================================================	
+	public static interface ActionerPerChromosome<D extends RegionRange<D>> {
+		public void takeAction(Chrom chrom, ArrayList<D> regions);
+	}
+	
+	// ========================================================================
+	/** Intersects this object with the argument and saves the results in this object. */
+	public RegionRangesOverGenome<E, T> intersect(RegionRangesOverGenome<E, T> rhs, RegionBreakerAndIntersecter.RegionIntersectTester<E> intersecterObject) {
+		
+		// If null then return
+		if (rhs == null) return this;
+		
+		// Now, iterate over the chromosomes
+		for (Chrom chrom : Chrom.ValidChromosomes) {			
+			RegionBreakerAndIntersecter.takeUnionAndBreakDownIntersectingRegions(this.getRegions(chrom), rhs.getRegions(chrom), intersecterObject);
+		}
+		
+		return this;
+	}
+
+	// ========================================================================
+	public static<E extends RegionRange<E>, T extends Serializable> RegionRangesOverGenome<E, T> 
+		intersectAll(Collection<RegionRangesOverGenome<E, T>> allSamples, 
+					 RegionBreakerAndIntersecter.RegionIntersectTester<E> intersecterObject) {
+
+		// Set a return object.  
+		RegionRangesOverGenome<E, T> baseSample = null;
+		
+		for (Iterator<RegionRangesOverGenome<E, T>> sampleIter = allSamples.iterator(); sampleIter.hasNext(); ) {
+			RegionRangesOverGenome<E, T> currentSample = sampleIter.next();
+			
+			if (baseSample == null) {
+				baseSample = currentSample.makeClone();
+			} else {
+				baseSample.intersect(currentSample, intersecterObject);
+			}
+		}
+		
+		// Will return null if input list is empty
+		return baseSample;
+	}
+	
+	// ========================================================================
 	/**
 	 * @param args
 	 */

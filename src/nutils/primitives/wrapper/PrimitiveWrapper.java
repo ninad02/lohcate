@@ -1,15 +1,24 @@
 /**
  * 
  */
-package nutils;
+package nutils.primitives.wrapper;
+
+import java.io.Serializable;
+
+import nutils.CloneInf;
+import nutils.NullaryClassFactory;
 
 
 /**
  * @author ninad
  *
  */
-public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements Comparable<T> {
+public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements Comparable<T>, Serializable {
 		
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 487200172011561389L;
 	protected static final byte DefaultValue = 0;
 
 	//=========================================================================
@@ -20,6 +29,11 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 	/** Provides a wrapper for a primitive int value that can be changed.  Useful
 	 *  when you want to have a changeable integer within a container. */
 	public static class WInteger extends PrimitiveWrapper<WInteger> implements CloneInf<WInteger> {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 5364611144472487047L;
+
 		public static final NullaryClassFactory<WInteger> ClassFactory = new NullaryClassFactory<WInteger>(WInteger.class);
 		
 		public int mInt;
@@ -72,6 +86,11 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 	 */
 	public static class WIntegerSetOnce extends WInteger {
 		
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 3513153186232452102L;
+
 		public static final NullaryClassFactory<WIntegerSetOnce> ClassFactory = new NullaryClassFactory<WIntegerSetOnce>(WIntegerSetOnce.class);
 		
 		private boolean mAlreadySetOnce;
@@ -109,6 +128,10 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 
 	//=========================================================================
 	public static class WDouble extends PrimitiveWrapper<WDouble> {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -1695323296329779788L;
 		public double mDouble;
 		public WDouble(double d) { mDouble = d; }
 		public WDouble() { this(DefaultValue); }
@@ -154,6 +177,10 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 	 *  value.  If rejects any attempt to set the value to a second new value.
 	 */
 	public static class WDoubleSetOnce extends WDouble {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -7701062470079569861L;
 		private boolean mAlreadySetOnce;
 		
 		public WDoubleSetOnce() {
@@ -191,6 +218,10 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 
 	//=========================================================================
 	public static class WFloat extends PrimitiveWrapper<WFloat> {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -5959443692165371017L;
 		public float mFloat;
 		public WFloat(float f) { mFloat = f; }
 		
@@ -232,6 +263,10 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 
 	//=========================================================================
 	public static class WByte extends PrimitiveWrapper<WByte> {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1371871778317109403L;
 		public byte mByte;
 		public WByte(byte b) { mByte = b; }
 		
@@ -272,6 +307,10 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 
 	//=========================================================================
 	public static class WBoolean extends PrimitiveWrapper<WBoolean> {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 4062487221340800789L;
 		public boolean mBoolean;		
 		public WBoolean(boolean b) { mBoolean = b; }
 		
@@ -312,6 +351,10 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 
 	//=========================================================================
 	public static class WLong extends PrimitiveWrapper<WLong> {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -6008319569123390431L;
 		public long mLong;
 		public WLong(long l) { mLong = l; }
 		
@@ -352,6 +395,10 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 
 	//=========================================================================
 	public static class WChar extends PrimitiveWrapper<WChar> {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -7489775918672747877L;
 		public char mChar;
 		public WChar(char ch) { mChar = ch; }
 		
@@ -392,6 +439,10 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 
 	//=========================================================================
 	public static class WString extends PrimitiveWrapper<WString> {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 3766531879207274819L;
 		public String mStr;
 		public WString(String s) { mStr = s; }
 		
@@ -434,7 +485,11 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 	}
 
 	//=========================================================================
-	public static class WObject<E extends Object & Comparable<? super E>> extends PrimitiveWrapper<WObject<E>> {
+	public static class WObject<E extends Object & Comparable<E>> extends PrimitiveWrapper<WObject<E>> {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 4222977275080522829L;
 		public E mObj;
 		public WObject(E o) { mObj = o; }
 		
@@ -464,7 +519,7 @@ public abstract class PrimitiveWrapper<T extends PrimitiveWrapper<T>> implements
 				return false;
 			if (getClass() != obj.getClass())
 				return false;
-			WObject other = (WObject) obj;
+			WObject<?> other = (WObject<?>) obj;
 			if (mObj == null) {
 				if (other.mObj != null)
 					return false;

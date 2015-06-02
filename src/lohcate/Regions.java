@@ -25,11 +25,11 @@ import nutils.EnumMapSafe;
 import nutils.IOUtils;
 import nutils.NullaryClassFactory;
 import nutils.NumberUtils;
-import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
 import nutils.BitUtils.Compactor.CompactorIntoLong;
 import nutils.collectionsSorted.ArrayListSortedComparable;
 import nutils.counter.DynamicBucketCounter;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 import lohcate.clustering.AlleleFractionStatsForSample;
 import lohcate.clustering.Clustering;
@@ -336,7 +336,7 @@ public class Regions {
 	public static void countClusterTypesInRegions(CopyNumberRegionsByChromosome regionsGenomeWide, 
 												  ArrayList<CopyNumberRegionsByChromosome> regionsGenomeWideSampleSpecific, 
 												  ArrayList<File> sampleFiles) {
-		regionsGenomeWide.clearClusterCounts();
+		regionsGenomeWide.clearEventCounts();
 		
 		StringBuilder sb = new StringBuilder(4096);
 

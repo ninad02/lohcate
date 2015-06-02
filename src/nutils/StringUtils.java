@@ -5,6 +5,9 @@ import java.util.BitSet;
 import java.util.Comparator;
 import java.util.Random;
 
+import nutils.UtilsBasic.ProcedureToBeTimed;
+import nutils.primitives.wrapper.PrimitiveWrapper;
+
 
 
 public class StringUtils {
@@ -48,12 +51,45 @@ public class StringUtils {
 	}
 
 	// ========================================================================
+	public static void timeTest() {
+		
+		final int numIter = 10000000;
+		final String testString1 = "Hello";
+		final String testString2 = "World";
+		
+		ProcedureToBeTimed pSB = new ProcedureToBeTimed() {			
+			StringBuilder sb = new StringBuilder(1024);
+			
+			@Override
+			public void takeAction() {
+				for (int i = 0; i < numIter; i++) {
+					sb.setLength(0);
+					sb.append(testString1).append(i * 10).append(testString2);
+				}
+			}
+		};
+		
+		ProcedureToBeTimed pS = new ProcedureToBeTimed() {						
+			
+			@Override
+			public void takeAction() {
+				for (int i = 0; i < numIter; i++) {
+					String s = testString1 + i * 10 + testString2;
+				}
+			}
+		};
+		
+		System.out.println(UtilsBasic.getTimeTaken(pSB));
+		System.out.println(UtilsBasic.getTimeTaken(pS));
+	}
+	
+	// ========================================================================
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-
+		timeTest();
 	}
 	
 	// ========================================================================

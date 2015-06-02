@@ -6,8 +6,8 @@ import java.util.Comparator;
 
 import nutils.ArrayUtils;
 import nutils.CompareUtils;
-import nutils.PrimitiveWrapper;
 import nutils.BitUtils.ValueExtractor;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 import com.carrotsearch.hppc.LongArrayList;
 

@@ -2,12 +2,15 @@ package genomeUtils;
 
 import genomeEnums.Chrom;
 
+import java.io.Serializable;
 import java.util.Comparator;
 
 import nutils.CloneInf;
 
 
-public abstract class RegionRange<T extends RegionRange<T> & CloneInf<T> & Comparable<T>> implements Comparable<T>, CloneInf<T> {
+public abstract class RegionRange<T extends RegionRange<T> & CloneInf<T> & Comparable<T>> implements Comparable<T>, CloneInf<T>, Serializable {
+	
+	private static final long serialVersionUID = 4040744761435698096L;
 	
 	// ========================================================================
 	// MAIN CLASS
@@ -324,6 +327,8 @@ public abstract class RegionRange<T extends RegionRange<T> & CloneInf<T> & Compa
 	// INNER CLASS
 	// ========================================================================
 	public static class Default extends RegionRange<Default> {
+
+		private static final long serialVersionUID = 9146096850510385845L;
 
 		public Default() {
 			super();

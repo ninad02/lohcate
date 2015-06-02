@@ -52,7 +52,6 @@ import nutils.ContingencyTable;
 import nutils.ControlFlagBool;
 import nutils.EnumMapSafe;
 import nutils.IOUtils;
-import nutils.PrimitiveWrapper;
 import nutils.SortUtils;
 import nutils.ContingencyTable.ContingencyTableValue;
 import nutils.RangeDouble;
@@ -66,6 +65,7 @@ import nutils.counter.DynamicRoundedDoubleCounter;
 import nutils.image.ImageAppender;
 import nutils.math.BinomialTestPermutationValues;
 import nutils.math.PoissonDistributionList;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 import org.apache.commons.math3.distribution.PoissonDistribution;
 import org.apache.commons.math3.genetics.PermutationChromosome;

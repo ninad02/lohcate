@@ -39,7 +39,6 @@ import nutils.EnumMatrix;
 import nutils.IOUtils;
 import nutils.NullaryClassFactory;
 import nutils.NumberUtils;
-import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
 import nutils.BitUtils.BitSetUtils;
 import nutils.BitUtils.ValueExtractor;
@@ -52,6 +51,7 @@ import nutils.array.FastArrayListLong.FastArrayListIndex;
 import nutils.array.FastArrayListLong.FastArrayListIterator;
 import nutils.collectionsSorted.ArrayListSortedComparable;
 import nutils.counter.BucketCounterEnum;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 public class GeneEnrichment {
 

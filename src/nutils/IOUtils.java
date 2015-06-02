@@ -22,7 +22,10 @@ public class IOUtils {
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-
+		String s1 = "test123";
+		String s2 = makeCopy(s1);
+		System.out.println(s1.equals(s2));		
+		System.out.println(s1 == s2);
 	}
 
 	// ========================================================================
@@ -135,6 +138,29 @@ public class IOUtils {
 			System.exit(-1);
 		}
 		return null;
+	}
+	
+	// ========================================================================
+	/** Creates a copy of an object via serialization so long as the object implements serializable. */
+	@SuppressWarnings("unchecked")
+	public static<T extends Serializable> T makeCopy(T obj) {
+		ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+		T rV = null;
+		try {
+			ObjectOutputStream out = new ObjectOutputStream(byteStream);
+			out.writeObject(obj);
+			out.close();
+			
+			byte[] byteBuffer = byteStream.toByteArray();
+			ByteArrayInputStream byteArrayIn = new ByteArrayInputStream(byteBuffer);
+			ObjectInputStream in = new ObjectInputStream(byteArrayIn);
+			rV = (T) in.readObject();			
+			in.close();
+		} catch (IOException | ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+		
+		return rV;
 	}
 	
 	// ========================================================================

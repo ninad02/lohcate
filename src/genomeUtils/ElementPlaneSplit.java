@@ -2,7 +2,7 @@ package genomeUtils;
 
 import java.util.ArrayList;
 
-import nutils.PrimitiveWrapper;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 import com.carrotsearch.hppc.IntArrayList;
 

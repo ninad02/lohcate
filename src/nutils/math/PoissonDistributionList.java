@@ -3,9 +3,9 @@ package nutils.math;
 import java.io.PrintStream;
 import java.util.ArrayList;
 
-import nutils.PrimitiveWrapper;
 import nutils.collectionsSorted.ArrayListSorted;
 import nutils.collectionsSorted.ArrayListSortedComparable;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 
 /**

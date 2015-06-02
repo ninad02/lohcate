@@ -1,5 +1,7 @@
 package nutils;
 
+import java.io.Serializable;
+
 /** 
  * A convenience class to place control flags inside a program.  The intent is for
  * the developer to use this class instead of a boolean variable; the benefit is that
@@ -9,8 +11,13 @@ package nutils;
  * @author Ninad Dewal
  *
  */
-public class ControlFlagBool {
+public class ControlFlagBool implements Serializable {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 4759935024513978553L;
+	
 	protected Boolean mFlag;
 	
 	// ========================================================================

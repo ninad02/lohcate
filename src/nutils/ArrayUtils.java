@@ -1,5 +1,6 @@
 package nutils;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -24,7 +25,8 @@ public class ArrayUtils {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 		//Test_removeNullElements();
-		Test_removeNullElementsSimple();
+		//Test_removeNullElementsSimple();
+		TestDeepCopy();
 	}
 	
 	// ========================================================================
@@ -1107,7 +1109,50 @@ public class ArrayUtils {
 			pad.add(valueToAddList1, valueToAddList2);
 		}
 		
-		return pad.toArrays();
+		return pad.toArrays();		
+	}
+
+	// ========================================================================
+	/** Returns a deep copy of a Collection. */
+	public static<E extends CloneInf<E>, C extends Collection<E>> C makeDeepCopy_Cloning(C theCollection) {
+		NullaryClassFactory<C> classFactory = new NullaryClassFactory<C>((Class<C>) theCollection.getClass());		
+		C newCollection = classFactory.newInstance();
+		
+		for (Iterator<E> iter = theCollection.iterator(); iter.hasNext(); ) {
+			E element = iter.next();
+			E elementCopy = element.makeClone();
+			newCollection.add(elementCopy);
+		}
+		return newCollection;
+	}
+	
+	// ========================================================================
+	/** Returns a deep copy of a Collection. */
+	public static<E extends Serializable, C extends Collection<E>> C makeDeepCopy_Serialization(C theCollection) {
+		NullaryClassFactory<C> classFactory = new NullaryClassFactory<C>((Class<C>) theCollection.getClass());		
+		C newCollection = classFactory.newInstance();
+		
+		for (Iterator<E> iter = theCollection.iterator(); iter.hasNext(); ) {
+			E element = iter.next();
+			E elementCopy = IOUtils.makeCopy(element);
+			newCollection.add(elementCopy);
+		}
+		return newCollection;
+	}
+	
+	// ========================================================================
+	private static void TestDeepCopy() {
+		ArrayList<Integer> list1 = new ArrayList<Integer>();
+		int numElem = 5;
+		for (int i = 0; i < numElem; i++) { list1.add(i); }
+		System.out.println(list1);
+		
+		ArrayList<Integer> list2 = makeDeepCopy_Serialization(list1);
+		System.out.println(list2);
+		
+		for (int i = 0; i < numElem; i++) {
+			System.out.println(list1.get(i) + "\t" + list2.get(i) + "\t" + (list1.get(i) == list2.get(i)) + "\t" + (list1.get(i).intValue() == list2.get(i).intValue()));
+		}
 	}
 	
 }

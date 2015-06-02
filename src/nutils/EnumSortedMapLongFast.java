@@ -1,9 +1,9 @@
 package nutils;
 
-import cern.colt.list.LongArrayList;
 import nutils.BitUtils.ValueExtractor;
 import nutils.array.FastArrayListLong;
 import nutils.array.FastArrayListLong.FastArrayListIndex;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 public class EnumSortedMapLongFast<E extends Enum<E>> {
 	

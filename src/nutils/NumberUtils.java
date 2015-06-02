@@ -10,9 +10,13 @@ import java.util.EnumSet;
 import java.util.Random;
 
 
+import nutils.primitives.wrapper.PrimitiveWrapper;
+
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.PoissonDistribution;
 import org.apache.commons.math3.stat.Frequency;
+
+import sun.java2d.loops.ScaledBlit;
 
 import com.carrotsearch.hppc.DoubleArrayList;
 import com.carrotsearch.hppc.cursors.DoubleCursor;
@@ -460,6 +464,25 @@ public class NumberUtils {
 		
 		return allSets;		
 	}
+
+	// ========================================================================
+	/** Based on where the value argument scales on its own original range, this computes
+	 *  the equivalent value on the new scale.
+	 * @param value
+	 * @param originalRangeMin
+	 * @param originalRangeMax
+	 * @param newRangeMin
+	 * @return the scaled value in the new range
+	 */
+	public static int scale(int value, int originalRangeMin, int originalRangeMax, int newRangeMin, int newRangeMax) {
+		return Cast.toInt(Math.round(scale((double) value, originalRangeMin, originalRangeMax, newRangeMin, newRangeMax)));
+	}
+	
+	public static double scale(final double value, final double originalRangeMin, final double originalRangeMax, final double newRangeMin, final double newRangeMax) {
+		double valueFractionOriginal = (value - originalRangeMin) / (originalRangeMax - originalRangeMin);
+		double valueFractionNew = (newRangeMax - newRangeMin) * valueFractionOriginal;
+		return valueFractionNew + newRangeMin;
+	}
 	
 	// ========================================================================
 	/** This function adds two log-base-10 numbers, with the added boolean condition.  
@@ -521,7 +544,8 @@ public class NumberUtils {
 		//TestDoubleListFromString();
 		//TestIntListFromString();;
 		
-		powerSetEnum(TestEnum.class, false);
+		//powerSetEnum(TestEnum.class, false);
+		System.out.println(NumberUtils.scale(2, 1, 5, 1, 100));
 		
 		/*
 		String dd = "2,3,4,5";

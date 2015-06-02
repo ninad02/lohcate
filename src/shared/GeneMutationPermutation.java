@@ -28,9 +28,9 @@ import cern.colt.list.DoubleArrayList;
 import nutils.GraphUtils;
 import nutils.IOUtils;
 import nutils.NumberUtils;
-import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
 import nutils.counter.DynamicRoundedDoubleCounter;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 public class GeneMutationPermutation {
 

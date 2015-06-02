@@ -8,10 +8,10 @@ import nutils.CompareUtils;
 import nutils.EnumSortedMapLong;
 import nutils.EnumSortedMapLongFast;
 import nutils.IOUtils;
-import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
 import nutils.BitUtils.Compactor.CompactorInf;
 import nutils.BitUtils.Compactor.CompactorIntoLong;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 /** This table will contain values of bias in an optimized fashion. */
 

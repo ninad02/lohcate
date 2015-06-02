@@ -18,8 +18,8 @@ import nutils.EnumMapSafe;
 import nutils.IOUtils;
 import nutils.NullaryClassFactory;
 import nutils.NumberUtils;
-import nutils.PrimitiveWrapper;
 import nutils.StringUtils;
+import nutils.primitives.wrapper.PrimitiveWrapper;
 
 public class SortMultiCenterMutationCalling {
 

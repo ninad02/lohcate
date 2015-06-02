@@ -2,7 +2,6 @@ package nutils;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.EnumMap;
 
 public class NullaryClassFactory<V> {
 	
@@ -24,21 +23,7 @@ public class NullaryClassFactory<V> {
 	// ========================================================================
 	/** The same as newInstanceRaw(), but the exceptions are caught internally. */
 	public V newInstance() {
-		V newObject = null;
-		
-		try {
-			newObject = newInstanceRaw();
-			
-		} catch (IllegalAccessException e) {			
-			e.printStackTrace();
-			System.exit(-1);
-			
-		} catch (InstantiationException e) {
-			e.printStackTrace();
-			System.exit(-1);		
-		}
-		
-		return newObject;
+		return NullaryClassFactory.getNewInstance(mClass);
 	}
 
 	// ========================================================================
@@ -75,6 +60,25 @@ public class NullaryClassFactory<V> {
 		return newList;
 	}
 
+	// ========================================================================
+	public static<V> V getNewInstance(Class<V> theClass) {
+		V newObject = null;
+		
+		try {
+			newObject = theClass.newInstance();
+			
+		} catch (IllegalAccessException e) {			
+			e.printStackTrace();
+			System.exit(-1);
+			
+		} catch (InstantiationException e) {
+			e.printStackTrace();
+			System.exit(-1);		
+		}
+		
+		return newObject;
+	}
+	
 	// ========================================================================
 	/**
 	 * @param args

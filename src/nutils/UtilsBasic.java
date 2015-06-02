@@ -24,6 +24,19 @@ public class UtilsBasic {
 		
 		return theEnum;
 	}
+
+	// ========================================================================
+	public static interface ProcedureToBeTimed {
+		public void takeAction();
+	}
+	
+	// ========================================================================
+	public static long getTimeTaken(ProcedureToBeTimed p) {
+		long timeStart = System.currentTimeMillis();
+		p.takeAction();
+		long timeEnd = System.currentTimeMillis();
+		return (timeEnd - timeStart);		
+	}
 	
 	// ========================================================================
 	@SuppressWarnings("unchecked")

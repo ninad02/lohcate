@@ -90,6 +90,22 @@ public class BitSetUtils {
 		return (i >= theArray.length ? -1 : i);
 	}
 	
+	// ===========================
+	public static interface BitSetPermutationTask {
+		public void takeAction(boolean[] bitArray, int permutationNumber);
+	}
+	
+	// ===========================
+	public static void performPermutation(int numSlots, int numSlotsDesiredTrue, int numIterations, BitSetPermutationTask permutationTask) {
+		boolean[] bitArray = new boolean[numSlots];
+		Arrays.fill(bitArray, false);
+		
+		for (int iter = 0; iter < numIterations; iter++) {
+			BitSetUtils.setBooleanArrayWithRandomValues(bitArray, numSlotsDesiredTrue);
+			permutationTask.takeAction(bitArray, iter);
+		}
+	}
+	
 	// ========================================================================
 	/** Given a BitSet and a string of bits, this populates the bitset.  Any non-zero characters
 	 *  are treated as 1.  If the BitSet passed in is null, it returns a new BitSet.

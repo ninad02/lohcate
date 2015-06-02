@@ -7,18 +7,22 @@ import java.io.PrintStream;
 import java.util.ListIterator;
 
 import lohcateEnums.EventType;
-import nutils.StringUtils.StringClone;
 
 // ========================================================================
 // INNER CLASS
 // ========================================================================
 /** Stores the regions for a given sample, split by chromosome.  
  *  Chromosomes are indexed starting at 1 */
-public class CopyNumberRegionsByChromosome extends RegionRangesOverGenome<CopyNumberRegionRangeLOHcate, StringClone> {
+public class CopyNumberRegionsByChromosome extends RegionRangesOverGenome<CopyNumberRegionRangeLOHcate, String> {
 	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 3554012850014065460L;
+
 	// ========================================================================
 	public CopyNumberRegionsByChromosome(String sampleName) {
-		super(new StringClone(sampleName));
+		super(sampleName);
 	}
 	
 	// ========================================================================
@@ -32,10 +36,10 @@ public class CopyNumberRegionsByChromosome extends RegionRangesOverGenome<CopyNu
 	}
 	
 	// ========================================================================
-	public String getSampleName() { return this.mMetaInfo.mStr; }
+	public String getSampleName() { return this.mMetaInfo; }
 
 	// ========================================================================
-	public void clearClusterCounts() {
+	public void clearEventCounts() {
 		for (Chrom chrom : Chrom.values()) {			
 			for (CopyNumberRegionRangeLOHcate oneRegionInChrom : getRegions(chrom)) {
 				oneRegionInChrom.mEventTypeCounts.clear();
