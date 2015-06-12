@@ -1,7 +1,5 @@
 package nutils.counter;
 
-import genomeUtils.ChromPosition;
-
 import java.util.HashMap;
 
 import nutils.ArrayUtils;

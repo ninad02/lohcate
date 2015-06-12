@@ -23,6 +23,8 @@ import nutils.primitives.wrapper.PrimitiveWrapper;
 
 public class SortMultiCenterMutationCalling {
 
+	private static final boolean PerformWeightedAnalysis = false;
+	
 	private static enum Center {
 		BC("bcgsc.ca"),
 		Broad("broad.mit.edu"),
@@ -202,7 +204,7 @@ public class SortMultiCenterMutationCalling {
 		
 		int maxCardinality = Center.values().length;		
 		int maxCardinalityToInclude = Math.min(5, maxCardinality);
-		boolean doScaling = true;
+		boolean doScaling = PerformWeightedAnalysis;
 
 		ArrayList<FloatArrayList> scoresSensOverall = new ArrayList<FloatArrayList>();
 		ArrayList<FloatArrayList> scoresPPVOverall = new ArrayList<FloatArrayList>();
